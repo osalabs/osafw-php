@@ -1,0 +1,12 @@
+RewriteEngine On
+RewriteBase /
+
+#RewriteRule ^css/site_\d+.css /css/site.css [L]
+#RewriteRule ^js/site_\d+.js /js/site.js [L]
+
+
+RewriteCond %{REQUEST_FILENAME} !-l
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule .* index.php [L,QSA]
+#RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
