@@ -1,0 +1,25 @@
+    <!-- Placed at the end of the document so the pages load faster -->
+<!--script src="<~ROOT_URL>/js/lng/<~GLOBAL[LANG]>.js"></script-->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<script src="<~ROOT_URL>/js/form.20150930.js"></script>
+<script src="<~ROOT_URL>/js/jgrowl.min.js"></script>
+<script src="<~ROOT_URL>/js/jquery.form.min.js"></script>
+
+<~load_script>
+
+<script>
+  <~head_script.js>
+
+  $(document).ready(function(){
+    setup_cancel_form_handlers();
+    <~body_onload.js>
+  });
+
+  <~./common.js>
+  <~./admin.js ifge="SESSION[access_level]" value="100">
+</script>
+
+<~footer_script>
+
+<~#/std/counters/ga>

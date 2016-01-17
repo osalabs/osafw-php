@@ -130,11 +130,4 @@ echo "</pre>";
 #exit;
 */
 
-#TODO - for svnup module
-$SVNUP=array( #for doing svn up
-  'user' => 'XXXX',
-  'pwd'  => 'YYYY',
-  'interface_pwd' => '321', #just to protect interface /php/sys.php?show_svnup=1
-);
-
 ?>
