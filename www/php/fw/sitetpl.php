@@ -44,6 +44,7 @@
  2013-10-23 - fixed: delim for radios now is a class for <label>
  2014-11-20 - fixed: tag_if better compares values
  2014-11-25 - changed to use $CONFIG global var instead site_root, site_templ...
+ 2014-11-28 - fixed: sec2date now detect '0000-00-00 00:00:00' and return empty string
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -531,10 +532,10 @@ function tag_replace_raw($page, $tag_full, $value, $is_inline){
     $restr='/'.preg_quote($PARSE_PAGE_OPEN_TAG.$tag_full.$PARSE_PAGE_CLOSE_TAG, '/').".*?".preg_quote($PARSE_PAGE_OPENEND_TAG.$tag.$PARSE_PAGE_CLOSE_TAG, '/').'/si';
 
     #quote special PHP $ and \\12345
-    $value=str_replace('$', '\$', $value);
     //$value=preg_replace('/\\\\(d+)/', '\\\\$1', $value);
-    $value=preg_replace('/\\\\/', '\\\\\\\\', $value);//better
-    
+    $value=preg_replace('/\\\\/', '\\\\\\\\', $value);  //better
+    $value=str_replace('$', '\$', $value);              //order is important
+
     return preg_replace($restr, $value ,$page);
 
  } else{
@@ -762,6 +763,9 @@ function sec2date($str, $attrs){
  $format='d M Y H:i';
  if ( $attrs['date'] ) $format=$attrs['date'];
  if ($str){
+    if ($str=='0000-00-00 00:00:00'){
+        return '';
+    }
     if ( !preg_match("/^\d+$/", $str) ){
        $str=strtotime($str);
     }
