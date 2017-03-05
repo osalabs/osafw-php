@@ -3,6 +3,7 @@
 
 -- CREATE DATABASE xxx;
 
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
 DROP TABLE IF EXISTS users;
 CREATE TABLE users (
     id                  int unsigned NOT NULL auto_increment,
@@ -190,6 +191,7 @@ INSERT INTO spages (parent_id, url, iname) VALUES
 ;
 update spages set is_home=1 where id=1;
 
+
 /*categories*/
 DROP TABLE IF EXISTS categories;
 CREATE TABLE categories (
@@ -245,7 +247,7 @@ INSERT INTO events (icode, iname) VALUES ('users_del',    'User deleted');
 DROP TABLE event_log;
 CREATE TABLE event_log (
     id                  bigint unsigned NOT NULL auto_increment,
-    events_id           int unsigned NOT NULL DEFAULT 0,           /* email type sent */
+    events_id           int unsigned NOT NULL DEFAULT 0,           /* event type */
 
     item_id             int NOT NULL DEFAULT 0,           /*related id*/
     item_id2            int NOT NULL DEFAULT 0,           /*related id (if another)*/
@@ -253,6 +255,8 @@ CREATE TABLE event_log (
     iname               varchar(255) NOT NULL DEFAULT '', /*short description of what's happened or additional data*/
 
     records_affected    int NOT NULL DEFAULT 0,
+
+    fields              text,       /*serialized json with related fields data (for history) in form {fieldname: data, fieldname: data}*/
 
     add_time            timestamp DEFAULT CURRENT_TIMESTAMP,                 /*date record added*/
     add_user_id         int unsigned default 0,            /*user added record*/
