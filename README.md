@@ -3,7 +3,7 @@ PHP web framework
 
 ## Features
 
-- simple and straight in develpment/maintenance
+- simple and straight in development and maintenance
 - **MVC-like** code, data, templates are split
   - code consists of: controllers, models, framework core and optional 3rd party libs
   - uses [ParsePage template engine](https://github.com/osalabs/parsepage)
