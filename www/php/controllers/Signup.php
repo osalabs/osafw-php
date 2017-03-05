@@ -8,7 +8,10 @@ class SignupController extends FwAdminController {
     public $model_name = 'Users';
 
     public function __construct() {
+        global $CONFIG;
         parent::__construct();
+
+        if (!$CONFIG['IS_SIGNUP']) throw new ApplicationException("Sign Up access denied by site config [IS_SIGNUP]");
     }
 
     public function IndexAction() {

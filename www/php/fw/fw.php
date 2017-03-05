@@ -73,8 +73,6 @@ class fw {
         session_start();  #start session on each request
 
         #initial fixes
-        date_default_timezone_set('UTC'); #required in PHP 5.3  #!!!TODO use timezone from user's browser (i.e. save in users table)
-
         if (get_magic_quotes_gpc()){
             $_POST = array_map(array('Utils','kill_magic_quotes'), $_POST);
             $_GET = array_map(array('Utils','kill_magic_quotes'), $_GET);
@@ -89,13 +87,6 @@ class fw {
            $CONFIG['LANG']=$CONFIG['LANG_DEF'];  #use default language
         }
 
-        #for debug
-        error_reporting(E_ALL ^ E_NOTICE);
-        if ($CONFIG['IS_DEBUG']){
-            #ini_set('display_errors',1);
-            #error_reporting(E_ALL);
-        }
-
         # and now run dispatcher
         $fw = fw::i();
 
@@ -103,7 +94,6 @@ class fw {
 
         //fw vairables
         $fw->page_layout = $CONFIG['PAGE_TPL'];
-        $fw->G = $CONFIG;
 
         #save flash to current var and update session
         if (isset($_SESSION['_flash'])){
@@ -140,6 +130,8 @@ class fw {
     }
 
     public function __construct() {
+        global $CONFIG;
+        $this->G = $CONFIG;
     }
 
     public function run_route(){
@@ -223,13 +215,16 @@ class fw {
             return 0;
         }
     }
-    public function get_response_expected_format(){
+    public function get_response_expected_format($route=NULL){
+        if (!is_array($route)) $route = $this->route;
         $result = '';
 
         if ($route['format']=='json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
             $result = 'json';
         }elseif ($route['format']=='pjax' || $_SERVER['HTTP_X_REQUESTED_WITH']>'' ) {
             $result = 'pjax';
+        }else{
+            $result = $route['format'];
         }
 
         return $result;
@@ -250,19 +245,19 @@ class fw {
     # OUT: return TRUE throw AuthException if not authorized to view the page
     private function auth($route) {
         global $CONFIG;
-        $ACCESS_LEVELS = $CONFIG['ACCESS_LEVELS'];
+        $ACCESS_LEVELS = array_change_key_case($CONFIG['ACCESS_LEVELS'], CASE_LOWER);
 
-        #XSS check
+        #XSS check for all requests that modify data
         if ( ($_REQUEST["XSS"] || $this->route['method'] == "POST" || $this->route['method'] == "PUT" || $this->route['method'] == "DELETE")
             && $_SESSION["XSS"] > "" && $_SESSION["XSS"] <> $_REQUEST["XSS"]
-            && $this->route['controller']<>'Login' //special case - no XSS check for Login controller!
+            && !in_array($this->route['controller'], $CONFIG['NO_XSS']) //no XSS check for selected controllers
         ) {
            throw new AuthException("XSS Error");
         }
 
         #access level check
-        $path = '/'.$this->route['controller'].'/'.$this->route['action'];
-        $path2 = '/'.$this->route['controller'];
+        $path = strtolower('/'.$this->route['controller'].'/'.$this->route['action']);
+        $path2 = strtolower('/'.$this->route['controller']);
 
         $current_level = -1;
         if (isset($_SESSION['access_level'])) $current_level=$_SESSION['access_level'];
@@ -328,7 +323,6 @@ class fw {
             $this->parser('/error', $ps);
         }
 
-
     }
 
     # RETURN output to browser according to expected format: full html, pjax, json
@@ -339,6 +333,14 @@ class fw {
     # parser('/controller/action', $layout, $ps)   - show page from template  /controller/action = parser('/controller/action/', $layout, $ps)
     # full params:
     # $basedir, $layout, $ps, $out_filename=''|'v'|'filename'
+    #
+    # output format based on requested format: json, pjax or (default) full page html
+    # JSON: for automatic json response support - set ps("_json_enabled") = true - TODO make it better?
+    # to return only specific content for json - set it to ps("_json_data")
+    # to override page template - set ps("_page_tpl")="another_page_layout.html"
+    #
+    # TODO: (not for json) to perform route_redirect - set ps("_route_redirect"), ps("_route_redirect_controller"), ps("_route_redirect_args")
+    # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
     public function parser() {
         global $CONFIG;
 
@@ -373,21 +375,37 @@ class fw {
 
         $out_format = $this->get_response_expected_format();
         if ($out_format == 'json'){
-            //TODO!!! - output MUST be filtered out (per controller or per method? or just enable/disable json per controller/action and filter in action?)
-            //because hf may contain full data read from db like plain passwords, etc...
-            parse_json($ps, '');
+            if ($ps['_json_enabled']){
+                # if _json_data exists - return only this element
+                if (array_key_exists('_json_data', $ps)){
+                    parse_json($ps['_json_data']);
+                }else{
+                    parse_json($ps);
+                }
+            }else{
+                parse_json(array(
+                    'success'   => false,
+                    'message'   => 'JSON response is not enabled for the Controller.Action (set ps[\"_json_enabled\"]=true to enable).',
+                ));
+            }
 
-        }else{
+        }elseif ($out_format == 'html' || $out_format == 'pjax' || !$out_format){
+            #html output based on ParsePage templates
             if ($out_format == 'pjax') {
                 $layout = $CONFIG['PAGE_TPL_PJAX'];
             }
 
-        if ( !array_key_exists('ERR', $ps) ) {
-            $ps["ERR"] = $this->G['ERR']; #add errors if any
-        }
+            if ( !array_key_exists('ERR', $ps) ) {
+                $ps["ERR"] = $this->G['ERR']; #add errors if any
+            }
 
-        logger("basedir=[$basedir], layout=[$layout] to [$out_filename]");
-        return parse_page($basedir, $layout, $ps, $out_filename);
+            logger("basedir=[$basedir], layout=[$layout] to [$out_filename]");
+            return parse_page($basedir, $layout, $ps, $out_filename);
+
+        }else{
+            #any other formats - call controller's Export($out_format)
+            logger("export $out_format using ".$this->route['controller']."Controller.Export()");
+            $this->dispatcher->call_class_method($this->route['controller'].'Controller','Export', array($ps, $out_format));
         }
     }
 
@@ -486,6 +504,7 @@ class fw {
     // Administrator message alerter
     public function send_email_admin($msg_body){
         global $CONFIG;
+        logger("ADMIN ALERT:", $msg_body);
         $this->send_email($CONFIG['ADMIN_EMAIL'],'SITE SYSTEM ALERT!', $msg_body);
     }
 
@@ -574,6 +593,12 @@ function reqs($name){
 function req($name){
     return $_REQUEST[$name];
 }
+//return hash/array from request (if no such param or not array - returns empty array)
+function reqh($name){
+    $h=$_REQUEST[$name];
+    if (!is_array($h)) $h=array();
+    return $h;
+}
 
 
 ########################## for debug
@@ -630,6 +655,7 @@ function rw($var){
     if ($is_html) $var=preg_replace("/\n/", "<br>\n",$var);
  }
  echo $var.(($is_html)?"<br>":"")."\n";
+ flush();
 }
 ########################### same
 function rwe($var){

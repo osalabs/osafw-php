@@ -38,6 +38,16 @@ class Att extends FwModel {
         return db_array($this->table_name, $where, 'add_time desc');
     }
 
+    public function ilist_by_one_tn($rel_table_name, $rel_item_id) {
+        $where = array(
+            'status'        => 0,
+            'table_name'    => $rel_table_name,
+            'item_id'       => $rel_item_id,
+        );
+
+        return db_array($this->table_name, $where, 'add_time desc');
+    }
+
     /**
      * upload one posted file in $field_name field to item $id
      * @param  int      $id         item id
@@ -56,9 +66,35 @@ class Att extends FwModel {
             'fname'     => $file['name'],
             'fsize'     => filesize($filepath),
             'ext'       => $ext,
+            'status'    => 0, //switch from uploading status(1) to uploaded(0)
         );
         if ($is_add) $item['iname']=$file['name']; //if adding new image set user name to same as file
         $this->update($id, $item);
+    }
+
+    /**
+     * upload multiple files, add att records and link with ONE table/item_id
+     * @param array $files              UploadUtils::get_posted_files('file1')
+     * @param string $rel_table_name    related table
+     * @param string $rel_item_id       related itemid
+     * @return array of inserted ids
+     */
+    public function add_and_upload_one_tn($files, $rel_table_name, $rel_item_id){
+        $result=array();
+        foreach ($files as $key => $file) {
+            $fields=array(
+                'iname' => 'new file upload',
+                'status' => 1, //under upload
+                'table_name' => $rel_table_name,
+                'item_id'   => $rel_item_id,
+            );
+            $id=$this->add($fields);
+
+            $this->upload($id, $file, true);
+
+            $result[]=$id;
+        }
+        return $result;
     }
 
     //add/update att_table_links
@@ -84,15 +120,15 @@ class Att extends FwModel {
             $where['table_name'] = $table_name;
             $where['item_id'] = $id;
             $where['att_id'] = $att_id;
-            $row = db_row($att_table_link, $where);
+            $row = db_row($this->att_table_link, $where);
 
-            if (count($row)){
+            if ($row){
                 #existing link
                 $fields = array();
                 $fields['status'] = 0;
                 $where = array();
                 $where['id'] = $row['id'];
-                db_update($att_table_link, $fields, $where);
+                db_update($this->att_table_link, $fields, $where);
             }else{
                 #new link
                 $fields = array();
@@ -100,16 +136,12 @@ class Att extends FwModel {
                 $fields['table_name'] = $table_name;
                 $fields['item_id'] = $id;
                 $fields['add_user_id'] = $me_id;
-                db_insert($att_table_link, $fields);
+                db_insert($this->att_table_link, $fields);
             }
         }
 
         #3. remove not updated atts (i.e. user removed them)
-        $where = array();
-        $where['table_name'] = $table_name;
-        $where['item_id'] = $id;
-        $where['status'] = 1;
-        db_del($att_table_link, $where);
+        db_delete($this->att_table_link, 1, 'status', " and item_id=".dbqi($id)." and table_name=".dbq($table_name));
     }
 
     //return correct url

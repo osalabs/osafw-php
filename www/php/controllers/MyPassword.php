@@ -43,6 +43,7 @@ class MyPasswordController extends FwController {
             $vars = FormUtils::form2dbhash($item, 'email pwd');
             $this->model->update($id, $vars);
 
+            $this->fw->model('Events')->log_event('chpwd', $id);
             $this->fw->flash("record_updated", true);
             fw::redirect($this->base_url);
 

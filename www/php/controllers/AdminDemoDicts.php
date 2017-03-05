@@ -5,6 +5,7 @@ class AdminDemoDictsController extends FwAdminController {
     public $base_url = '/Admin/DemoDicts';
     public $required_fields = 'iname';
     public $save_fields = 'iname idesc status';
+    public $save_fields_checkboxes = '';
     public $model_name = 'DemoDicts';
     /*REMOVE OR OVERRIDE*/
     public $search_fields = 'iname idesc';
@@ -13,6 +14,7 @@ class AdminDemoDictsController extends FwAdminController {
                         'id'            => 'id',
                         'iname'         => 'iname',
                         'add_time'      => 'add_time',
+                        'status'        => 'status',
                         );
 
     public function __construct() {
@@ -21,6 +23,17 @@ class AdminDemoDictsController extends FwAdminController {
         //optionally init controller
     }
 
+    //override due to custom search filter on status
+    public function set_list_search() {
+        parent::set_list_search();
+
+        if ($this->list_filter['status']>''){
+            $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
+        }
+    }
+
+    //override if necessary: IndexAction, ShowAction, ShowFormAction, Validate, DeleteAction, Export, SaveMultiAction
+    //or override just: set_list_search, set_list_rows, set_save_itemdb
 
 }//end of class
 

@@ -16,6 +16,10 @@ class DateUtils {
         list ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime($unixtime);
         $year+=1900;
         $mon+=1;
+
+        if (strlen($mday)<2) $mday="0".$mday;
+        if (strlen($mon)<2) $mon="0".$mon;
+
         if ($is_date_only){
             return "$year-$mon-$mday";
         }else{
@@ -99,22 +103,27 @@ class DateUtils {
     }
 
     #input: 0-86400 (daily time in seconds)
-    #output: HH:MM
+    #output: HH:MM or empty string if 0
     public static function int2timestr($i) {
+        if (!$i) return '';
+
         $h = floor($i / 3600);
         $m = floor(($i - $h * 3600) / 60);
+        if ($m<10) $m='0'.$m;
         return $h.':'.$m;
     }
 
-    #input: HH:MM
+    #input: HH:MM or HH
     #output: 0-86400 (daily time in seconds)
     public static function timestr2int($hhmm) {
         $result = 0;
         $ahhmm = explode(':', $hhmm);
         if (count($ahhmm)==2) {
             $result = (int)($ahhmm[0]) * 3600 + (int)($ahhmm[1]) * 60;
+        }elseif (count($ahhmm)==1){
+            $result = (int)($ahhmm[0]) * 3600;
         }
-        
+
         return $result;
     }
 

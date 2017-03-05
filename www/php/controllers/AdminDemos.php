@@ -4,11 +4,13 @@ class AdminDemosController extends FwAdminController {
     const route_default_action = '';
     public $base_url='/Admin/Demos';
     public $required_fields = 'iname email';
-    public $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi is_checkbox att_id status';
+    public $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
+    public $save_fields_checkboxes = 'is_checkbox';
     public $model_name = 'Demos';
     public $model_related;
 
     /*REMOVE OR OVERRIDE*/
+    public $related_field_name = 'demo_dicts_id';
     public $search_fields = 'iname idesc';
     public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
     public $list_sortmap = array(                   //sorting map: req param name => sql field name(s) asc|desc direction
@@ -17,6 +19,11 @@ class AdminDemosController extends FwAdminController {
                         'add_time'      => 'add_time',
                         'demo_dicts_id' => 'demo_dicts_id',
                         'email'         => 'email',
+                        'status'        => 'status',
+                        );
+    public $form_new_defaults=array(
+                        'fint'=>0,
+                        'ffloat'=>0,
                         );
 
     public function __construct() {
@@ -25,15 +32,23 @@ class AdminDemosController extends FwAdminController {
         $this->model_related = fw::model('DemoDicts');
     }
 
-    public function IndexAction() {
-        $ps = parent::IndexAction();
+    //override due to custom search filter on status
+    public function set_list_search() {
+        parent::set_list_search();
+
+        if ($this->list_filter['status']>''){
+            $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
+        }
+    }
+
+    // override get list rows as list need to be modified
+    public function get_list_rows() {
+        parent::get_list_rows();
 
         #add/modify rows from db
-        foreach ($ps['list_rows'] as $k => $row) {
-            $ps['list_rows'][$k]['demo_dicts'] = $this->model_related->one( $row['demo_dicts_id'] );
+        foreach ($this->list_rows as $k => $row) {
+            $this->list_rows[$k]['demo_dicts'] = $this->model_related->one( $row['demo_dicts_id'] );
         }
-
-        return $ps;
     }
 
     public function ShowFormAction($form_id) {
@@ -47,14 +62,12 @@ class AdminDemosController extends FwAdminController {
                 $dict_link_multi = FormUtils::ids2multi($item['dict_link_multi']);
             }else{
                 #defaults
-                $item=array(
-                    'fint'=>0,
-                    'ffloat'=>0,
-                );
+                $item=$this->form_new_defaults;
+                if ($this->related_id) $item['demo_dicts_id']=$this->related_id;
             }
         }else{
             $itemdb = $id ? $this->model->one($id) : array();
-            $item = array_merge($itemdb, req('item'));
+            $item = array_merge($itemdb, reqh('item'));
             $dict_link_multi = req('dict_link_multi');
         }
 
@@ -63,9 +76,11 @@ class AdminDemosController extends FwAdminController {
             'i'     => $item,
             'add_user_id_name'  => fw::model('Users')->full_name($item['add_user_id']),
             'upd_user_id_name'  => fw::model('Users')->full_name($item['upd_user_id']),
+            'return_url'        => $this->return_url,
+            'related_id'        => $this->related_id,
 
             #read dropdowns lists from db
-            'select_options_parent_id'      => FormUtils::select_options_db( db_array("select id, iname from $this->table_name where parent_id=0 and status=0 order by iname"), $item['parent_id'] ),
+            'select_options_parent_id'      => $this->model->get_select_options_parent( $item['parent_id'] ),
             'select_options_demo_dicts_id'  => $this->model_related->get_select_options( $item['demo_dicts_id'] ),
             'dict_link_auto_id_iname'       => $item['dict_link_auto_id'] ? $this->model_related->iname( $item['dict_link_auto_id'] ) : $item['dict_link_auto_id_iname'],
             'multi_datarow'                 => $this->model_related->get_multi_list( $dict_link_multi ),
@@ -77,37 +92,25 @@ class AdminDemosController extends FwAdminController {
         return $ps;
     }
 
-    public function SaveAction($form_id) {
-        $id = $form_id+0;
-        $item = req('item');
+    // override to modify some fields before save
+    public function set_save_itemdb($id, $item){
+        $itemdb=parent::set_save_itemdb($id, $item);
 
-        try{
-            $this->Validate($id, $item);
-            #load old record if necessary
-            #$item_old = $this->model->one($id);
+        #load old record if necessary
+        #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
-            FormUtils::form2dbhash_checkboxes($itemdb, $item, 'is_checkbox');
+        $itemdb['dict_link_auto_id'] = $this->model_related->add_or_update_quick( $item['dict_link_auto_id_iname'] );
+        $itemdb['dict_link_multi'] = FormUtils::multi2ids( req('dict_link_multi') );
+        #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');
+        $itemdb['ftime'] = DateUtils::timestr2int( $item['ftime_str'] ); #ftime - convert from HH:MM to int (0-24h in seconds)
 
-            $itemdb['dict_link_auto_id'] = $this->model_related->add_or_update_quick( $item['dict_link_auto_id_iname'] );
-            $itemdb['dict_link_multi'] = FormUtils::multi2ids( req('dict_link_multi') );
-            #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');
-            $itemdb['ftime'] = DateUtils::timestr2int( $item['ftime_str'] ); #ftime - convert from HH:MM to int (0-24h in seconds)
-
-            $id = $this->model_add_or_update($id, $itemdb);
-
-            fw::redirect($this->base_url.'/'.$id.'/edit');
-
-        }catch( ApplicationException $ex ){
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("ShowForm");
-        }
+        return $itemdb;
     }
 
     public function Validate($id, $item) {
         $result= $this->validate_required($item, $this->required_fields);
 
-        //result here used only to disable further validation if required fields validation failed
+        //check $result here used only to disable further validation if required fields validation failed
         if ($result){
             if ($this->model->is_exists( $item['email'], $id ) ){
                 $this->ferr('email', 'EXISTS');

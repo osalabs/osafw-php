@@ -14,16 +14,16 @@ class Settings extends FwModel {
     */
 
     public static function read($icode){
-        return fw::i()->get_value($icode);
+        return fw::model('Settings')->get_value($icode);
     }
     public static function readi($icode){
-        return Utils::f2int(fw::i()->get_value($icode));
+        return (fw::model('Settings')->get_value($icode))+0;
     }
     public static function readd($icode){
-        return Utils::f2date(fw::i()->get_value($icode));
+        return Utils::f2date(fw::model('Settings')->get_value($icode));
     }
     public static function write($icode, $value){
-        return Utils::f2date(fw::i()->set_value($icode, $value));
+        return fw::model('Settings')->set_value($icode, $value);
     }
 
     public function __construct() {
@@ -45,14 +45,14 @@ class Settings extends FwModel {
     }
 
     public function get_value($icode){
-        return one_by_icode($icode)['ivalue'];
+        return $this->one_by_icode($icode)['ivalue'];
     }
     public function set_value($icode, $ivalue){
-        $item = one_by_icode($icode);
+        $item = $this->one_by_icode($icode);
         $fields=array(
             'ivalue'    => $ivalue
         );
-        if (count($item)){
+        if ($item){
             #exists - update
             $this->update($item['id'], $fields);
 

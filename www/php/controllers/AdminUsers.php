@@ -59,8 +59,8 @@ class AdminUsersController extends FwAdminController {
         $this->validate_check_result();
     }
 
-    public function ExportAction() {
-        $ps = $this->IndexAction();
+    public function Export($ps, $format) {
+        if ($format!='csv') throw new ApplicationException("Unsupported format");
 
         $fields = array(
             'fname'   => 'First Name',

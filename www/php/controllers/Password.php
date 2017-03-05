@@ -15,6 +15,7 @@ class PasswordController extends FwController {
 
         $ps = array(
             'i'     => $item,
+            'hide_sidebar'  => true,
         );
 
         return $ps;

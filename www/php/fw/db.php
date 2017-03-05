@@ -167,6 +167,10 @@ function dbq($value, $field_type=null){
  return DB::i()->quote($value, $field_type);
 }
 
+function dbq_ident($value){
+ return DB::i()->quote_ident($value);
+}
+
 /**
  * return one value (0 column or named column) from $sql or table/where/orderby
  * syntax 1: (raw sql)
@@ -519,6 +523,11 @@ class DB {
             //syntax 1
             $res = $this->query($sql_or_table);
         }
+        /* workaround if fetch_all not available
+         while ($row = $res->fetch_assoc()) {
+          $result[] = $row;
+        }
+        */
         $result = $res->fetch_all(MYSQLI_ASSOC);
         if (!is_array($result)) $result = array();
         $res->free();

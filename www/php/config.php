@@ -73,13 +73,13 @@ $FW_CONFIG = array(
     'LOGGER_MESSAGE_TYPE'   => 3, #3 - default to $site_error_log
     'IS_DEBUG'              => false,
 
+    'IS_SIGNUP'             => true,  #set to false to disable Sign Up module
     'LOGGED_DEFAULT_URL'    => '/Main',
     'UNLOGGED_DEFAULT_URL'  => '/',
 
     'SITE_TEMPLATES'        => $site_root.'/template',
     'PUBLIC_UPLOAD_DIR'     => $site_root.'/upload',
     'PUBLIC_UPLOAD_URL'     => $root_url.'/upload',
-
 
     #page layout templates - relative to SITE_TEMPLATES dir
     'PAGE_TPL'              => '/page_tpl.html',
@@ -92,6 +92,10 @@ $FW_CONFIG = array(
     'ROUTE_PREFIXES'        => array(
                                 '/Admin',
                                 '/My',
+                                ),
+    #Controllers without need for XSS check
+    'NO_XSS'                => array(
+                                'Login',
                                 ),
     #Allowed Access levels for Controllers
     #0 - user must be logged in
@@ -111,7 +115,7 @@ $FW_CONFIG = array(
     'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
     'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
 
-    'SITE_VERSION'          => '0.14.1125',
+    'SITE_VERSION'          => '0.16.1226',
 
     ########### place site specific configuration variables here:
     'SITE_VAR'              => false,
@@ -129,5 +133,6 @@ echo print_r($CONFIG, true)."<br>\n";
 echo "</pre>";
 #exit;
 */
+
 
 ?>

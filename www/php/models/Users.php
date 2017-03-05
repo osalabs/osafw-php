@@ -8,7 +8,7 @@ class Users extends FwModel {
                     );
     public static $PERM_COOKIE_NAME='perm';
     public static $PERM_COOKIE_DAYS=356;
-
+    public static $order_by = 'fname, lname';
     public function __construct() {
         parent::__construct();
 
@@ -24,6 +24,19 @@ class Users extends FwModel {
         $item = $this->one($id);
         if ($item['id']){
             $result=$item['fname'].' '.$item['lname'];
+        }
+        return $result;
+    }
+
+    public function add_or_update($login, $pwd, $item){
+        $result=0;
+        $itemold=$this->one_by_email($login);
+        $item['pwd']=$pwd;
+        if ($itemold){
+            $this->update($itemold['id'], $item);
+            $result=$itemold['id'];
+        }else{
+            $result=parent::add($item);
         }
         return $result;
     }
@@ -63,6 +76,8 @@ class Users extends FwModel {
         $_SESSION['is_just_registered']=$is_just_registered;
         session_write_close();
 
+        $this->fw->model('Events')->log_event('login', $id);
+
         //set permanent login if requested
         //if ($_REQUEST['is_remember']) create_perm_cookie($id);
         $this->create_perm_cookie($id);  #in this project no need is_remember
@@ -77,10 +92,18 @@ class Users extends FwModel {
         }
 
         $_SESSION['login']=$_SESSION['user']['email'];
+        $fname = trim($_SESSION['user']['fname']);
+        $lname = trim($_SESSION['user']['lname']);
+        $_SESSION['user_name']=$fname.($fname?' ':'').$lname; #will be empty if no user name set
         $_SESSION['access_level']=$_SESSION['user']['access_level'];
         $_SESSION['is_logged']=1;
         $_SESSION['XSS']=Utils::get_rand_str(16);  #setup XSS code
     }
+
+    public function session_reload(){
+        $this->set_def_session($_SESSION['user']['id']+0);
+    }
+
     private function update_after_login($id) {
         $hU=$this->one($id);
         #TODO add_notify_log($GLOBAL['NOTIFY_LOG_LOGIN'], $id, 0, $hU);
@@ -173,6 +196,25 @@ class Users extends FwModel {
         $req_level=self::$ACL[$access_str]+0;
 
         return $_SESSION['user']['access_level']>=$req_level ? true : false;
+    }
+
+    /**
+     * return sql for limiting access according to current user ACL
+     * @param  string $alias optional, add_user_id field alias with dot. Example: 'c.'. If not provided - no alias used
+     * @param  string $field optional, add_user_id field name
+     * @return string        sql query string like " and add_user_id=".Utils::me()
+     */
+    public function sql_acl($alias='', $field=''){
+        $result='';
+        if (self::is_access('MODER')){
+            //if we are admin user - allow access to all records
+        }else{
+            //if we are normal user - allows access only records we created
+            if (!$field) $field = 'add_user_id';
+
+            $result=' and '.$alias.$field.'='.dbqi(Utils::me()).' ';
+        }
+        return $result;
     }
 
 }

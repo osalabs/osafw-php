@@ -9,6 +9,8 @@ class HomeController extends FwController {
 
     #CACHED as home_page
     public function IndexAction() {
+        #fw::redirect('/Login'); #uncomment to always show login instead of Home
+
         /*cached version
         $ps = FwCache::get_value('home_page');
 
@@ -21,17 +23,19 @@ class HomeController extends FwController {
         }
         */
 
-        $ps = array();
+        $ps = array(
+            'hide_sidebar'  => true,
+        );
         return $ps;
     }
 
     public function ShowAction($id='') {
-        $ps = array();
+        $ps = array(
+            'hide_sidebar'  => true,
+        );
 
         $this->fw->parser('/home/'.Dispatcher::_route_fix_chars(strtolower($id)), $ps);
         return false;
     }
-
 }
-
 ?>

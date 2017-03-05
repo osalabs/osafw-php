@@ -4,7 +4,7 @@ $modal.off('click', '.thumbs a').on('click', '.thumbs a', function (e) {
     e.preventDefault();
 
     var $img = $(this).find('img');
-    $modal.trigger('select.modal-att', [$(this).data('id'), $img.prop('alt'), $img.data('url') ] );
+    $modal.trigger('select.modal-att', [$(this).data('id'), $img.prop('alt'), $img.data('url'), $img.data('is_image') ] );
 
     $modal.modal('hide');
     return false;
@@ -39,7 +39,7 @@ $modal.find('form').ajaxForm({
     },
     success  : function (data) {
         if (data.success){
-            $modal.trigger('select.modal-att', [data.id, data.iname, data.url ] );
+            $modal.trigger('select.modal-att', [data.id, data.iname, data.url, data.is_image ] );
             $modal.modal('hide');
         }else{
             hint_error(data.err_msg);

@@ -94,6 +94,20 @@ class Utils {
         return '"'.$str.'"';
     }
 
+    /**
+     * for each row in $rows add array keys/values to this row
+     * @param  dbarray $rows  array of hashes
+     * @param  array $toadd keys/values to add
+     * @return none $rows changed by ref
+     */
+    public static function dbarray_inject(&$rows, $toadd){
+        foreach ($rows as $k => $row) {
+            #array merge
+            foreach ($toadd as $key => $value) {
+                $rows[$k][$key] = $value;
+            }
+        }
+    }
 
     /**
      * array of values to csv-formatted string for one line, order defiled by $fields
@@ -182,6 +196,188 @@ class Utils {
 
         return $result;
     }
+
+    //return UUID v4, ex: 67700f72-57a4-4bc6-9c69-836e980390ce
+    //WARNING: tries to use random_bytes or openssl_random_pseudo_bytes. If not present - pseudo-random data used
+    public static function uuid(){
+        if (function_exists('random_bytes')){ //PHP 7 only
+            $data=random_bytes(16);
+        }elseif (function_exists('openssl_random_pseudo_bytes')){
+            $data=openssl_random_pseudo_bytes(16);
+        }else{
+            $data='';
+            for($i=0;$i<16;$i++){
+               $data.=chr(mt_rand(0,255));
+            }
+        }
+
+        $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
+        $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+
+    /**
+     * load content from url
+     * @param string $url url to get info from
+     * @param array $params optional, if set - post will be used, instead of get. Can be string or array
+     * @param array $headers optional, add headers
+     * @param array $to_file optional, save response to file (for file downloads)
+     * @return string content received. FALSE if error
+     */
+    public static function load_url($url, $params=null, $headers=null, $to_file=''){
+        #logger("CURL TO: [$url]", $params);
+        $cu = curl_init();
+
+        curl_setopt($cu, CURLOPT_URL,$url);
+        curl_setopt($cu, CURLOPT_TIMEOUT, 60);
+        curl_setopt($cu, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($cu, CURLOPT_FAILONERROR, true); #cause fail on >=400 errors
+        if (is_array($headers)) curl_setopt($cu, CURLOPT_HTTPHEADER, $headers);
+
+        if (!is_null($params)){
+            curl_setopt($cu, CURLOPT_POST, 1);
+            curl_setopt($cu, CURLOPT_POSTFIELDS, $params);
+        }
+        if ($to_file>''){
+            #downloading to tmp file first
+            $tmp_file = $to_file.'.download';
+            $fh_to_file=fopen($tmp_file, 'wb');
+            curl_setopt($cu, CURLOPT_FILE, $fh_to_file);
+            curl_setopt($cu, CURLOPT_TIMEOUT, 3600); #1h timeout
+        }
+        #curl_setopt($cu, CURLOPT_VERBOSE,true);
+        ##curl_setopt($cu, CURLINFO_HEADER_OUT, 1);
+
+        $result = curl_exec($cu);
+        #logger(curl_getinfo($cu));
+        if(curl_error($cu)){
+            logger('CURL ERROR: '.curl_error($cu));
+            $result=FALSE;
+        }
+        curl_close($cu);
+        #logger("CURL RESULT:", $result);
+
+        if ($to_file>''){
+            fclose($fh_to_file);
+            #if file download successfull - rename to destination
+            #if failed - just remove tmp file
+            if ($result!==FALSE){
+                rename($tmp_file, $to_file);
+            }else{
+                unlink($tmp_file);
+            }
+        }
+
+        return $result;
+    }
+
+    #send file to URL with optional params using curl
+    public static function send_file_to_url($url, $from_file, $params=null, $headers=null){
+        #logger("CURL FILE [$from_file] TO: [$url]", $params);
+        $cu = curl_init();
+
+        curl_setopt($cu, CURLOPT_URL,$url);
+        curl_setopt($cu, CURLOPT_POST, 1);
+        curl_setopt($cu, CURLOPT_TIMEOUT, 3600); #1h timeout
+        curl_setopt($cu, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($cu, CURLOPT_FAILONERROR, true); #cause fail on >=400 errors
+
+        $headers1=array(
+            'Content-Type: multipart/form-data'
+        );
+        if (is_array($headers)) $headers1 += $headers;
+        curl_setopt($cu, CURLOPT_HTTPHEADER, $headers1);
+
+        $params1=array(
+            'file'  => new CURLFile($from_file)
+        );
+        if (is_array($params)) $params1 += $params;
+        curl_setopt($cu, CURLOPT_POSTFIELDS, $params1);
+
+        #curl_setopt($cu, CURLOPT_VERBOSE,true);
+        ##curl_setopt($cu, CURLINFO_HEADER_OUT, 1);
+
+        $result = curl_exec($cu);
+        #logger(curl_getinfo($cu));
+        if(curl_error($cu)){
+            logger('CURL ERROR: '.curl_error($cu));
+            $result=FALSE;
+        }
+        curl_close($cu);
+        #logger("CURL RESULT:", $result);
+
+        return $result;
+    }
+
+    /**
+     * post json to the url
+     * @param string $url url to get info from
+     * @param array $json
+     * @param array $to_file optional, save response to file (for file downloads)
+     * @return array json data received. FALSE if error
+     */
+    public static function post_json($url, $json, $to_file=''){
+        $jsonstr = json_encode($json);
+
+        $headers=array(
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($jsonstr),
+        );
+        $result=static::load_url($url, $jsonstr, $headers, $to_file);
+        if ($result!==FALSE) {
+            if ($to_file>''){
+                #if it was file transfer, just construct successful response
+                $result = array(
+                    'success'   => true,
+                    'fsize'     => filesize($to_file)
+                );
+            }else{
+                $result = json_decode($result, true);
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * GET json from the url
+     * @param string $url url to get info from
+     * @param string $to_file optional, save response to file (for file downloads)
+     * @param array $headers optional, additional headers
+     * @return array json data received. FALSE if error
+     */
+    public static function get_json($url, $to_file='',$headers=null){
+
+        $headers2=array(
+            'Accept: application/json'
+        );
+        if (is_array($headers)) $headers2 = array_merge($headers2, $headers);
+
+        $result=static::load_url($url, null, $headers2, $to_file);
+        if ($result!==FALSE) {
+            if ($to_file>''){
+                #if it was file transfer, just construct successful response
+                $result = array(
+                    'success'   => true,
+                    'fsize'     => filesize($to_file)
+                );
+            }else{
+                $result = json_decode($result, true);
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * return parsed json from the POST request
+     * @return array json or FALSE
+     */
+    public static function get_posted_json(){
+        $raw = file_get_contents("php://input");
+        return json_decode($raw, true);
+    }
+
 }
 
 ?>

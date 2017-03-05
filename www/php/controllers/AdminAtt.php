@@ -83,7 +83,7 @@ class AdminAttController extends FwAdminController {
             'add_user_id_name'  => fw::model('Users')->full_name($item['add_user_id']),
             'upd_user_id_name'  => fw::model('Users')->full_name($item['upd_user_id']),
 
-            'att_categories_id' => Utils::bytes2str($item['fsize']),
+            'fsize_human'       => Utils::bytes2str($item['fsize']),
             'url'               => $this->model->get_url($id),
             'url_m'             => ($item['is_image'] ? $this->model->get_url($id, 'm') : ''),
 
@@ -106,6 +106,9 @@ class AdminAttController extends FwAdminController {
 
             $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
             if (!strlen($itemdb["iname"])) $itemdb["iname"] = 'new file upload';
+            if (!$id) $itemdb['status']=1; #under upload
+            if (!$itemdb['att_categories_id']) $itemdb['att_categories_id']=1; #default cat - general
+
 
             $is_add = ($id==0);
             $id = $this->model_add_or_update($id, $itemdb);
@@ -113,10 +116,11 @@ class AdminAttController extends FwAdminController {
             #Proceed upload
             if (count($files)) $this->model->upload($id, $files[0], $is_add);
 
-            logger($this->fw->get_response_expected_format());
+            #logger($this->fw->get_response_expected_format());
             if ($this->fw->get_response_expected_format()=='json'){
                 $item = $this->model->one($id);
                 return array(
+                    '_json_enabled' => true,
                     'success'   => true,
                     'id'        => $id,
                     'item'      => $item,
@@ -127,10 +131,11 @@ class AdminAttController extends FwAdminController {
             }
 
         }catch( ApplicationException $ex ){
-            logger($this->fw->get_response_expected_format());
-            logger($ex->getMessage());
+            #logger($this->fw->get_response_expected_format());
+            #logger($ex->getMessage());
             if ($this->fw->get_response_expected_format()=='json'){
                 return array(
+                    '_json_enabled' => true,
                     'success'   => false,
                     'err_msg'   => $ex->getMessage(),
                     'id'        => $id,

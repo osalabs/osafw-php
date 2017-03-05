@@ -153,6 +153,13 @@ class FormUtils {
     return implode( ',', array_keys($hitems) );
   }
 
+  #similar to multi2ids, but uses array_values instead array_keys
+  public static function multiv2ids($hitems) {
+    if (!is_array($hitems) || !count($hitems)) return '';
+
+    return implode( ',', array_values($hitems) );
+  }
+
   # from string of ids: "1,2,3,4" to hash (id => 1)
   public static function ids2multi($str){
     $result=array();

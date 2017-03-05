@@ -17,6 +17,7 @@ class LoginController extends FwController {
         }
         $ps = array(
             'i'  => $item,
+            'hide_sidebar'  => true,
         );
 
         return $ps;
@@ -36,6 +37,7 @@ class LoginController extends FwController {
             $pwd    = $_REQUEST['item']['pwdh'];
             if ($_REQUEST["item"]["chpwd"] == "1") $pwd = $_REQUEST['item']['pwd'];
             $pwd = substr(trim($pwd), 0, 32);
+            $gourl = reqs('gourl');
 
             if (!strlen($login) || !strlen($pwd) ) {
                 $this->ferr("REGISTER", True);
@@ -47,7 +49,6 @@ class LoginController extends FwController {
 
             $this->model->do_login( $hU['id'] );
 
-            $gourl = reqs('gourl');
             if ($gourl && !preg_match("/^http/i", $gourl)){ #if url set and not external url (hack!) given
                 fw::redirect($gourl);
             }else{
@@ -154,6 +155,8 @@ class LoginController extends FwController {
 
     public function LogoffAction() {
         global $CONFIG;
+
+        $this->fw->model('Events')->log_event('logoff', Utils::me());
 
         //delete session
         $_SESSION = array();

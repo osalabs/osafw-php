@@ -63,6 +63,7 @@ abstract class FwModel {
 
         $this->cache_remove($id);
 
+        $this->fw->model('Events')->log_fields($this->table_name.'_add', $id, $item);
         return $id;
     }
 
@@ -70,10 +71,11 @@ abstract class FwModel {
     public function update($id, $item) {
         if (!isset($item['upd_user_id'])) $item['upd_user_id']=Utils::me();
         $item['upd_time']='~!now()';
-        $id=db_update($this->table_name, $item, $id);
+        db_update($this->table_name, $item, $id);
 
         $this->cache_remove($id);
 
+        $this->fw->model('Events')->log_fields($this->table_name.'_upd', $id, $item);
         return $id;
     }
 
@@ -102,15 +104,15 @@ abstract class FwModel {
     public function delete($id, $is_perm=NULL) {
         if ($is_perm){
             db_delete($this->table_name, $id);
+            $this->fw->model('Events')->log_event($this->table_name.'_del', $id);
         }else{
             $vars=array(
                 'status'    => 127,
             );
-            db_update($this->table_name, $vars, $id);
+            $this->update($id, $vars);
         }
 
         $this->cache_remove($id);
-
         return true;
     }
 

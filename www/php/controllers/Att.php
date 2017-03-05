@@ -31,11 +31,12 @@ class AttController extends FwController {
                 $this->model->transmit_file($id, $size, 'inline');
             }else{
                 #if it's not an image and requested preview - return std image
-                $filepath = $CONFIG['site_root'].'/img/att_file.png'; # TODO move to web.config or to model?
+                header('location: '.$CONFIG['ROOT_URL'].'/img/att_file.png');
 
-                header('Content-type: '.UploadUtils::get_mime4ext($item['ext']));
-                $fp = fopen($filepath, 'rb');
-                fpassthru($fp);
+                // $filepath = $CONFIG['site_root'].'/img/att_file.png'; # TODO move to web.config or to model?
+                // header('Content-type: '.UploadUtils::get_mime4ext($item['ext']));
+                // $fp = fopen($filepath, 'rb');
+                // fpassthru($fp);
             }
         }else{
             $this->model->transmit_file($id, $size, 'inline');

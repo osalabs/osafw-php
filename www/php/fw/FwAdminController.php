@@ -8,9 +8,10 @@
 
 class FwAdminController extends FwController {
     const route_default_action = '';
-    public $base_url = '/Admin/Fw';
+    public $base_url = '/Admin/FwAdmin';
     public $required_fields = 'iname';
     public $save_fields = 'iname status';
+    public $save_fields_checkboxes = '';
     #public $model_name = 'DemoDicts'; #set in child class!
     /*REMOVE OR OVERRIDE
     public $search_fields = 'iname idesc';
@@ -26,7 +27,7 @@ class FwAdminController extends FwController {
         parent::__construct();
 
         //optionally init controller
-        $this->table_name = $this->model->table_name;
+        $this->list_view = $this->model->table_name;
     }
 
     public function IndexAction() {
@@ -34,10 +35,7 @@ class FwAdminController extends FwController {
         $f = $this->get_filter();
 
         $this->set_list_sorting();
-
-        $this->list_where = ' status=0 ';
         $this->set_list_search();
-
         //other filters add to $this->list_where here
 
         $this->get_list_rows();
@@ -52,8 +50,9 @@ class FwAdminController extends FwController {
             'count'         => $this->list_count,
             'pager'         => $this->list_pager,
             'f'             => $this->list_filter,
+            'related_id'    => $this->related_id,
         );
-        
+
         return $ps;
     }
 
@@ -65,12 +64,11 @@ class FwAdminController extends FwController {
                 $item = $this->model->one($id);
             }else{
                 #defaults
-                $item=array(
-                );
+                $item=$this->form_new_defaults;
             }
         }else{
             $itemdb = $id ? $this->model->one($id) : array();
-            $item = array_merge($itemdb, req('item'));
+            $item = array_merge($itemdb, reqh('item'));
         }
 
         $ps = array(
@@ -78,6 +76,8 @@ class FwAdminController extends FwController {
             'i'     => $item,
             'add_user_id_name'  => fw::model('Users')->full_name($item['add_user_id']),
             'upd_user_id_name'  => fw::model('Users')->full_name($item['upd_user_id']),
+            'return_url'        => $this->return_url,
+            'related_id'        => $this->related_id,
         );
 
         return $ps;
@@ -85,34 +85,57 @@ class FwAdminController extends FwController {
 
     public function SaveAction($form_id) {
         $id = $form_id+0;
-        $item = req('item');
+        $item = reqh('item');
+
+        $success = true;
+        $is_new  = ($id==0);
+        $location = '';
 
         try{
             $this->Validate($id, $item);
-            #load old record if necessary
-            #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
+            $itemdb=$this->set_save_itemdb($id, $item);
 
             $id = $this->model_add_or_update($id, $itemdb);
 
-            fw::redirect($this->base_url.'/'.$id.'/edit');
+            $location = $this->get_return_location($id);
 
         }catch( ApplicationException $ex ){
+            $success=false;
             $this->set_form_error($ex->getMessage());
-            $this->route_redirect("ShowForm");
+        }
+
+        if ($this->fw->is_json_expected()){
+            return array(
+                '_json_enabled' => true,
+                'id'        => $id,
+                'is_new'    => $is_new,
+                'location'  => $location,
+                'success'   => $success,
+                'err_msg'   => $this->fw->G['err_msg'],
+                #TODO - add ERR field errors here
+            );
+        }else{
+            #if save success - return redirect
+            #if save failed - return back to add/edit form
+            if ($success){
+                fw::redirect($location);
+            }else{
+                $this->route_redirect("ShowForm");
+            }
         }
     }
 
     public function Validate($id, $item) {
         $result= $this->validate_required($item, $this->required_fields);
 
+/*
         if ($result){
             if ($this->model->is_exists( $item['iname'], $id ) ){
                 $this->ferr('iname', 'EXISTS');
             }
         }
-
+*/
         $this->validate_check_result();
     }
 
@@ -120,6 +143,8 @@ class FwAdminController extends FwController {
         $id+=0;
         $ps = array(
             'i' => $this->model->one($id),
+            'return_url'        => $this->return_url,
+            'related_id'        => $this->related_id,
         );
 
         return $ps;
@@ -130,7 +155,7 @@ class FwAdminController extends FwController {
         $this->model->delete($id);
 
         $this->fw->flash("onedelete", 1);
-        fw::redirect($this->base_url);
+        fw::redirect($this->get_return_location());
     }
 
     public function SaveMultiAction(){
@@ -147,7 +172,7 @@ class FwAdminController extends FwController {
         }
 
         $this->fw->flash("multidelete", $ctr);
-        fw::redirect($this->base_url);
+        fw::redirect($this->get_return_location());
     }
 
 }//end of class

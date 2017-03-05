@@ -10,7 +10,6 @@ abstract class FwController {
     //overridable
     const route_default_action = ''; #index, show
     public $model_name; //default model name for the controller
-    public $table_name; #$model_name is required in child class
 
     public $list_sortdef = 'id asc';    //default sorting - req param name, asc|desc direction
     public $list_sortmap = array(       //sorting map: req param name => sql field name(s) asc|desc direction
@@ -21,18 +20,29 @@ abstract class FwController {
     public $search_fields = 'iname idesc';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
                                             //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
 
+    public $form_new_defaults=array();      //defaults for the fields in new form
+    public $save_fields;                    //fields to save from the form to db, space-separated
+    public $save_fields_checkboxes;         //checkboxes fields to save from the form to db, qw string: "field|def_value field2|def_value2" or "field field2" (def_value=1 in this case)
+
     //not overridable
     public $fw;  //current app/framework object
     public $model; //default model for the controller
+    public $list_view;                  // table or view name to selecte from for the list screen
     public $list_orderby;               // orderby for the list screen
     public $list_filter;                // filter values for the list screen
-    public $list_where;                 // where to use in list sql
+    public $list_where=' status<>127 '; // where sql to use in list sql, by default - return all non-deleted(status=127) records
     public $list_count;                 // count of list rows returned from db
     public $list_rows;                  // list rows returned from db (array of hashes)
     public $list_pager;                 // pager for the list from FormUtils::get_pager
+    public $return_url;                 // url to return after SaveAction successfully completed, passed via request
+    public $related_id;                 // related id, passed via request. Controller should limit view to items related to this id
+    public $related_field_name;         // if set and $related_id passed - list will be filtered on this field
 
     public function __construct() {
         $this->fw = fw::i();
+
+        $this->return_url=reqs('return_url');
+        $this->related_id=reqs('related_id');
 
         if ($this->model_name){
             $this->model = fw::model($this->model_name);
@@ -117,6 +127,8 @@ abstract class FwController {
      * add to $this->list_where search conditions from $this->list_filter['s'] and based on fields in $this->search_fields
      */
     public function set_list_search() {
+        #$this->list_where =' 1=1 '; #override initial in child if necessary
+
         $s = trim($this->list_filter['s']);
         if ( strlen($s) && $this->search_fields){
             $like_quoted=dbq('%'.$s.'%');
@@ -139,6 +151,11 @@ abstract class FwController {
 
             $this->list_where .= ' and ('.implode(' or ', $afields).')';
         }
+
+        #if related id and field name set - filter on it
+        if ($this->related_id>'' && $this->related_field_name){
+            $this->list_where .= ' and '.dbq_ident($this->related_field_name).'='.dbq($this->related_id);
+        }
     }
 
     /**
@@ -148,20 +165,50 @@ abstract class FwController {
      * @return string $this->list_pager pager from FormUtils::get_pager
      */
     public function get_list_rows() {
-        $this->list_count = db_value("select count(*) from $this->table_name where " . $this->list_where);
+        $this->list_count = db_value("select count(*) from {$this->list_view} where " . $this->list_where);
         if ($this->list_count){
             $offset = $this->list_filter['pagenum']*$this->list_filter['pagesize'];
             $limit  = $this->list_filter['pagesize'];
 
-            $sql = "SELECT * FROM $this->table_name WHERE $this->list_where ORDER BY $this->list_orderby LIMIT $offset, $limit";
+            $sql = "SELECT * FROM {$this->list_view} WHERE {$this->list_where} ORDER BY {$this->list_orderby} LIMIT {$offset}, {$limit}";
             $this->list_rows = db_array($sql);
             $this->list_pager = FormUtils::get_pager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
         }else{
             $this->list_rows = array();
             $this->list_pager = array();
         }
+
+        #if related_id defined - add it to each row
+        if ($this->related_id>''){
+            Utils::dbarray_inject($this->list_rows, array('related_id' => $this->related_id));
+        }
+
+        //add/modify rows from db - use in override child class
+        /*
+        foreach ($this->list_rows as $k => $row) {
+            $this->list_rows[$k]['field'] = 'value';
+        }
+        */
     }
 
+    /**
+     * prepare and return itemdb for save to db
+     * called from SaveAction()
+     * using save_fields and save_fields_checkboxes
+     * override in child class if more modifications is necessary
+     *
+     * @param integer $id   item id, could be 0 for new item
+     * @param array   $item fields from the form
+     */
+    public function set_save_itemdb($id, $item){
+        #load old record if necessary
+        #$item_old = $this->model->one($id);
+
+        $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
+        FormUtils::form2dbhash_checkboxes($itemdb, $item, $this->save_fields_checkboxes);
+
+        return $itemdb;
+    }
 
     /**
      * validate required fields are non-empty and set global ERR[field] and ERR[REQ] values in case of errors
@@ -179,7 +226,7 @@ abstract class FwController {
         }
 
         foreach ($afields as $fld) {
-            if (!array_key_exists($fld, $item) || !strlen(trim($item[$fld])) ){
+            if ($fld>'' && (!array_key_exists($fld, $item) || !strlen(trim($item[$fld])) ) ) {
                 $result=false;
                 $this->ferr($fld);
             }
@@ -223,6 +270,37 @@ abstract class FwController {
             $this->fw->flash("record_added", 1);
         }
         return $id;
+    }
+
+    /**
+     * return URL for location after successful Save action
+     * basic rule: after save we return to edit form screen. Or, if return_url set, to the return_url
+     *
+     * @param  integer $id new or updated form id
+     * @return string     url
+     */
+    public function get_return_location($id=null){
+        $result='';
+
+        #if no id passed - basically return to list url, if passed - return to edit url
+        if (is_null($id)){
+            $base_url = $this->base_url;
+        }else{
+            $base_url = $this->base_url.'/'.$id.'/edit';
+        }
+
+        if ($this->return_url){
+            if ($this->fw->is_json_expected()){
+                //if json - it's usually autosave - don't redirect back to return url yet
+                $result = $base_url.'?return_url='.Utils::escape_str($this->return_url).($this->related_id?'&related_id='.$this->related_id:'');
+            }else{
+                $result = $this->return_url;
+            }
+        }else{
+            $result = $base_url.($this->related_id?'?related_id='.$this->related_id:'');
+        }
+
+        return $result;
     }
 
     ######################### Default Actions
