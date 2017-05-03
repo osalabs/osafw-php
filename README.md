@@ -3,11 +3,11 @@ PHP web framework
 
 ## Features
 
-- simple and straight in develpment/maintenance
+- simple and straight in development and maintenance
 - **MVC-like** code, data, templates are split
   - code consists of: controllers, models, framework core and optional 3rd party libs
   - uses [ParsePage template engine](https://github.com/osalabs/parsepage)
-  - data stored by default in MySQL database (using db.php)[https://github.com/osalabs/db.php]
+  - data stored by default in MySQL database [using db.php](https://github.com/osalabs/db.php)
 - **RESTful** with some practical enhancements
   - `GET /Controller` - list view
   - `GET /Controller/ID` - one record view
@@ -34,13 +34,18 @@ TODO
 
 ## Installation
 
-TODO
+1. put contents of `/www` into your webserver's public html folder
+2. edit `/www/php/config.site.php` (or `config.develop.php`)
+3. create database from `/db/database.sql`
+4. open site in your browser and login with credentials as defined in database.sql
+
+Automated install via Composer - TBD
 
 ## Documentation
 
 ### debugging
 
-Debugging is much easier with these 3 functions:
+Debugging is much easier with these 3 globally available functions:
 
 1. `rw($var)` this function will work like var_dump and just dump variable structure and data to browser (with some formatting)
 
