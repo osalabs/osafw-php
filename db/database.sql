@@ -4,8 +4,8 @@
 -- CREATE DATABASE xxx;
 
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
+-- DROP TABLE IF EXISTS users;
+CREATE TABLE IF NOT EXISTS users (
     id                  int unsigned NOT NULL auto_increment,
     access_level        int default 0,               /*General user access level, 0 - customer, 100-site admin*/
 
@@ -46,8 +46,8 @@ insert into users (access_level, email, pwd, fname, lname, add_time)
 VALUES (100, 'admin@admin.com', 'CHANGE_ME', 'Website', 'Admin', now());
 
 /*user cookies (for permanent sessions)*/
-DROP TABLE IF EXISTS user_cookie;
-CREATE TABLE user_cookie (
+-- DROP TABLE IF EXISTS user_cookie;
+CREATE TABLE IF NOT EXISTS user_cookie (
     cookie_id           varchar(32) NOT NULL,      /*cookie id: time(secs)+rand(16)*/
     users_id            int unsigned NOT NULL,
 
@@ -58,8 +58,8 @@ CREATE TABLE user_cookie (
 
 
 /*Site Settings - special table for misc site settings*/
-DROP TABLE settings;
-CREATE TABLE settings (
+-- DROP TABLE IF EXISTS settings;
+CREATE TABLE IF NOT EXISTS settings (
     id                  int unsigned NOT NULL auto_increment,
 
     icat                varchar(64) NOT NULL DEFAULT '', /*settings category: ''-system, 'other' -site specific*/
@@ -86,8 +86,8 @@ INSERT INTO settings (is_user_edit, input, icat, icode, ivalue, iname, idesc) VA
 (1, 10, '', 'test', 'novalue', 'test settings', 'description');
 
 /* upload categories */
-DROP TABLE att_categories;
-CREATE TABLE att_categories (
+-- DROP TABLE IF EXISTS att_categories;
+CREATE TABLE IF NOT EXISTS att_categories (
     id                  int unsigned NOT NULL auto_increment,
 
     icode               varchar(64) NOT NULL DEFAULT '', /*to use from code*/
@@ -108,8 +108,8 @@ INSERT INTO att_categories (icode, iname) VALUES
 ,('files', 'Files')
 ;
 
-DROP TABLE att;
-CREATE TABLE att (
+-- DROP TABLE IF EXISTS att;
+CREATE TABLE IF NOT EXISTS att (
     id                  int unsigned NOT NULL auto_increment, /* files stored on disk under 0/0/0/id.dat */
     att_categories_id   int unsigned NULL,
 
@@ -135,8 +135,8 @@ CREATE TABLE att (
 CREATE INDEX att_table_name ON att (table_name, item_id);
 
 /* link att files to table items*/
-DROP TABLE att_table_link;
-CREATE TABLE att_table_link (
+-- DROP TABLE IF EXISTS att_table_link;
+CREATE TABLE IF NOT EXISTS att_table_link (
     id                  int unsigned NOT NULL auto_increment,
     att_id              int unsigned NOT NULL,
 
@@ -152,8 +152,8 @@ CREATE TABLE att_table_link (
 CREATE UNIQUE INDEX att_table_link_UX ON att_table_link (table_name, item_id, att_id);
 
 /*Static pages*/
-DROP TABLE spages;
-CREATE TABLE spages (
+-- DROP TABLE IF EXISTS spages;
+CREATE TABLE IF NOT EXISTS spages (
     id                  int unsigned NOT NULL auto_increment,
     parent_id           int unsigned NOT NULL DEFAULT 0,  /*parent page id*/
 
@@ -186,15 +186,15 @@ CREATE INDEX spages_url ON spages (url);
 
 --TRUNCATE TABLE spages;
 INSERT INTO spages (parent_id, url, iname) VALUES
-(0,'','Home') --1
-,(1,'test','Test sub-home page') --2
+(0,'','Home') -- 1
+,(1,'test','Test sub-home page') -- 2
 ;
 update spages set is_home=1 where id=1;
 
 
 /*categories*/
-DROP TABLE IF EXISTS categories;
-CREATE TABLE categories (
+-- DROP TABLE IF EXISTS categories;
+CREATE TABLE IF NOT EXISTS categories (
     id                  int unsigned NOT NULL auto_increment,
     parent_id           int unsigned NOT NULL default 0,
 
@@ -219,8 +219,8 @@ INSERT INTO categories (iname) VALUES
 ;
 
 /*event types for log*/
-DROP TABLE events;
-CREATE TABLE events (
+-- DROP TABLE IF EXISTS events;
+CREATE TABLE IF NOT EXISTS events (
     id                  int unsigned NOT NULL auto_increment,
     icode               varchar(64) NOT NULL default '',
 
@@ -244,8 +244,8 @@ INSERT INTO events (icode, iname) VALUES ('users_upd',    'User updated');
 INSERT INTO events (icode, iname) VALUES ('users_del',    'User deleted');
 
 /* log of all user-initiated events */
-DROP TABLE event_log;
-CREATE TABLE event_log (
+-- DROP TABLE IF EXISTS event_log;
+CREATE TABLE IF NOT EXISTS event_log (
     id                  bigint unsigned NOT NULL auto_increment,
     events_id           int unsigned NOT NULL DEFAULT 0,           /* event type */
 
@@ -265,15 +265,4 @@ CREATE TABLE event_log (
     KEY (events_id),
     KEY (add_user_id),
     KEY (add_time)
-);
-
-CREATE TABLE event_log_details (
-    id                  bigint unsigned NOT NULL auto_increment,
-
-    event_log_id        bigint unsigned NULL,
-    fname               varchar(255) NOT NULL,   /*field name changed*/
-    fdata               varchar(255) NOT NULL,  /*new data written*/
-
-    PRIMARY KEY (id),
-    FOREIGN KEY (event_log_id) REFERENCES event_log(id)
 );
