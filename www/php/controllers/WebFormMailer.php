@@ -17,7 +17,7 @@ class WebFormMailerController extends FwController {
     }
 
     public function SaveAction() {
-        $mail_to = $this->fw->G['SUPPORT_EMAIL'];
+        $mail_to = $this->fw->GLOBAL['SUPPORT_EMAIL'];
         $mail_subject = reqs('subject');
         $redirect_to = reqs('redirect');
 
@@ -31,7 +31,7 @@ class WebFormMailerController extends FwController {
         $this->fw->send_email($mail_to, $mail_subject, $msg_body);
 
         //need to add root_domain, so no one can use our redirector for bad purposes
-        fw::redirect($this->fw->G['ROOT_DOMAIN'].$redirect_to);
+        fw::redirect($this->fw->GLOBAL['ROOT_DOMAIN'].$redirect_to);
     }
 
 }

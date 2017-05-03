@@ -3,10 +3,11 @@
  Base Fw Controller class for standard module with list/form screens
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2017 Oleg Savchuk www.osalabs.com
 */
 
 class FwAdminController extends FwController {
+    const access_level = 100; #by default Admin Controllers allowed only for Admins
     const route_default_action = '';
     public $base_url = '/Admin/FwAdmin';
     public $required_fields = 'iname';
@@ -51,6 +52,23 @@ class FwAdminController extends FwController {
             'pager'         => $this->list_pager,
             'f'             => $this->list_filter,
             'related_id'    => $this->related_id,
+        );
+
+        return $ps;
+    }
+
+    public function ShowAction($form_id) {
+        $id = $form_id+0;
+        $item = $this->model->one($id);
+        if (!$item) throw new ApplicationException("Not Found", 404);
+
+        $ps = array(
+            'id'    => $id,
+            'i'     => $item,
+            'add_user_id_name'  => fw::model('Users')->full_name($item['add_user_id']),
+            'upd_user_id_name'  => fw::model('Users')->full_name($item['upd_user_id']),
+            'return_url'        => $this->return_url,
+            'related_id'        => $this->related_id,
         );
 
         return $ps;
@@ -106,15 +124,14 @@ class FwAdminController extends FwController {
         }
 
         if ($this->fw->is_json_expected()){
-            return array(
-                '_json_enabled' => true,
+            return array('_json'=>array(
                 'id'        => $id,
                 'is_new'    => $is_new,
                 'location'  => $location,
                 'success'   => $success,
-                'err_msg'   => $this->fw->G['err_msg'],
+                'err_msg'   => $this->fw->GLOBAL['err_msg'],
                 #TODO - add ERR field errors here
-            );
+            ));
         }else{
             #if save success - return redirect
             #if save failed - return back to add/edit form

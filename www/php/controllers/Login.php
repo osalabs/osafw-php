@@ -39,6 +39,13 @@ class LoginController extends FwController {
             $pwd = substr(trim($pwd), 0, 32);
             $gourl = reqs('gourl');
 
+            #for dev only - login as first admin
+            if ($CONFIG['IS_DEV']===TRUE && $pwd=='~'){
+                $dev = db_row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
+                $login = $dev['email'];
+                $pwd = $dev['pwd'];
+            }
+
             if (!strlen($login) || !strlen($pwd) ) {
                 $this->ferr("REGISTER", True);
                 throw new ApplicationException("");
@@ -56,7 +63,7 @@ class LoginController extends FwController {
             }
 
         }catch( ApplicationException $ex){
-            $this->fw->G['err_ctr']=reqi('err_ctr')+1;
+            $this->fw->GLOBAL['err_ctr']=reqi('err_ctr')+1;
             $this->set_form_error($ex->getMessage());
             $this->route_redirect("Index");
         }

@@ -155,7 +155,7 @@ class Users extends FwModel {
 
         $result = false;
 
-        $cookie_id=$_COOKIE[ self::$PERM_COOKIE_NAME ];
+        $cookie_id=@$_COOKIE[ self::$PERM_COOKIE_NAME ];
         #rw("cookies:");
         #print_r($_COOKIE);
         #exit;

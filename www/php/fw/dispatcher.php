@@ -4,7 +4,7 @@
  by default RESTful approach assumed
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2017 Oleg Savchuk www.osalabs.com
 
  SAMPLE USAGE:
 
@@ -99,7 +99,7 @@ class Dispatcher {
 */
 
         #logger("ROUTE found:", $hroute);
-        logger("ROUTE: ".$hroute['method'].' '.$hroute['controller'].'.'.$hroute['action'].' id='.$hroute['id'].' '.$hroute['action_more']);
+        logger('DEBUG', "ROUTE: ".$hroute['method'].' '.$hroute['controller'].'.'.$hroute['action'].' id='.$hroute['id'].' '.$hroute['action_more']);
 
         return $hroute;
     }
@@ -116,7 +116,7 @@ class Dispatcher {
     # IN: class name, method, params
     # OUT: throws NoClassException/NoClassMethodException if no class/method exists
     public function call_class_method($class_name, $method, $aparams=array()){
-        #logger("calling $class_name->$method", $aparams);
+        logger('TRACE', "calling $class_name->$method", $aparams);
         try {
             if ($class_name){
               if ( !class_exists($class_name) ) throw new NoClassException();
@@ -140,6 +140,12 @@ class Dispatcher {
         $class_name=$controller.'Controller';
         if ( !class_exists($class_name) ) throw new NoClassException();
         return $class_name::route_default_action;
+    }
+
+    public function get_route_access_level($controller){
+        $class_name=$controller.'Controller';
+        if ( !class_exists($class_name) ) throw new NoClassException();
+        return $class_name::access_level;
     }
 
     # leave just allowed chars in string - for routers: controller, action
@@ -252,7 +258,7 @@ class Dispatcher {
         logger('INFO','*** REQUEST START ['.$uri.']');
 
         #check if method override exits
-        $tmp_method_check = $_POST['_method'];
+        $tmp_method_check = @$_POST['_method'];
         if ($tmp_method_check>'' && array_key_exists($tmp_method_check, $this::$METHOD_ALLOWED)){
             $method = $tmp_method_check;
         }
@@ -304,15 +310,9 @@ class Dispatcher {
            $RX_ACTION='[\d\w_-]+';
 
            #get RESTful URI
-           #$is_match=preg_match_all("!/($RX_CONTROLLER)(?:/(new)|/(\d+)\.?(\w+)?(?:/(edit|delete))?)?/?!i", $uri, $m);
-           #$is_match=preg_match_all("!/($RX_CONTROLLER)(?:/(new)|/(\d+)\.?(\w+)?(?:/(edit|delete))?)?!i", $uri, $m);  #multi-controllers - TODO, not work normally
-           #$is_match=preg_match("!^/($RX_CONTROLLER)(?:/(new)|/([A-Z0-9]+)\.?(\w+)?(?:/(edit|delete))?)?$!i", $uri, $m);  #one controller only, id is Alphanum
-           #$is_match=preg_match("!^/($RX_CONTROLLER)(?:/(new)|/(\d+)\.?(\w+)?(?:/(edit|delete))?)?$!i", $uri, $m);  #one controller only, id is digits only
            $is_match=preg_match("!^/($RX_CONTROLLER)(?:/(new|\.\w+)|/($RX_ACTION)(?:\.(\w+))?(?:/(edit|delete))?)?/?$!i", $uri, $m);  #one controller only, id is "Alphanum_-"
 
-           #"^/([^/]+)(?:/(new|\.\w+)|/([\d\w_-]+)(?:\.(\w+))?(?:/(edit|delete))?)?/?$"
-
-           #logger("$method $uri => REST is_match=$is_match");
+           #logger('TRACE', "$method $uri => REST is_match=$is_match");
            #logger($m);
 
            if ($is_match){
@@ -352,7 +352,7 @@ class Dispatcher {
 
                 #call default method $ROUTES['']
                 #@list($cur_controller,$cur_action)=$this->split_route($ROUTES['']);
-                #logger("DEFAULT call $cur_controller->$cur_action()\n");
+                #logger('TRACE', "DEFAULT call $cur_controller->$cur_action()\n");
            }
         }
 
@@ -371,7 +371,7 @@ class Dispatcher {
            'format'     => $cur_format,
            'params'     => $cur_aparams,
         );
-        #logger("RESULT=", $result);
+        logger('TRACE', 'ROUTER RESULT=', $result);
         return $result;
     }
 }

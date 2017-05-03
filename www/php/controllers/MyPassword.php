@@ -1,6 +1,7 @@
 <?php
 
 class MyPasswordController extends FwController {
+    const access_level = 0; #logged only
     const route_default_action = '';
     public $base_url = '/My/Password';
     public $model_name = 'Users';

@@ -19,15 +19,16 @@ $SITE_CONFIG=array(
 
     #db connection settings  - REQUIRED
     'DB'    => array(
-                'DBNAME'    => 'XXXXXXXXXXX',
-                'USER'      => 'XXXXX',
-                'PWD'       => '',
+                'DBNAME'    => '',      #database name
+                'USER'      => '',      #db user name
+                'PWD'       => '',      #db user password
                 'HOST'      => 'localhost',
                 'PORT'      => '',
                 'SQL_SERVER'=> '', # if empty - MySQL
+                'IS_LOG'    => true,
                 ),
     #'site_error_log'    => $FW_CONFIG['SITE_ROOT_OFFLINE'].'/error.log',
-    'IS_DEBUG'          => false,
+    'LOG_LEVEL'          => 'INFO', #use WARN|ERROR|FATAL|OFF for production, use INFO temporary to see SQL queries in production
 );
 
 ini_set('display_errors',0);

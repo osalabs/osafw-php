@@ -1,6 +1,7 @@
 <?php
 
 class AdminCategoriesController extends FwAdminController {
+    const access_level = 80; #logged editor only
     const route_default_action = '';
     public $base_url = '/Admin/Categories';
     public $required_fields = 'iname';

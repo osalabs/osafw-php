@@ -49,7 +49,7 @@ class DateUtils {
 
         if (!strlen($s) || $s=='0000-00-00' || $s=='0000-00-00 00:00:00') return '';
 
-        $unixtime=SQLDate2Unix($s);
+        $unixtime=self::SQLDate2Unix($s);
 
         $time_format_str='';
         if ($add_hms){

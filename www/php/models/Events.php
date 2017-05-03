@@ -30,7 +30,7 @@ class Events extends FwModel {
 
         $ev = $this->one_by_icode($ev_icode);
         if (!$ev){
-            logger('WARNING. No event defined for icode=['.$ev_icode.'], auto-creating');
+            logger('INFO', 'No event defined for icode=['.$ev_icode.'], auto-creating');
             $ev=array(
                 'icode' => $ev_icode,
                 'iname' => $ev_icode,

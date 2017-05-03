@@ -342,7 +342,8 @@ class DB {
     public static $instance;
 
     public $dbh;                    //mysqli object
-    public $config = array();       //should contain: DBNAME, USER, PWD, HOST, PORT, [SQL_SERVER]
+    public $config = array();       //should contain: DBNAME, USER, PWD, HOST, PORT, [SQL_SERVER], IS_LOG
+                                    //if IS_LOG - external function logger() will be called for logging
 
     function __construct($config=NULL){
         global $CONFIG;
@@ -366,7 +367,9 @@ class DB {
     public function connect(){
         $this->dbh=new mysqli($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ( $this->config['PORT']>'' ? (int)$this->config['PORT'] : NULL ) );
         if ($this->dbh->connect_error){
-            throw new Exception('Cannot connect to the database because: ('.$this->dbh->connect_errno.') '.$this->dbh->connect_error);
+            $msg='Cannot connect to the database because: ('.$this->dbh->connect_errno.') '.$this->dbh->connect_error;
+            $this->logger('FATAL', $msg);
+            throw new Exception($msg);
         }
 
         $res = $this->dbh->set_charset("utf8");
@@ -403,7 +406,7 @@ class DB {
     public function handle_error($checkvar){
         if ($checkvar===FALSE){
             $err_str = 'Error in DB operation: ('.$this->dbh->errno.') '.$this->dbh->error;
-            logger('ERROR', $err_str);
+            $this->logger('ERROR', $err_str);
             throw new Exception($err_str);
         }
     }
@@ -421,8 +424,8 @@ class DB {
 
         if (is_array($params) && count($params)){
             //use prepared query
-            logger($sql);
-            logger($params);
+            $this->logger('INFO', $sql);
+            $this->logger('INFO', $params);
 
             $st = $this->dbh->prepare($sql);
             $this->handle_error($st);
@@ -448,7 +451,7 @@ class DB {
             $st->close();
         }else{
             //use direct query
-            logger($sql);
+            $this->logger('INFO', $sql);
 
             $result = $this->dbh->query($sql);
             #no need to check for metadata here as query returns TRUE for non-select
@@ -532,7 +535,7 @@ class DB {
         if (!is_array($result)) $result = array();
         $res->free();
 
-        #logger($result);
+        #$this->logger('DEBUG', $result);
         return $result;
     }
 
@@ -878,6 +881,16 @@ class DB {
      */
     public function get_identity(){
         return $this->dbh->insert_id;
+    }
+
+    /**
+     * [logger description]
+     * @param  str $log_type 'ERROR'|'DEBUG'|'INFO'
+     * @param  str $value    value to log
+     * @return none
+     */
+    public function logger($log_type, $value){
+        if ($this->config['IS_LOG']) logger($log_type, $value);
     }
 }
 

@@ -97,6 +97,11 @@ class Att extends FwModel {
         return $result;
     }
 
+    public function get_att_links($table_name, $id){
+        if (!$id || !$table_name) return array();
+        return db_array('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name='.dbq($table_name).' and atl.item_id='.dbqi($id));
+    }
+
     //add/update att_table_links
     public function update_att_links($table_name, $id, $form_att){
         if (!is_array($form_att)) return;
@@ -149,7 +154,7 @@ class Att extends FwModel {
         if (!$id) return '';
 
         #if /Att need to be on offline folder
-        $result = $this->fw->G['ROOT_URL'].'/Att/'.$id;
+        $result = $this->fw->GLOBAL['ROOT_URL'].'/Att/'.$id;
         if ($size>''){
             $result .= '?size='.$size;
         }
@@ -191,7 +196,7 @@ class Att extends FwModel {
         header("Content-Length: " . filesize($filepath));
         header('Content-Disposition: '.$disposition.'; filename="'.$filename.'"');
 
-        #logger('transmit file '.$filepath." $id, $size, $disposition, ".UploadUtils::get_mime4ext($item['ext']));
+        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, ".UploadUtils::get_mime4ext($item['ext']));
         $fp = fopen($filepath, 'rb');
         fpassthru($fp);
     }

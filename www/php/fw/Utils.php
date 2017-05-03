@@ -8,7 +8,7 @@ class Utils {
 
     //just return logged user id
     public static function me() {
-        return $_SESSION['user']['id']+0;
+        return @$_SESSION['user']['id']+0;
     }
 
     public static function kill_magic_quotes($value){
@@ -226,7 +226,7 @@ class Utils {
      * @return string content received. FALSE if error
      */
     public static function load_url($url, $params=null, $headers=null, $to_file=''){
-        #logger("CURL TO: [$url]", $params);
+        logger('TRACE', "CURL load from: [$url]", $params, $headers, $to_file);
         $cu = curl_init();
 
         curl_setopt($cu, CURLOPT_URL,$url);
@@ -252,7 +252,7 @@ class Utils {
         $result = curl_exec($cu);
         #logger(curl_getinfo($cu));
         if(curl_error($cu)){
-            logger('CURL ERROR: '.curl_error($cu));
+            logger('ERROR', 'CURL error: '.curl_error($cu));
             $result=FALSE;
         }
         curl_close($cu);
@@ -274,7 +274,7 @@ class Utils {
 
     #send file to URL with optional params using curl
     public static function send_file_to_url($url, $from_file, $params=null, $headers=null){
-        #logger("CURL FILE [$from_file] TO: [$url]", $params);
+        logger('TRACE', "CURL post file [$from_file] to: [$url]", $params, $headers);
         $cu = curl_init();
 
         curl_setopt($cu, CURLOPT_URL,$url);
@@ -301,7 +301,7 @@ class Utils {
         $result = curl_exec($cu);
         #logger(curl_getinfo($cu));
         if(curl_error($cu)){
-            logger('CURL ERROR: '.curl_error($cu));
+            logger('ERORR','CURL error: '.curl_error($cu));
             $result=FALSE;
         }
         curl_close($cu);

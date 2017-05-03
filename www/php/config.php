@@ -7,7 +7,6 @@
 
 */
 
-$IS_TEST_SERVER=0;  #0 - production server
 $conf_server_name='site';
 
 ########### detect test/development servers and load appropriate config
@@ -22,7 +21,6 @@ $DEV_SERVERS=array(
 #detect
 foreach($DEV_SERVERS as $k => $arr){
  if ( @file_exists($arr[0]) ){
-    if ($arr[1]!='site') $IS_TEST_SERVER=1;
     $conf_server_name=$arr[1];
     break;
  }
@@ -61,17 +59,18 @@ $FW_CONFIG = array(
 
     #db connection settings
     'DB'    => array(
-                'DBNAME'    => 'XXXXXXXXXXX',
-                'USER'      => '',
-                'PWD'       => '',
+                'DBNAME'    => '',      #database name
+                'USER'      => '',      #db user name
+                'PWD'       => '',      #db user password
                 'HOST'      => 'localhost',
                 'PORT'      => '',
                 'SQL_SERVER'=> '', # if empty - MySQL
+                'IS_LOG'    => true, #enable logging via fw
                 ),
 
     'site_error_log'        => $site_root_offline.'/logs/error.log',
     'LOGGER_MESSAGE_TYPE'   => 3, #3 - default to $site_error_log
-    'IS_DEBUG'              => false,
+    'LOG_LEVEL'             => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
 
     'IS_SIGNUP'             => true,  #set to false to disable Sign Up module
     'LOGGED_DEFAULT_URL'    => '/Main',
@@ -92,30 +91,26 @@ $FW_CONFIG = array(
     'ROUTE_PREFIXES'        => array(
                                 '/Admin',
                                 '/My',
+                                '/Dev',
                                 ),
     #Controllers without need for XSS check
     'NO_XSS'                => array(
                                 'Login',
                                 ),
     #Allowed Access levels for Controllers
+    #if set here - overrides Controller::access_level
     #0 - user must be logged in
     #100 - admin user
     'ACCESS_LEVELS'         => array(
-                                '/Main'         => 0,
-                                '/MySettings'   => 0,
-                                '/MyPassword'   => 0,
-                                '/AdminCategories' => 80,
-                                '/AdminSPages'  => 80,
-                                '/AdminUsers'   => 100,
-                                '/AdminAtt'     => 100,
-                                '/AdminSettings'   => 100,
+    #                            '/Main'         => 0,
+                                '/AdminAtt/Select' => 0,
                                 ),
 
     #multilanguage support settings
     'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
     'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
 
-    'SITE_VERSION'          => '0.16.1226',
+    'SITE_VERSION'          => '0.17.0502',
 
     ########### place site specific configuration variables here:
     'SITE_VAR'              => false,

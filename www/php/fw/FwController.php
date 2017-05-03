@@ -3,12 +3,15 @@
  Base Fw Controller class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2017 Oleg Savchuk www.osalabs.com
 */
 
 abstract class FwController {
     //overridable
-    const route_default_action = ''; #index, show
+    const access_level = null;          //access level for the controller. $CONFIG['ACCESS_LEVELS'] overrides this.
+                                        //Default=null - use config. If not set in config - all users can access this controller (even not logged)
+    const route_default_action = '';    //empty, "index", "show" - default action for controller, dispatcher will use it if no requested action found
+                                        //if no default action set - this is special case action - this mean action should be got form REST's 'id'
     public $model_name; //default model name for the controller
 
     public $list_sortdef = 'id asc';    //default sorting - req param name, asc|desc direction
@@ -56,7 +59,7 @@ abstract class FwController {
 
     //add fields name to form error hash
     public function ferr($field_name, $error_type=true) {
-        $this->fw->G['ERR'][$field_name]=$error_type;
+        $this->fw->GLOBAL['ERR'][$field_name]=$error_type;
     }
 
     #get filter saved in session
@@ -67,7 +70,7 @@ abstract class FwController {
         global $CONFIG;
 
         #each filter remembered in session linking to controller.action
-        $session_key = '_filter_'.$this->fw->G['controller.action'];
+        $session_key = '_filter_'.$this->fw->GLOBAL['controller.action'];
         $sfilter = $_SESSION[ $session_key ];
         if (!is_array($sfilter)) $sfilter=array();
 
@@ -241,10 +244,10 @@ abstract class FwController {
     //throw ValidationException exception if global ERR non-empty
     //also set global ERR[INVALID] if ERR non-empty, but ERR[REQUIRED] not true
     public function validate_check_result($result=true) {
-        if ($this->fw->G['ERR']['REQUIRED']){
+        if ($this->fw->GLOBAL['ERR']['REQUIRED']){
             $result=false;
         }
-        if ( count($this->fw->G['ERR']) && !$this->fw->G['ERR']['REQUIRED'] ){
+        if ( count($this->fw->GLOBAL['ERR']) && !$this->fw->GLOBAL['ERR']['REQUIRED'] ){
             $this->ferr('INVALID', true);
             $result=false;
         }
@@ -252,7 +255,7 @@ abstract class FwController {
     }
 
     public function set_form_error($err_msg){
-        $this->fw->G['err_msg']=$err_msg;
+        $this->fw->GLOBAL['err_msg']=$err_msg;
     }
 
     /**

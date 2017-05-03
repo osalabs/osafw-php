@@ -1,6 +1,7 @@
 <?php
 
 class MySettingsController extends FwController {
+    const access_level = 0; #logged only
     const route_default_action = '';
     public $base_url = '/My/Settings';
     public $model_name = 'Users';

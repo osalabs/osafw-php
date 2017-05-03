@@ -116,30 +116,25 @@ class AdminAttController extends FwAdminController {
             #Proceed upload
             if (count($files)) $this->model->upload($id, $files[0], $is_add);
 
-            #logger($this->fw->get_response_expected_format());
             if ($this->fw->get_response_expected_format()=='json'){
                 $item = $this->model->one($id);
-                return array(
-                    '_json_enabled' => true,
-                    'success'   => true,
-                    'id'        => $id,
-                    'item'      => $item,
-                    'url'       => $this->model->get_url_direct($item),
-                );
+                return array('_json' => array(
+                        'success'   => true,
+                        'id'        => $id,
+                        'item'      => $item,
+                        'url'       => $this->model->get_url_direct($item),
+                ));
             }else{
                 fw::redirect($this->base_url.'/'.$id.'/edit');
             }
 
         }catch( ApplicationException $ex ){
-            #logger($this->fw->get_response_expected_format());
-            #logger($ex->getMessage());
             if ($this->fw->get_response_expected_format()=='json'){
-                return array(
-                    '_json_enabled' => true,
+                return array('_json' => array(
                     'success'   => false,
                     'err_msg'   => $ex->getMessage(),
                     'id'        => $id,
-                );
+                ));
             }else{
                 $this->set_form_error($ex->getMessage());
                 $this->route_redirect("ShowForm");

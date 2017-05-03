@@ -22,7 +22,12 @@ class FormUtils {
 
         #copy fields
         foreach ($anames as $name){
-          if (!$is_exists || array_key_exists($name, $FORM)) $result[$name]=$FORM[$name];
+          if (!$is_exists || array_key_exists($name, $FORM)) {
+            $v=$FORM[$name];
+            #if form contains array - convert to comma-separated string (it's from select multiple)
+            if (is_array($v)) $v = implode(',', $v);
+            $result[$name]=$v;
+          }
         }
     }
 

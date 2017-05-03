@@ -134,7 +134,7 @@ class UploadUtils {
     public static function upload_file($item_id, $module_basedir, $file, $opt=array()) {
         $result='';
         if (!$item_id || !is_array($file) || !$module_basedir ) return '';
-        #logger("upload_file: $item_id, $module_basedir");
+        logger('TRACE', "upload_file: $item_id, $module_basedir", $file, $opt);
 
         self::cleanup_upload($item_id, $module_basedir);
 
@@ -149,7 +149,7 @@ class UploadUtils {
 
             //check other options
         }else{
-            logger('ERROR move_uploaded_file');
+            logger('WARN','Upload error during move_uploaded_file');
         }
 
         return $result;

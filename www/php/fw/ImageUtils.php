@@ -92,7 +92,7 @@ class ImageUtils {
       return array($new_w,$new_h);
 
     }else{
-      logger("ERROR: FILE NOT EXISTS $in_file");
+      logger('WARN', "ERROR resizing image - file not exists: [$in_file]");
       return array(0,0);
     }
 
@@ -176,7 +176,7 @@ class ImageUtils {
     if ($img==-1) throw new Exception("no GD installed, required for image_rotate"); #not done because GD is not attached
 
     if (!function_exists('imagerotate')) {
-      logger("WARN: standard 'imagerotate' not exists, emulating...");
+      logger('WARN',"standard 'imagerotate' not exists, emulating...");
       ini_set("memory_limit", "128M");
       $img==self::imagerotate_my($img, $angle, 0xFFFFFF);
     }else{
@@ -301,7 +301,7 @@ class ImageUtils {
       if (!$out_file) $out_file=$in_file;
 
       if (!file_exists($in_file)){
-          logger("ERROR: FILE NOT EXISTS $in_file");
+          logger('WARN', "ERROR resizing image - file not exists: [$in_file]");
           return 0;
       }
 

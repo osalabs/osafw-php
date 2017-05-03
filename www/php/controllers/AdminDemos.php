@@ -1,6 +1,7 @@
 <?php
 
 class AdminDemosController extends FwAdminController {
+    const access_level = 100;
     const route_default_action = '';
     public $base_url='/Admin/Demos';
     public $required_fields = 'iname email';
@@ -51,6 +52,35 @@ class AdminDemosController extends FwAdminController {
         }
     }
 
+    //View item screen
+    public function ShowAction($form_id) {
+        $id = $form_id+0;
+        $item = $this->model->one($id);
+        if (!$item) throw new ApplicationException("Not Found", 404);
+
+        $item["ftime_str"] = DateUtils::int2timestr( $item["ftime"] );
+        $dict_link_multi = FormUtils::ids2multi($item['dict_link_multi']);
+
+        $ps = array(
+            'id'    => $id,
+            'i'     => $item,
+            'add_user_id_name'  => fw::model('Users')->full_name($item['add_user_id']),
+            'upd_user_id_name'  => fw::model('Users')->full_name($item['upd_user_id']),
+            'return_url'        => $this->return_url,
+            'related_id'        => $this->related_id,
+
+            'parent'            => $this->model->one( $item['parent_id'] ),
+            'demo_dicts'        => $this->model_related->one( $item['demo_dicts_id'] ),
+            'dict_link_auto'    => $this->model_related->one( $item['dict_link_auto_id'] ),
+            'multi_datarow'     => $this->model_related->get_multi_list( $dict_link_multi ),
+            'att'               => fw::model('Att')->one($item['att_id']+0),
+            'att_links'         => fw::model('Att')->get_att_links($this->model->table_name, $id),
+        );
+
+        return $ps;
+    }
+
+    //Add/Edit item form screen
     public function ShowFormAction($form_id) {
         $id = $form_id+0;
         $dict_link_multi=array();
@@ -84,7 +114,8 @@ class AdminDemosController extends FwAdminController {
             'select_options_demo_dicts_id'  => $this->model_related->get_select_options( $item['demo_dicts_id'] ),
             'dict_link_auto_id_iname'       => $item['dict_link_auto_id'] ? $this->model_related->iname( $item['dict_link_auto_id'] ) : $item['dict_link_auto_id_iname'],
             'multi_datarow'                 => $this->model_related->get_multi_list( $dict_link_multi ),
-            'att_id_url_s'                  => $this->fw->model('Att')->get_url_direct($item['att_id'],'s'),
+            'att'                           => fw::model('Att')->one($item['att_id']+0),
+            'att_links'                     => fw::model('Att')->get_att_links($this->model->table_name, $id),
         );
         #combo date
         #TODO FormUtils::combo4date( $item['fdate_combo'], $ps, 'fdate_combo');
@@ -101,10 +132,20 @@ class AdminDemosController extends FwAdminController {
 
         $itemdb['dict_link_auto_id'] = $this->model_related->add_or_update_quick( $item['dict_link_auto_id_iname'] );
         $itemdb['dict_link_multi'] = FormUtils::multi2ids( req('dict_link_multi') );
+        $itemdb['fdate_pop']= DateUtils::Str2SQL($itemdb['fdate_pop']);
         #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');
         $itemdb['ftime'] = DateUtils::timestr2int( $item['ftime_str'] ); #ftime - convert from HH:MM to int (0-24h in seconds)
 
         return $itemdb;
+    }
+
+    // override because we need to update att links
+    public function model_add_or_update($id, $fields){
+        $id=parent::model_add_or_update($id, $fields);
+
+        fw::model('Att')->update_att_links($this->model->table_name, $id, reqh('att'));
+
+        return $id;
     }
 
     public function Validate($id, $item) {
@@ -127,7 +168,9 @@ class AdminDemosController extends FwAdminController {
     public function AjaxAutocompleteAction(){
         $query = reqs('q');
 
-        $ps=$this->model_related->get_autocomplete_items($query);
+        $ps=array(
+            '_json' => $this->model_related->get_autocomplete_items($query),
+        );
         return $ps;
     }
 

@@ -3,7 +3,7 @@
  ParsePage - Site Template Parser
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2017 Oleg Savchuk www.osalabs.com
 
  2006-07-15 Oleg Savchuk - fixed inline tags parsing
  2006-12-30 - fixed parse_page_sort_tags (added \b)
@@ -45,6 +45,7 @@
  2014-11-20 - fixed: tag_if better compares values
  2014-11-25 - changed to use $CONFIG global var instead site_root, site_templ...
  2014-11-28 - fixed: sec2date now detect '0000-00-00 00:00:00' and return empty string
+ 2017-03-08 - fixed: quote special PHP $ and \\12345
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -165,6 +166,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
  //make path 'absolute'
  if (!preg_match("/^\//",$tpl_name)) $tpl_name="$basedir/$tpl_name";
+ #logger('TRACE', "parsing $tpl_name");
 
  if (!$page){
     //load template
@@ -188,13 +190,14 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
        //re-sort $tags_full, so all 'inline' and 'sub' tags will be parsed first
        $tags_full=parse_page_sort_tags($tags_full);
+       #logger($tags_full);
 
        $TAGSEEN=array();
        for($i=0;$i<count($tags_full);$i++){
          $tag_full=$tags_full[$i];
          if (array_key_exists($tag_full, $TAGSEEN)) continue;
          $TAGSEEN[$tag_full]=1;
-
+         #logger($tag_full);
 
          $tag='';
          $attrs=array();
@@ -235,7 +238,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
             //get var from GLOBALS, not from $hf
             if ( array_key_exists('global', $attrs) ){
-                 $tagvalue=hfvalue($tag, fw::i()->G); #was: $GLOBALS
+                 $tagvalue=hfvalue($tag, fw::i()->GLOBAL); #was: $GLOBALS
             }
             //get var from SESSION, not from $hf
             elseif ( array_key_exists('session', $attrs) ){
@@ -276,7 +279,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
                        $k1++;
                     }
                   }else{
-                    logger('WARN', 'ParsePage - not an array passed to repeat tag = '.$tag);
+                    logger('DEBUG', 'ParsePage warning - not an array passed to repeat tag = '.$tag); #DEBUG cause this dev error happens frequently
                     $tagvalue='';
                   }
 
@@ -330,7 +333,11 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
     } //if tags empty
 
 
- } //if  tpl empty
+ }else{ //if  tpl empty
+  logger('TRACE', "ParsePage notice - empty template [$tpl_name]");
+ }
+
+ #logger('TRACE', "End of $tpl_name");
 
  if ($out_filename && $out_filename!='v' && $out_filename!='s'){
     $outdir=dirname($out_filename);  //check dir
@@ -364,7 +371,7 @@ function hfvalue($tag, &$hf){
 
     if ( strtoupper($arr[0])=='GLOBAL' ){
        #was $ptr=&$GLOBALS;
-      $ptr=fw::i()->G;
+      $ptr=fw::i()->GLOBAL;
        array_shift($arr);
     }elseif ( strtoupper($arr[0])=='SESSION' ){
        $ptr=&$_SESSION;
@@ -401,6 +408,13 @@ function get_inline_tpl(&$page, $tag, $tag_full){
  $restr='/'.preg_quote($PARSE_PAGE_OPEN_TAG.$tag_full.$PARSE_PAGE_CLOSE_TAG, '/')."(.*?)".preg_quote($PARSE_PAGE_OPENEND_TAG.$tag.$PARSE_PAGE_CLOSE_TAG, '/').'/si';
  if ( preg_match($restr, $page, $match) ){
     $inline_tpl=$match[1];
+ }else{
+  if ( preg_match('/'.preg_quote($PARSE_PAGE_OPEN_TAG.$tag_full.$PARSE_PAGE_CLOSE_TAG, '/').'/', $page) ){
+    logger('DEBUG', "ParsePage error - no closing tag </~$tag> found for inline template <~$tag_full>");
+  }else{
+    //no open tag found - skip
+    //TODO - optimize - when inline template parsed - tags should be marked as seen
+  }
  }
  return $inline_tpl;
 }
@@ -449,9 +463,9 @@ function tag_if($attrs, $hf){
   # if no if operation - return true
   if (!$oper) return true;
 
-  #just for debug
+  #just for debug upgrade from old templates
   if (array_key_exists("ifgee", $attrs) || array_key_exists("iflee", $attrs)){
-    rw("WARNING! old-style template used. Upgrade templates!");
+    logger('WARN', "ParsePage warning - old-style template used. Upgrade templates!");
   }
 
   $avalue='';
@@ -532,9 +546,7 @@ function tag_replace_raw($page, $tag_full, $value, $is_inline){
     $restr='/'.preg_quote($PARSE_PAGE_OPEN_TAG.$tag_full.$PARSE_PAGE_CLOSE_TAG, '/').".*?".preg_quote($PARSE_PAGE_OPENEND_TAG.$tag.$PARSE_PAGE_CLOSE_TAG, '/').'/si';
 
     #quote special PHP $ and \\12345
-    //$value=preg_replace('/\\\\(d+)/', '\\\\$1', $value);
-    $value=preg_replace('/\\\\/', '\\\\\\\\', $value);  //better
-    $value=str_replace('$', '\$', $value);              //order is important
+    $value=str_replace(array('\\', '$'), array('\\\\', '\\$'), $value); //even better, order is important
 
     return preg_replace($restr, $value ,$page);
 
@@ -554,7 +566,7 @@ function parse_select_tag($basedir, $tpl_path, $hf, $attrs){
  if (is_array($sel_value)) $sel_value=array_flip($sel_value);
  if (!preg_match("/^\//",$tpl_path)) $tpl_path="$basedir/$tpl_path";
 
- $lines=preg_split("/[\r\n]+/",file_get_contents($CONFIG['SITE_TEMPLATES'].$tpl_path));
+ $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
  $result;
  for($i=0;$i<count($lines);$i++){
@@ -590,7 +602,7 @@ function parse_radio_tag($basedir, $tpl_path, $hf, $attrs){
  $delim=htmlescape_back($attrs['delim']);
  if (!preg_match("/^\//",$tpl_path)) $tpl_path="$basedir/$tpl_path";
 
- $lines=preg_split("/[\r\n]+/",file_get_contents($CONFIG['SITE_TEMPLATES'].$tpl_path));
+ $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
  $result;
  for($i=0;$i<count($lines);$i++){
@@ -621,7 +633,7 @@ function parse_selvalue_tag($basedir, $tpl_path, $hf, $attrs){
  $sel_value=hfvalue($attrs['selvalue'], $hf);
  if (!preg_match("/^\//",$tpl_path)) $tpl_path="$basedir/$tpl_path";
 
- $lines=preg_split("/[\r\n]+/",file_get_contents($CONFIG['SITE_TEMPLATES'].$tpl_path));
+ $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
  $result;
  for($i=0;$i<count($lines);$i++){
@@ -668,7 +680,7 @@ function parse_page_sort_tags($tags_full){
 // CACHED!!!
 global $FILE_CACHE;
 $FILE_CACHE=array();
-function precache_file($infile, $isdie=0){
+function precache_file($infile, $isdie=false){
  global $FILE_CACHE;
  $result='';
 
@@ -679,11 +691,15 @@ function precache_file($infile, $isdie=0){
  if (file_exists($infile)){
     $result=file_get_contents($infile);
  } else {
+   $msg="ParsePage - can't open template file [$infile]";
    if ($isdie){
-      die("Can't open template [$infile] file");
+      logger('ERROR', $msg);
+      throw new Exception();
+   }else{
+      #if no die - just log trace, it's not an issue if there are no template file
+      logger('TRACE', $msg);
    }
  }
-
 
  $FILE_CACHE[$infile]=$result;
  return $result;
@@ -952,6 +968,7 @@ function update_lang($str, $lang){
 
  $lang_file=$CONFIG['SITE_TEMPLATES']."/lang/$lang.txt";
  $LANG_STR=load_lang($lang_file);
+ logger('TRACE', "ParsePage notice - updating lang [$lang_file]");
 
  if ( !array_key_exists($str, $LANG_STR) ){
     $LANG_CACHE[$lang_file][$str]="";

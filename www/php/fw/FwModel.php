@@ -166,7 +166,7 @@ abstract class FwModel {
     //simple upload of the file related to item
     public function upload_file($id, $file){
         $filepath = UploadUtils::upload_file($id, $this->get_upload_basedir(), $file);
-        logger("file uploaded to [$filepath]");
+        logger('DEBUG', "file uploaded to [$filepath]");
 
         UploadUtils::upload_resize($filepath, UploadUtils::$IMG_RESIZE_DEF);
         return $filepath;
