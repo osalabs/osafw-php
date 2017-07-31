@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS settings (
     PRIMARY KEY  (id),
     UNIQUE KEY (icode),
     KEY (icat)
-);
+) DEFAULT CHARSET=utf8;
 INSERT INTO settings (is_user_edit, input, icat, icode, ivalue, iname, idesc) VALUES
 (1, 10, '', 'test', 'novalue', 'test settings', 'description');
 
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS att_categories (
     upd_time            timestamp,
     upd_user_id         int unsigned default 0,
     PRIMARY KEY  (id)
-);
+) DEFAULT CHARSET=utf8;
 INSERT INTO att_categories (icode, iname) VALUES
 ('general', 'General images')
 ,('users', 'Member photos')
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS att (
 
     fname               varchar(255) NOT NULL DEFAULT '',              /*original file name*/
     fsize               int DEFAULT 0,                   /*file size*/
-    ext                 varchar(4) NOT NULL DEFAULT '',                 /*extension*/
+    ext                 varchar(16) NOT NULL DEFAULT '',                 /*extension*/
     iname               varchar(255) NOT NULL DEFAULT '',   /*attachment name*/
 
     status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS att (
     upd_user_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (att_categories_id) REFERENCES att_categories(id)
-);
+) DEFAULT CHARSET=utf8;
 CREATE INDEX att_table_name ON att (table_name, item_id);
 
 /* link att files to table items*/
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS att_table_link (
     add_user_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (att_id) REFERENCES att(id)
-);
+) DEFAULT CHARSET=utf8;
 CREATE UNIQUE INDEX att_table_link_UX ON att_table_link (table_name, item_id, att_id);
 
 /*Static pages*/
@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS spages (
     upd_user_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (head_att_id) REFERENCES att(id)
-);
+) DEFAULT CHARSET=utf8;
 CREATE INDEX spages_parent_id ON spages (parent_id, prio);
 CREATE INDEX spages_url ON spages (url);
 
@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS events (
 
     PRIMARY KEY (id),
     KEY (icode)
-);
+) DEFAULT CHARSET=utf8;
 INSERT INTO events (icode, iname) VALUES ('login',    'User login');
 INSERT INTO events (icode, iname) VALUES ('logoff',   'User logoff');
 INSERT INTO events (icode, iname) VALUES ('chpwd',    'User changed login/pwd');
@@ -265,4 +265,4 @@ CREATE TABLE IF NOT EXISTS event_log (
     KEY (events_id),
     KEY (add_user_id),
     KEY (add_time)
-);
+) DEFAULT CHARSET=utf8;

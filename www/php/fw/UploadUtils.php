@@ -30,12 +30,10 @@ class UploadUtils {
         return $result;
     }
     public static function get_upload_basedir(){
-        global $CONFIG;
-        return $CONFIG['PUBLIC_UPLOAD_DIR'];
+        return fw::i()->config->PUBLIC_UPLOAD_DIR;
     }
     public static function get_upload_baseurl(){
-        global $CONFIG;
-        return $CONFIG['PUBLIC_UPLOAD_URL'];
+        return fw::i()->config->PUBLIC_UPLOAD_URL;
     }
 
     /**

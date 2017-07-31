@@ -15,18 +15,17 @@ class Events extends FwModel {
     //add new record - override FwModel because we don't need to log this
     public function add($item) {
         if (!isset($item['add_user_id'])) $item['add_user_id']=Utils::me();
-        $id=db_insert($this->table_name, $item);
+        $id=$this->db->insert($this->table_name, $item);
 
         return $id;
     }
 
     public function one_by_icode($icode){
-        return db_row($this->table_name, array('icode'=>$icode));
+        return $this->db->row($this->table_name, array('icode'=>$icode));
     }
 
     public function log_event($ev_icode, $item_id=0, $item_id2=0, $iname='', $records_affected=0, $fields=null){
-        global $CONFIG;
-        if (!$CONFIG['IS_LOG_EVENTS']) return;
+        if (!$this->fw->config->IS_LOG_EVENTS) return;
 
         $ev = $this->one_by_icode($ev_icode);
         if (!$ev){
@@ -48,7 +47,7 @@ class Events extends FwModel {
             'add_user_id' => Utils::me(),
         );
         if (!is_null($fields)) $tolog['fields'] = json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK);
-        return db_insert($this->log_table_name, $tolog);
+        return $this->db->insert($this->log_table_name, $tolog);
     }
 
     //just to log fields for particular record

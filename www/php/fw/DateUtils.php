@@ -45,8 +45,6 @@ class DateUtils {
     // from YYYY-MM-DD to date string
     // params: SQL Date, Format (if 1 - better human format), Add HH:MM:SS
     public static function SQL2Str($s, $human_format=0, $add_hms=0){
-        global $form_utils_AMONTH;
-
         if (!strlen($s) || $s=='0000-00-00' || $s=='0000-00-00 00:00:00') return '';
 
         $unixtime=self::SQLDate2Unix($s);

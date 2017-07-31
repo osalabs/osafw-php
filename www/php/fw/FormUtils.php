@@ -51,8 +51,7 @@ class FormUtils {
 
   #RETURN: array of pages for pagination
   public static function get_pager($count, $pagenum, $pagesize=NULL){
-    global $CONFIG;
-    if (is_null($pagesize)) $pagesize = $CONFIG['MAX_PAGE_ITEMS'];
+    if (is_null($pagesize)) $pagesize = fw::i()->config->MAX_PAGE_ITEMS;
 
     $pager = array();
     if ($count>$pagesize){

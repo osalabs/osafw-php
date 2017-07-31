@@ -13,11 +13,11 @@
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse navbar-ex1-collapse">
       <ul class="nav navbar-nav">
-          <li <~/std/header/active ifeq="GLOBAL[controller.action]" value="Home.Index">><a href="<~ROOT_URL>/">Home</a></li>
-          <li <~/std/header/active ifeq="GLOBAL[controller.action]" value="Home.Show.About">><a href="<~/home/url>/About">About</a></li>
-          <li <~/std/header/active ifeq="GLOBAL[controller.action]" value="Home.Show.Contact">><a href="<~/contact/url>">Contact</a></li>
+          <li <~/common/clactive ifeq="GLOBAL[controller.action]" value="Home.Index">><a href="<~ROOT_URL>/">Home</a></li>
+          <li <~/common/clactive ifeq="GLOBAL[controller.action.id]" value="Home.Show.About">><a href="<~/home/url>/About">About</a></li>
+          <li <~/common/clactive ifeq="GLOBAL[controller]" value="Contact">><a href="<~/contact/url>">Contact</a></li>
           <~logged_login unless="SESSION[is_logged]" inline>
-            <li <~/std/header/active ifeq="GLOBAL[controller]" value="Login">><a href="<~/login/url>">Login</a></li>
+            <li <~/common/clactive ifeq="GLOBAL[controller]" value="Login">><a href="<~/login/url>">Login</a></li>
           </~logged_login>
       </ul>
 
@@ -26,8 +26,8 @@
         <li class="dropdown">
           <a href="#" data-toggle="dropdown"><~SESSION[user_name] if="SESSION[user_name]"><~SESSION[login] unless="SESSION[user_name]"> <span class="caret"></span></a>
           <ul class="dropdown-menu">
-            <li <~/std/header/active ifeq="GLOBAL[controller]" value="MySettings"> ><a href="<~/my/settings/url>">My Profile</a></li>
-            <li <~/std/header/active ifeq="GLOBAL[controller]" value="MyPassword"> ><a href="<~/my/password/url>">Change Login or Password</a></li>
+            <li><a href="<~/my/settings/url>">My Profile</a></li>
+            <li><a href="<~/my/password/url>">Change Login or Password</a></li>
             <li class="divider"></li>
             <li><a href="/Logoff">Logoff</a></li>
           </ul>

@@ -24,8 +24,6 @@ class LoginController extends FwController {
     }
 
     public function SaveAction() {
-        global $CONFIG;
-
         #special case login
         if ( req('save_type')=='facebook' ){
             $this->SaveFacebook();
@@ -40,8 +38,8 @@ class LoginController extends FwController {
             $gourl = reqs('gourl');
 
             #for dev only - login as first admin
-            if ($CONFIG['IS_DEV']===TRUE && $pwd=='~'){
-                $dev = db_row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
+            if ($this->fw->config->IS_DEV===TRUE && $login=='' && $pwd=='~'){
+                $dev = $this->fw->db->row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
                 $login = $dev['email'];
                 $pwd = $dev['pwd'];
             }
@@ -51,7 +49,7 @@ class LoginController extends FwController {
                 throw new ApplicationException("");
             }
 
-            $hU = db_row("select * from users where email=".dbq($login)." and pwd=".dbq($pwd));
+            $hU = $this->fw->db->row("select * from users where email=".$this->fw->db->quote($login)." and pwd=".$this->fw->db->quote($pwd));
             if ( !isset($hU['access_level']) || $hU['status']!=0 ) throw new ApplicationException(lng("User Authentication Error"));
 
             $this->model->do_login( $hU['id'] );
@@ -59,7 +57,7 @@ class LoginController extends FwController {
             if ($gourl && !preg_match("/^http/i", $gourl)){ #if url set and not external url (hack!) given
                 fw::redirect($gourl);
             }else{
-                fw::redirect($CONFIG['LOGGED_DEFAULT_URL']);
+                fw::redirect($this->fw->config->LOGGED_DEFAULT_URL);
             }
 
         }catch( ApplicationException $ex){
@@ -95,13 +93,13 @@ class LoginController extends FwController {
 
         if (!$users_id){
             #now check by facebook email
-            $hU=db_row("select * from users where fb_email=".dbq($item['email']) );
+            $hU=$this->fw->db->row("select * from users where fb_email=".$this->fw->db->quote($item['email']) );
             if ($hU['id']) $users_id=$hU['id'];
         }
 
         if (!$users_id){
             #now check by facebook id
-            $hU=db_row("select * from users where fb_id=".dbq($item['id']) );
+            $hU=$this->fw->db->row("select * from users where fb_id=".$this->fw->db->quote($item['id']) );
             if ($hU['id']) $users_id=$hU['id'];
         }
 
@@ -125,7 +123,7 @@ class LoginController extends FwController {
             if (!$hU['fb_verified'])    $vars['fb_verified']    =$item['verified']=='true' ? 1 : 0;
             if (!$hU['fb_picture_url']) $vars['fb_picture_url'] ='http://graph.facebook.com/'.$item['username'].'/picture';
 
-            db_update('users', $vars, $users_id);
+            $this->fw->db->update('users', $vars, $users_id);
 
         }else{
             #register user first if new
@@ -161,8 +159,6 @@ class LoginController extends FwController {
     }
 
     public function LogoffAction() {
-        global $CONFIG;
-
         $this->fw->model('Events')->log_event('logoff', Utils::me());
 
         //delete session
@@ -171,7 +167,7 @@ class LoginController extends FwController {
 
         $this->model->remove_perm_cookie();
 
-        fw::redirect($CONFIG['UNLOGGED_DEFAULT_URL']);
+        fw::redirect($this->fw->config->UNLOGGED_DEFAULT_URL);
     }
 
 }//end of class

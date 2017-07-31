@@ -1,6 +1,7 @@
 <?php
 
 class SignupController extends FwAdminController {
+    const access_level = null;
     const route_default_action = '';
     public $base_url='/Signup';
     public $required_fields = 'email pwd pwd2';
@@ -8,10 +9,9 @@ class SignupController extends FwAdminController {
     public $model_name = 'Users';
 
     public function __construct() {
-        global $CONFIG;
         parent::__construct();
 
-        if (!$CONFIG['IS_SIGNUP']) throw new ApplicationException("Sign Up access denied by site config [IS_SIGNUP]");
+        if (!$this->fw->config->IS_SIGNUP) throw new ApplicationException("Sign Up access denied by site config [IS_SIGNUP]");
     }
 
     public function IndexAction() {
@@ -43,8 +43,6 @@ class SignupController extends FwAdminController {
     }
 
     public function SaveAction($form_id) {
-        global $CONFIG;
-
         $id = $form_id+0;
         $item = req('item');
 
@@ -65,7 +63,7 @@ class SignupController extends FwAdminController {
             $this->fw->send_email_tpl( $user['email'], 'signup.txt', $ps);
 
             $this->model->do_login( $id );
-            fw::redirect($CONFIG['LOGGED_DEFAULT_URL']);
+            fw::redirect($this->fw->config->LOGGED_DEFAULT_URL);
 
         }catch( ApplicationException $ex ){
             $this->set_form_error($ex->getMessage());

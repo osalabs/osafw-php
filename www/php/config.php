@@ -52,7 +52,9 @@ $FW_CONFIG = array(
 
     'MAIL'  => array(
                 'IS_SMTP'       => false, #if true, use SMTP settings below
-                'SMTP_SERVER'   => '', #IP or domain name of SMTP server
+                'SMTPSecure'    => '', #empty or ssl or tls
+                'SMTP_SERVER'   => '', #IP or domain name of SMTP server ";" separated if multiple
+                'SMTP_PORT'     => '', #optional, SMTP port
                 'USER'          => '', #SMTP auth user
                 'PWD'           => '', #SMTP auth pwd
                 ),
@@ -71,19 +73,20 @@ $FW_CONFIG = array(
     'site_error_log'        => $site_root_offline.'/logs/error.log',
     'LOGGER_MESSAGE_TYPE'   => 3, #3 - default to $site_error_log
     'LOG_LEVEL'             => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'IS_DEV'                => false, #NEVER set to true on live environments
 
     'IS_SIGNUP'             => true,  #set to false to disable Sign Up module
     'LOGGED_DEFAULT_URL'    => '/Main',
     'UNLOGGED_DEFAULT_URL'  => '/',
 
-    'SITE_TEMPLATES'        => $site_root.'/template',
+    'SITE_TEMPLATES'        => $site_root_offline.'/template',
     'PUBLIC_UPLOAD_DIR'     => $site_root.'/upload',
     'PUBLIC_UPLOAD_URL'     => $root_url.'/upload',
 
     #page layout templates - relative to SITE_TEMPLATES dir
-    'PAGE_TPL'              => '/page_tpl.html',
-    'PAGE_TPL_PJAX'         => '/page_tpl_pjax.html',
-    'PAGE_TPL_ADMIN'        => '/page_tpl.html',
+    'PAGE_LAYOUT'              => '/layout.html',       #default layout for all pages
+    'PAGE_LAYOUT_PJAX'         => '/layout_pjax.html',
+    'PAGE_LAYOUT_ADMIN'        => '/layout_tpl.html',
 
     'MAX_PAGE_ITEMS'        => 25,
 

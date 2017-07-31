@@ -4,7 +4,7 @@ class AdminUsersController extends FwAdminController {
     const route_default_action = '';
     public $base_url = '/Admin/Users';
     public $required_fields = 'email access_level';
-    public $save_fields = 'email fname lname phone pwd access_level status';
+    public $save_fields = 'email pwd access_level fname lname title address1 address2 city state zip phone status att_id';
     public $model_name = 'Users';
 
     public $list_sortdef = 'iname asc';    //default sorting - req param name, asc|desc direction
@@ -13,10 +13,29 @@ class AdminUsersController extends FwAdminController {
                         'iname'         => 'fname,lname',
                         'email'         => 'email',
                         'access_level'  => 'access_level',
+                        'status'        => 'status',
                         'add_time'      => 'add_time',
                         );
     public $search_fields = 'email fname lname';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
                                             //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
+
+    public function set_list_search() {
+        $this->list_where=' 1=1 ';
+
+        parent::set_list_search();
+
+        if ($this->list_filter['status']>''){
+            $this->list_where .= ' and status='.$this->fw->db->quote($this->list_filter['status']);
+        }else{
+            $this->list_where .= ' and status<>127';
+        }
+    }
+
+    public function ShowFormAction($form_id){
+        $ps = parent::ShowFormAction($form_id);
+        $ps['att']= fw::model('Att')->one($ps['i']['att_id']+0);
+        return $ps;
+    }
 
     public function SaveAction($form_id) {
         $id = $form_id+0;
@@ -69,6 +88,20 @@ class AdminUsersController extends FwAdminController {
             'add_time' => 'Added',
         );
         Utils::response_csv($ps['list_rows'], $fields, "members.csv");
+    }
+
+    //send email notification with password
+    public function SendPwdAction($form_id){
+        $id=$form_id+0;
+
+        $user = $this->model->one($id);
+        $this->fw->send_email_tpl( $user['email'], 'email_pwd.txt', $user);
+
+        return array(
+            '_json' => array(
+                    'success'   => true,
+                ),
+        );
     }
 
 }//end of class

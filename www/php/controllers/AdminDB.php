@@ -7,7 +7,7 @@ class AdminDBController extends FwController {
         parent::__construct();
 
         //optionally init controller
-        fw::redirect('/phpminiadmin_site.php');
+        fw::redirect('/phpminiadmin.php');
     }
 
 }//end of class

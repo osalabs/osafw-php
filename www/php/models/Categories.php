@@ -9,8 +9,8 @@ class Categories extends FwModel {
 
     public function ilist($parent_id=NULL) {
         $where ='';
-        if (!is_null($parent_id)) $where .='and parent_id='.dbq($parent_id);
-        return db_array("select * from ".$this->table_name." where status=0 $where order by parent_id, prio desc, iname");
+        if (!is_null($parent_id)) $where .='and parent_id='.$this->db->quote($parent_id);
+        return $this->db->arr("select * from ".$this->table_name." where status=0 $where order by parent_id, prio desc, iname");
     }
 
     public function get_select_options($sel_id, $parent_id=NULL) {

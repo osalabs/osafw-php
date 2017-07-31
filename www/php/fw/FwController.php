@@ -67,8 +67,6 @@ abstract class FwController {
     #get filter values from request and overwrite saved in session
     #save back to session and return
     public function get_filter(){
-        global $CONFIG;
-
         #each filter remembered in session linking to controller.action
         $session_key = '_filter_'.$this->fw->GLOBAL['controller.action'];
         $sfilter = $_SESSION[ $session_key ];
@@ -84,7 +82,7 @@ abstract class FwController {
 
         #paging
         if ( !preg_match("/^\d+$/", $f['pagenum']) ) $f['pagenum']=0;
-        if ( !preg_match("/^\d+$/", $f['pagesize']) ) $f['pagesize']=$CONFIG['MAX_PAGE_ITEMS'];
+        if ( !preg_match("/^\d+$/", $f['pagesize']) ) $f['pagesize']=$this->fw->config->MAX_PAGE_ITEMS;
 
         #save in session for later use
         $_SESSION[ $session_key ] = $f;
@@ -134,8 +132,8 @@ abstract class FwController {
 
         $s = trim($this->list_filter['s']);
         if ( strlen($s) && $this->search_fields){
-            $like_quoted=dbq('%'.$s.'%');
-            $exact_quoted=dbq($s);
+            $like_quoted=$this->fw->db->quote('%'.$s.'%');
+            $exact_quoted=$this->fw->db->quote($s);
 
             $afields = Utils::qw($this->search_fields);
             foreach ($afields as $key => $fieldsand) {
@@ -157,7 +155,7 @@ abstract class FwController {
 
         #if related id and field name set - filter on it
         if ($this->related_id>'' && $this->related_field_name){
-            $this->list_where .= ' and '.dbq_ident($this->related_field_name).'='.dbq($this->related_id);
+            $this->list_where .= ' and '.$this->fw->db->quote_ident($this->related_field_name).'='.$this->fw->db->quote($this->related_id);
         }
     }
 
@@ -168,13 +166,13 @@ abstract class FwController {
      * @return string $this->list_pager pager from FormUtils::get_pager
      */
     public function get_list_rows() {
-        $this->list_count = db_value("select count(*) from {$this->list_view} where " . $this->list_where);
+        $this->list_count = $this->fw->db->value("select count(*) from {$this->list_view} where " . $this->list_where);
         if ($this->list_count){
             $offset = $this->list_filter['pagenum']*$this->list_filter['pagesize'];
             $limit  = $this->list_filter['pagesize'];
 
             $sql = "SELECT * FROM {$this->list_view} WHERE {$this->list_where} ORDER BY {$this->list_orderby} LIMIT {$offset}, {$limit}";
-            $this->list_rows = db_array($sql);
+            $this->list_rows = $this->fw->db->arr($sql);
             $this->list_pager = FormUtils::get_pager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
         }else{
             $this->list_rows = array();
@@ -183,7 +181,7 @@ abstract class FwController {
 
         #if related_id defined - add it to each row
         if ($this->related_id>''){
-            Utils::dbarray_inject($this->list_rows, array('related_id' => $this->related_id));
+            Utils::array_inject($this->list_rows, array('related_id' => $this->related_id));
         }
 
         //add/modify rows from db - use in override child class

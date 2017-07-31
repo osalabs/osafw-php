@@ -12,7 +12,7 @@ class AttCategories extends FwModel {
     }
 
     public function one_by_icode($icode){
-        return db_row($this->table_name, array('icode'=>$icode));
+        return $this->db->row($this->table_name, array('icode'=>$icode));
     }
 }
 

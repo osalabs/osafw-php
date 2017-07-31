@@ -96,11 +96,12 @@ class Utils {
 
     /**
      * for each row in $rows add array keys/values to this row
-     * @param  dbarray $rows  array of hashes
+     * usage: Utils::array_inject($this->list_rows, array('related_id' => $this->related_id));
+     * @param  array $rows  array of assoc arrays
      * @param  array $toadd keys/values to add
-     * @return none $rows changed by ref
+     * @return none, $rows changed by ref
      */
-    public static function dbarray_inject(&$rows, $toadd){
+    public static function array_inject(&$rows, $toadd){
         foreach ($rows as $k => $row) {
             #array merge
             foreach ($toadd as $key => $value) {
@@ -250,7 +251,8 @@ class Utils {
         ##curl_setopt($cu, CURLINFO_HEADER_OUT, 1);
 
         $result = curl_exec($cu);
-        #logger(curl_getinfo($cu));
+        logger('TRACE', 'RESULT:', $result);
+        #logger('TRACE', 'CURL INFO:', curl_getinfo($cu));
         if(curl_error($cu)){
             logger('ERROR', 'CURL error: '.curl_error($cu));
             $result=FALSE;

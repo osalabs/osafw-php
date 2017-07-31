@@ -19,7 +19,6 @@ class AttController extends FwController {
     }
 
     public function ShowAction($id=''){
-        global $CONFIG;
         $id+=0;
         If (!$id) throw new ApplicationException("404 File Not Found");
         $size = reqs('size');
@@ -31,9 +30,9 @@ class AttController extends FwController {
                 $this->model->transmit_file($id, $size, 'inline');
             }else{
                 #if it's not an image and requested preview - return std image
-                header('location: '.$CONFIG['ROOT_URL'].'/img/att_file.png');
+                header('location: '.$this->fw->config->ROOT_URL.'/img/att_file.png');
 
-                // $filepath = $CONFIG['site_root'].'/img/att_file.png'; # TODO move to web.config or to model?
+                // $filepath = $this->fw->config->site_root.'/img/att_file.png'; # TODO move to web.config or to model?
                 // header('Content-type: '.UploadUtils::get_mime4ext($item['ext']));
                 // $fp = fopen($filepath, 'rb');
                 // fpassthru($fp);

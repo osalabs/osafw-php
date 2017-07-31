@@ -349,6 +349,8 @@ class DB {
         global $CONFIG;
         if (is_null($config)){
             $this->config = $CONFIG['DB']; //use site config, if config not passed explicitly
+        }else{
+            $this->config = $config;
         }
     }
 

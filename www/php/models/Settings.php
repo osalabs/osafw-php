@@ -38,7 +38,7 @@ class Settings extends FwModel {
             $row = FwCache::get_value($cache_key);
         }
         if ($is_force || is_null($row)){
-            $row = db_row($this->table_name, array('icode'=>$icode));
+            $row = $this->db->row($this->table_name, array('icode'=>$icode));
             FwCache::set_value($cache_key, $row);
         }
         return $row;

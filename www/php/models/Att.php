@@ -35,7 +35,7 @@ class Att extends FwModel {
             $where['att_categories_id'] = $att_categories_id;
         }
 
-        return db_array($this->table_name, $where, 'add_time desc');
+        return $this->db->arr($this->table_name, $where, 'add_time desc');
     }
 
     public function ilist_by_one_tn($rel_table_name, $rel_item_id) {
@@ -45,7 +45,7 @@ class Att extends FwModel {
             'item_id'       => $rel_item_id,
         );
 
-        return db_array($this->table_name, $where, 'add_time desc');
+        return $this->db->arr($this->table_name, $where, 'add_time desc');
     }
 
     /**
@@ -99,7 +99,7 @@ class Att extends FwModel {
 
     public function get_att_links($table_name, $id){
         if (!$id || !$table_name) return array();
-        return db_array('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name='.dbq($table_name).' and atl.item_id='.dbqi($id));
+        return $this->db->arr('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name='.$this->db->quote($table_name).' and atl.item_id='.dbqi($id));
     }
 
     //add/update att_table_links
@@ -114,7 +114,7 @@ class Att extends FwModel {
         $where = array();
         $where['table_name'] = $table_name;
         $where['item_id'] = $id;
-        db_update($this->att_table_link, $fields, $where);
+        $this->db->update($this->att_table_link, $fields, $where);
 
         #2. add new items or update old to status =0
         foreach ($form_att as $att_id => $value) {
@@ -125,7 +125,7 @@ class Att extends FwModel {
             $where['table_name'] = $table_name;
             $where['item_id'] = $id;
             $where['att_id'] = $att_id;
-            $row = db_row($this->att_table_link, $where);
+            $row = $this->db->row($this->att_table_link, $where);
 
             if ($row){
                 #existing link
@@ -133,7 +133,7 @@ class Att extends FwModel {
                 $fields['status'] = 0;
                 $where = array();
                 $where['id'] = $row['id'];
-                db_update($this->att_table_link, $fields, $where);
+                $this->db->update($this->att_table_link, $fields, $where);
             }else{
                 #new link
                 $fields = array();
@@ -141,12 +141,12 @@ class Att extends FwModel {
                 $fields['table_name'] = $table_name;
                 $fields['item_id'] = $id;
                 $fields['add_user_id'] = $me_id;
-                db_insert($this->att_table_link, $fields);
+                $this->db->insert($this->att_table_link, $fields);
             }
         }
 
         #3. remove not updated atts (i.e. user removed them)
-        db_delete($this->att_table_link, 1, 'status', " and item_id=".dbqi($id)." and table_name=".dbq($table_name));
+        $this->db->delete($this->att_table_link, 1, 'status', " and item_id=".dbqi($id)." and table_name=".$this->db->quote($table_name));
     }
 
     //return correct url
@@ -182,7 +182,9 @@ class Att extends FwModel {
     #transimt file by id/size to user's browser, optional disposition - attachment(default)/inline
     #also check access rights - throws ApplicationException if file not accessible by cur user
     #if no file found OR file status<>0 - throws ApplicationException
-    public function transmit_file($id, $size='', $disposition='attachment'){
+    #$is_private - if true - send private cache headers, instead of public
+    #Optimized: returns 304 if file not modified according to If-Modified-Since http header
+    public function transmit_file($id, $size='', $disposition='attachment', $is_private=false){
         $item = $this->one($id);
         #validation
         if (!count($item)) throw new ApplicationException('No file specified');
@@ -191,6 +193,23 @@ class Att extends FwModel {
         $size = UploadUtils::check_size($size);
 
         $filepath = $this->get_upload_path($id, $item['ext'], $size);
+        $filetime = filemtime($filepath);
+
+        $cache_time = 2592000; #30 days
+        header('Expires: '. gmdate('D, d M Y H:i:s \G\M\T', time() + $cache_time));
+        header("Pragma: cache");
+        if ($is_private){
+            header("Cache-Control: max-age=$cache_time, private");
+        }else{
+            header("Cache-Control: max-age=$cache_time, public");
+        }
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s T', $filetime));
+
+        if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE']) && strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) >= $filetime){
+            header('HTTP/1.0 304 Not Modified');
+            return;
+        }
+
         $filename = str_replace('"', "'", $item['iname']); #quote filename
         header('Content-type: '.UploadUtils::get_mime4ext($item['ext']));
         header("Content-Length: " . filesize($filepath));

@@ -12,12 +12,15 @@ abstract class FwModel {
 
     public $CACHE_PREFIX = 'fwmodel.one.'; #TODO - ability to cleanup all, but this model-only cache items
 
+    protected $db;
+
     public function __construct($param_fw=null) {
         if ( is_null($param_fw) ){
             $this->fw = fw::i();
         }else{
-            $this->fw = $fw;
+            $this->fw = $param_fw;
         }
+        $this->db = $this->fw->db;
     }
 
     //cached, pass $is_force=true to force read from db
@@ -27,7 +30,7 @@ abstract class FwModel {
             $row = FwCache::get_value($cache_key);
         }
         if ($is_force || is_null($row)){
-            $row = db_row("select * from ".$this->table_name." where id=".dbq($id));
+            $row = $this->db->row("select * from ".$this->table_name." where id=".$this->db->quote($id));
             FwCache::set_value($cache_key, $row);
         }else{
             #logger('CACHE HIT!');
@@ -36,7 +39,7 @@ abstract class FwModel {
     }
 
     public function one_by_iname($iname) {
-        return db_row("select * from ".$this->table_name." where iname=".dbq($iname));
+        return $this->db->row("select * from ".$this->table_name." where iname=".$this->db->quote($iname));
     }
 
     public function iname($id) {
@@ -59,7 +62,7 @@ abstract class FwModel {
     //add new record
     public function add($item) {
         if (!isset($item['add_user_id'])) $item['add_user_id']=Utils::me();
-        $id=db_insert($this->table_name, $item);
+        $id=$this->db->insert($this->table_name, $item);
 
         $this->cache_remove($id);
 
@@ -71,7 +74,7 @@ abstract class FwModel {
     public function update($id, $item) {
         if (!isset($item['upd_user_id'])) $item['upd_user_id']=Utils::me();
         $item['upd_time']='~!now()';
-        db_update($this->table_name, $item, $id);
+        $this->db->update($this->table_name, $item, $id);
 
         $this->cache_remove($id);
 
@@ -103,7 +106,7 @@ abstract class FwModel {
     //non-permanent or permanent delete
     public function delete($id, $is_perm=NULL) {
         if ($is_perm){
-            db_delete($this->table_name, $id);
+            $this->db->delete($this->table_name, $id);
             $this->fw->model('Events')->log_event($this->table_name.'_del', $id);
         }else{
             $vars=array(
@@ -124,7 +127,7 @@ abstract class FwModel {
 
     //check if item exists for a given iname
     public function is_exists_byfield($uniq_key, $field, $not_id=NULL) {
-        return db_is_record_exists($this->table_name, $uniq_key, $field, $not_id);
+        return $this->db->is_record_exists($this->table_name, $uniq_key, $field, $not_id);
     }
 
     public function is_exists($uniq_key, $not_id=NULL) {
@@ -134,7 +137,7 @@ abstract class FwModel {
     #return standard list of id,iname where status=0 order by iname
     public function ilist() {
         $sql  = 'select id, iname from '.$this->table_name.' where status=0 order by iname';
-        return db_array($sql);
+        return $this->db->arr($sql);
     }
 
     public function get_select_options($sel_id) {
@@ -155,9 +158,9 @@ abstract class FwModel {
     public function get_autocomplete_items($q, $limit=5) {
         $sql = 'select iname from '.$this->table_name.'
                  where status=0
-                  and iname like '.dbq('%'.$q.'%').'
+                  and iname like '.$this->db->quote('%'.$q.'%').'
                  limit '.$limit;
-        return db_col($sql);
+        return $this->db->col($sql);
     }
 
 

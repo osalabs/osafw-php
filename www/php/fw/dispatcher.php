@@ -75,9 +75,13 @@ class Dispatcher {
     );
 
     public $ROUTES = array();
+    public $ROOT_URL;
+    public $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
 
-    function __construct($ROUTES=array()) {
+    function __construct($ROUTES=array(), $ROOT_URL='', $ROUTE_PREFIXES=array()) {
         $this->ROUTES = $ROUTES;
+        $this->ROOT_URL = $ROOT_URL;
+        $this->ROUTE_PREFIXES = $ROUTE_PREFIXES;
     }
 
     # get route for method/uri with defaults
@@ -246,9 +250,7 @@ class Dispatcher {
     #       format
     #       params
     private function _uri2route($method, $uri, $ROUTES){
-        global $CONFIG;
-        $root_url = $CONFIG['ROOT_URL'];
-        $ROUTE_PREFIXES = $CONFIG['ROUTE_PREFIXES'];
+        $root_url = $this->ROOT_URL;
 
         $result = array();
 
@@ -265,7 +267,7 @@ class Dispatcher {
 
         #prefixes (such as /Admin /Member - setup in Config.php::$ROUTE_PREFIXES) - or do via $ROUTES?
         $controller_prefix='';
-        foreach ($ROUTE_PREFIXES as $prefix) {
+        foreach ($this->ROUTE_PREFIXES as $prefix) {
             $qprefix=preg_quote($prefix,'/');
             if ( preg_match('/^'.$qprefix.'/i', $uri) ){
                 $controller_prefix=$this->_route_fix_chars($prefix);

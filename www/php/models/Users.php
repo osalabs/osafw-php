@@ -16,7 +16,7 @@ class Users extends FwModel {
     }
 
     public function one_by_email($email) {
-        return db_row("select * from ".$this->table_name." where email=".dbq($email));
+        return $this->db->row("select * from ".$this->table_name." where email=".$this->db->quote($email));
     }
 
     public function full_name($id) {
@@ -26,6 +26,25 @@ class Users extends FwModel {
             $result=$item['fname'].' '.$item['lname'];
         }
         return $result;
+    }
+
+    #return standard list of id,iname where status=0 order by iname
+    public function ilist($min_acl=null) {
+        $where='';
+        if (!is_null($min_acl)) $where=' and access_level>='.dbqi($min_acl);
+        $sql  = "select *, (fname+' '+lname) as iname from $this->table_name where status=0 $where order by fname,lname";
+        return $this->db->arr($sql);
+    }
+
+    public function get_multi_list($hsel_ids, $min_acl=null){
+        $rows = $this->ilist($min_acl);
+        if (is_array($hsel_ids) && count($hsel_ids)){
+            foreach ($rows as $k => $row) {
+                $rows[$k]['is_checked'] = array_key_exists($row['id'], $hsel_ids)!==FALSE;
+            }
+        }
+
+        return $rows;
     }
 
     public function add_or_update($login, $pwd, $item){
@@ -42,18 +61,8 @@ class Users extends FwModel {
     }
 
     public function add($item) {
-        $vars=array(
-            'pwd'   => Utils::get_rand_str(8), #generate password
-        );
-        $vars=array_merge($vars, $item);
-        $id=parent::add($vars);
-
-        #send email notification with password
-        $ps=array(
-            'user' => $this->one($id),
-        );
-        $this->fw->send_email_tpl( $item['email'], 'email_registered.txt', $ps);
-
+        if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::get_rand_str(8); #generate password
+        $id=parent::add($item);
         return $id;
     }
 
@@ -61,7 +70,7 @@ class Users extends FwModel {
         return parent::is_exists_byfield($email, 'email', $not_id);
     }
     public function is_email_exists($email) {
-        return db_value("select 1 from ".$this->table_name." where email=".dbq($email)) ? true : false;
+        return $this->db->value("select 1 from ".$this->table_name." where email=".$this->db->quote($email)) ? true : false;
     }
 
     public function do_login($id) {
@@ -117,7 +126,7 @@ class Users extends FwModel {
            'login_ip' => $ip,
            'add_time' => '~!now()',
         );
-        db_insert('users_log', $vars);
+        $this->db->insert('users_log', $vars);
         */
 
         $host=gethostbyaddr($ip);
@@ -127,12 +136,11 @@ class Users extends FwModel {
             'login_ip'      => $ip,
             'login_host'    => $host,
         );
-        db_update($this->table_name, $vars, $id);
+        $this->db->update($this->table_name, $vars, $id);
     }
 
     public function create_perm_cookie($id){
-        global $CONFIG;
-        $root_domain0=$CONFIG['ROOT_DOMAIN0'];
+        $root_domain0=$this->fw->config->ROOT_DOMAIN0;
 
         $cookie_id=substr(Utils::get_rand_str(16).time(),0,32);
 
@@ -140,7 +148,7 @@ class Users extends FwModel {
             'cookie_id' => $cookie_id,
             'users_id'  => $id
         );
-        db_insert('user_cookie', $vars, array('replace' => 1));
+        $this->db->insert('user_cookie', $vars, array('replace' => 1));
 
         setcookie(self::$PERM_COOKIE_NAME, $cookie_id, time()+60*60*24*self::$PERM_COOKIE_DAYS, "/", (preg_match('/\./',$root_domain0))?'.'.$root_domain0:'');
         #rwe("[$root_domain0] ".self::$PERM_COOKIE_NAME.", $cookie_id, ".(time()+60*60*24*self::$PERM_COOKIE_DAYS));
@@ -150,8 +158,7 @@ class Users extends FwModel {
 
     # check for permanent login cookie and if it's present - do_login
     public function check_permanent_login(){
-        global $CONFIG;
-        $root_domain0=$CONFIG['ROOT_DOMAIN0'];
+        $root_domain0=$this->fw->config->ROOT_DOMAIN0;
 
         $result = false;
 
@@ -161,9 +168,9 @@ class Users extends FwModel {
         #exit;
 
         if ($cookie_id) {
-            $u_id=db_value("select users_id
+            $u_id=$this->db->value("select users_id
                   from user_cookie
-                 where cookie_id=".dbq($cookie_id)."
+                 where cookie_id=".$this->db->quote($cookie_id)."
                    and add_time>=FROM_DAYS(TO_DAYS(now())-".self::$PERM_COOKIE_DAYS.")
             ");
 
@@ -185,8 +192,8 @@ class Users extends FwModel {
         setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
 
         #cleanup in DB (user's cookie and ALL old cookies)
-        db_query("delete from user_cookie
-            where cookie_id=".dbq($cookie_id)."
+        $this->db->query("delete from user_cookie
+            where cookie_id=".$this->db->quote($cookie_id)."
                or add_time<FROM_DAYS(TO_DAYS(now())-".self::$PERM_COOKIE_DAYS.")
         ");
 

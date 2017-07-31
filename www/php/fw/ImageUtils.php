@@ -12,8 +12,8 @@ class ImageUtils {
   public static $MAX_RESIZE_WH=array(
 #                  ''    =>  array(1024,1024), #resize original - no resize if commented
                   's'  =>  array(150,150),
-                  'm'  =>  array(300,300),
-                  'l'  =>  array(600,600),
+                  'm'  =>  array(600,600),
+                  'l'  =>  array(1800,1800),
                 );
 
   //accept image file, max width, max height and out_file (default output to same file)

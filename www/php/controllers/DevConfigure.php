@@ -14,7 +14,7 @@ class DevConfigureController extends FwController {
     const route_default_action = 'index';
 
     public function IndexAction() {
-        global $CONFIG, $conf_server_name;
+        global $conf_server_name;
         $ps = array(
             'hide_sidebar' => true,
         );
@@ -22,12 +22,13 @@ class DevConfigureController extends FwController {
         $ps['config_file_name'] = "/php/config.$conf_server_name.php";
 
         $ps['is_db_config']=false;
-        if ($CONFIG['DB']['DBNAME'] && $CONFIG['DB']['USER']) $ps['is_db_config']=true;
+        if ($this->fw->config->DB['DBNAME'] && $this->fw->config->DB['USER']) $ps['is_db_config']=true;
 
         $ps['is_db_conn']=false;
         if ($ps['is_db_config']){
             try {
-                $db = @DB::i()->connect();
+                $db = DB::i();
+                @$db->connect();
                 $ps['is_db_conn']=true;
             } catch (Exception $e) {
                 $ps['db_conn_err']=$e->getMessage();
@@ -37,7 +38,7 @@ class DevConfigureController extends FwController {
         $ps['is_db_tables']=false;
         if ($ps['is_db_conn']){
             try {
-                $value=db_value("select count(*) from event_log"); #checking last table in a script as first tables might be filled
+                $value=$db->value("select count(*) from event_log"); #checking last table in a script as first tables might be filled
                 $ps['is_db_tables']=true;
             } catch (Exception $e) {
                 $ps['db_tables_err']=$e->getMessage();
@@ -45,10 +46,10 @@ class DevConfigureController extends FwController {
         }
 
         $ps['is_write_dirs']=false;
-        if (is_writable($CONFIG['PUBLIC_UPLOAD_DIR'])) $ps['is_write_dirs']=true;
+        if (is_writable($this->fw->config->PUBLIC_UPLOAD_DIR)) $ps['is_write_dirs']=true;
 
         $ps['is_error_log']=false;
-        if (is_writable($CONFIG['site_error_log'])) $ps['is_error_log']=true;
+        if (is_writable($this->fw->config->site_error_log)) $ps['is_error_log']=true;
 
         return $ps;
     }

@@ -8,15 +8,6 @@ require_once dirname(__FILE__)."/../config.php";
 require_once dirname(__FILE__)."/dispatcher.php";
 require_once dirname(__FILE__)."/parsepage.php";
 require_once dirname(__FILE__)."/db.php";
-require_once dirname(__FILE__)."/Utils.php";
-require_once dirname(__FILE__)."/FormUtils.php";
-require_once dirname(__FILE__)."/UploadUtils.php";
-require_once dirname(__FILE__)."/DateUtils.php";
-require_once dirname(__FILE__)."/FwCache.php";
-require_once dirname(__FILE__)."/FwController.php";
-require_once dirname(__FILE__)."/FwAdminController.php";
-require_once dirname(__FILE__)."/FwModel.php";
-require_once dirname(__FILE__)."/../FwHooks.php";
 
 //just to be able to distinguish between system exceptions and applicaiton-level exceptions
 class ApplicationException extends Exception {} #code in constructor used as return HTTP code, so you can throw exception with 404 for example
@@ -24,48 +15,21 @@ class ValidationException extends ApplicationException {}
 class ExitException extends Exception {}
 class BadAccessException extends Exception {}
 
-//******** autoload controller/model classes
-function __autoload($class_name){
-    $dir = dirname(__FILE__).'/..';
-    if ( preg_match('/Controller$/', $class_name) ){
-        $dir.='/controllers/';
-        $class_name=preg_replace("/Controller$/", "", $class_name);
-    }else{
-        $dir.='/models/';
-        $class_name=preg_replace("/Model$/", "", $class_name);
-    }
-
-    #try class name directly
-    $file = $dir.$class_name.'.php';
-    if (!file_exists($file)){
-        #if not exists - try normalized
-        $class_name=ucfirst(strtolower($class_name));   #normalize name, i.e. users => Users
-        $file = $dir.$class_name.'.php';
-    }
-
-    if (!file_exists($file)) throw new NoClassException("Class not found: $class_name");
-    try {
-        #logger("before include [$file]");
-        include_once $file;
-    } catch (Exception $ex){
-        logger('FATAL', "********** Error Loading class $class_name");
-        throw new Exception("Error Loading class $class_name", 1);
-    }
-}
-
 class fw {
     public static $instance;
 
     public $dispatcher;
+    public $db;
 
     public $route = array(); #current request route data
     public $ROUTES = array();
-    public $GLOBAL = array();    #"global" vars
+    public $GLOBAL = array();     #"global" vars, initialized with $CONFIG
+    public $config;               #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
     public $models_cache=array(); #cached model instances
 
     public $page_layout;
 
-    const LOG_LEVELS=array(
+    public static $LOG_LEVELS=array(
         'OFF'   => 0,   #no logging occurs
         'FATAL' => 10,  #severe error, current request (or even whole application) aborted (notify admin)
         'ERROR' => 20,  #error happened, but current request might still continue (notify admin)
@@ -82,6 +46,10 @@ class fw {
     public static function run($ROUTES=array()){
         global $CONFIG;
         $start_time = microtime(true);
+        $fw = fw::i();
+
+        spl_autoload_register(array($fw, 'autoload'));
+
         session_start();  #start session on each request
 
         #initial fixes
@@ -98,14 +66,13 @@ class fw {
         }else{
            $CONFIG['LANG']=$CONFIG['LANG_DEF'];  #use default language
         }
+        $fw->config = (object)$CONFIG; #set fw config
 
         # and now run dispatcher
-        $fw = fw::i();
-
         FwHooks::global_init();
 
         //fw vairables
-        $fw->page_layout = $CONFIG['PAGE_TPL'];
+        $fw->page_layout = $CONFIG['PAGE_LAYOUT'];
 
         #save flash to current var and update session
         if (isset($_SESSION['_flash'])){
@@ -113,7 +80,7 @@ class fw {
         }
         $_SESSION['_flash']=array();
 
-        $fw->dispatcher = new Dispatcher($ROUTES);
+        $fw->dispatcher = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES);
         $fw->route = $fw->dispatcher->get_route();
 
         $fw->run_route();
@@ -144,6 +111,49 @@ class fw {
     public function __construct() {
         global $CONFIG;
         $this->GLOBAL = $CONFIG;
+        $this->db = new DB($CONFIG['DB']); #prepare db object (will connect on demand)
+    }
+
+    //autoload controller/model classes
+    public function autoload($class_name){
+        $dirs = array();
+        $bdir = dirname(__FILE__).'/';
+        if ( preg_match('/Controller$/', $class_name) ){
+            $dirs[]= $bdir.'../controllers/';
+            if ($class_name!=='FwController' && $class_name!=='FwAdminController') $class_name=preg_replace("/Controller$/", "", $class_name);
+        }else{
+            $dirs[]= $bdir.'../models/';
+            if ($class_name!=='FwModel') $class_name=preg_replace("/Model$/", "", $class_name);
+        }
+        $dirs[]= $bdir; #also look at /www/php/fw
+        $dirs[]= $bdir.'../'; #also look at /www/php
+
+        $file_found='';
+        #logger($class_name, $dirs);
+        foreach ($dirs as $dir) {
+            #try class name directly
+            $file = $dir.$class_name.'.php';
+            if (file_exists($file)){
+                $file_found=$file;
+                break;
+            }
+
+            #if not exists - try normalized
+            $file = $dir.ucfirst(strtolower($class_name)).'.php';   #normalize name, i.e. users => Users
+            if (file_exists($file)){
+                $file_found=$file;
+                break;
+            }
+        }
+
+        if (!$file_found) throw new NoClassException("Class not found: $class_name");
+        try {
+            #logger("before include [$file_found]");
+            include_once $file_found;
+        } catch (Exception $ex){
+            logger('FATAL', "********** Error Loading class $class_name");
+            throw new Exception("Error Loading class $class_name");
+        }
     }
 
     public function run_route(){
@@ -256,13 +266,12 @@ class fw {
     # IN: route hash
     # OUT: return TRUE throw AuthException if not authorized to view the page
     private function auth($route) {
-        global $CONFIG;
-        $ACCESS_LEVELS = array_change_key_case($CONFIG['ACCESS_LEVELS'], CASE_LOWER);
+        $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS, CASE_LOWER);
 
         #XSS check for all requests that modify data
         if ( (reqs("XSS") || $this->route['method'] == "POST" || $this->route['method'] == "PUT" || $this->route['method'] == "DELETE")
             && $_SESSION["XSS"] > "" && $_SESSION["XSS"] <> reqs("XSS")
-            && !in_array($this->route['controller'], $CONFIG['NO_XSS']) //no XSS check for selected controllers
+            && !in_array($this->route['controller'], $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
            throw new AuthException("XSS Error");
         }
@@ -349,9 +358,9 @@ class fw {
 
     # RETURN output to browser according to expected format: full html, pjax, json
     # overloaded:
-    # parser()      - show page from template  /cur_controller/cur_action = parser('/cur_controller/cur_action/', $PAGE_TPL, array())
-    # parser($ps)   - show page from template  /cur_controller/cur_action = parser('/cur_controller/cur_action/', $PAGE_TPL, $ps)
-    # parser('/controller/action', $ps)   - show page from template  /controller/action = parser('/controller/action/', $PAGE_TPL, $ps)
+    # parser()      - show page from template  /cur_controller/cur_action = parser('/cur_controller/cur_action/', $PAGE_LAYOUT, array())
+    # parser($ps)   - show page from template  /cur_controller/cur_action = parser('/cur_controller/cur_action/', $PAGE_LAYOUT, $ps)
+    # parser('/controller/action', $ps)   - show page from template  /controller/action = parser('/controller/action/', $PAGE_LAYOUT, $ps)
     # parser('/controller/action', $layout, $ps)   - show page from template  /controller/action = parser('/controller/action/', $layout, $ps)
     # full params:
     # $basedir, $layout, $ps, $out_filename=''|'v'|'filename'
@@ -359,13 +368,11 @@ class fw {
     # output format based on requested format: json, pjax or (default) full page html
     # JSON: for automatic json response support - set ps("_json") = true
     # to return only specific content for json - set ps("_json")=array(...)
-    # to override page template - set ps("_page_tpl")="another_page_layout.html"
+    # to override page template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
     #
     # TODO: (not for json) to perform route_redirect - set ps("_route_redirect"), ps("_route_redirect_controller"), ps("_route_redirect_args")
     # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
     public function parser() {
-        global $CONFIG;
-
         $args=func_get_args();
         $basedir='';
         $controller = $this->route['controller'];
@@ -415,7 +422,12 @@ class fw {
         }elseif ($out_format == 'html' || $out_format == 'pjax' || !$out_format){
             #html output based on ParsePage templates
             if ($out_format == 'pjax') {
-                $layout = $CONFIG['PAGE_TPL_PJAX'];
+                $layout = $this->config->PAGE_LAYOUT_PJAX;
+            }
+
+            if ( array_key_exists('_layout', $ps) ) {
+                #override layout from parse strings
+                $layout = $ps['_layout'];
             }
 
             if ( !array_key_exists('ERR', $ps) ) {
@@ -445,76 +457,109 @@ class fw {
 
 
 ########################## Email functions
-
-    /*
-     send email in UTF-8
-     $ToEmail can be array
+   /**
+    * Send email in UTF-8 via PHPMailer (default) or mail() (but mail() can't do SMTP or html or file attachments)
+    * @param  string|array $ToEmail one string or array of email addresses
+    * @param  string $Subj    subject
+    * @param  string $Message message body
+    * @param  array  $options misc options:
+    *                          bcc => string for bcc emails
+    *                          cc => string or array for cc emails
+    *                          from => override from address (default $CONFIG['FROM_EMAIL'])
+    *                          reply => reply to email
+    *                          files => array(filepath, filepath, ...) or array(filename => filepath)
+    * @return bool   true if message sent successfully
     */
-    public function send_email($ToEmail, $Subj, $Message, $isBCC="", $FromEmail=""){
-      global $CONFIG;
+    public function send_email($ToEmail, $Subj, $Message, $options=array()){
+      $MAIL= $this->config->MAIL;
       $result=true;
-      $MAIL= $CONFIG['MAIL'];
 
-      if (!$FromEmail) $FromEmail=$CONFIG['FROM_EMAIL'];
+      if (!is_array($ToEmail)) $ToEmail=array($ToEmail);
 
-      logger('INFO', "Sending email. From=[$FromEmail], To=[$ToEmail], Subj=[$Subj]");
+      $from = $options['from'];
+      if (!$from) $from=$this->config->FROM_EMAIL;
+
+      $files = $options['files'];
+      if (!$files) $files=array();
+
+      logger('INFO', "Sending email. From=[$from], To=[".implode(",",$ToEmail)."], Subj=[$Subj]");
       logger('DEBUG', $Message);
 
-      if ($MAIL['IS_SMTP']){
-        #send using PHPMailer class
-        require_once(dirname(__FILE__).'/mail/class.mailer.php');
-        $mail = new PHPMailer(true);
+      #detect if message is in html format - it should start with <!DOCTYPE or <html tag
+      $is_html=false;
+      if ( preg_match('/^\s*<(!DOCTYPE|html)[^>]*>/', $Message) ){
+        $is_html=true;
+      }
 
-        $mail->IsSMTP();
+      #try to send using PHPMailer class
+      $file_phpmailer = dirname(__FILE__).'/mail/class.phpmailer.php';
+      if (file_exists($file_phpmailer)){
+        require_once($file_phpmailer);
+        $mail = new PHPMailer;
+
+        if ($MAIL['IS_SMTP']) {
+          require_once(dirname(__FILE__).'/mail/class.smtp.php');
+          $mail->isSMTP();
+        }
 
         try {
+          if ($this->config->LOG_LEVEL=='TRACE') $mail->SMTPDebug = 3; // Enable verbose debug output
           $mail->SMTPAuth   = true;
+          $mail->SMTPSecure = $MAIL['SMTPSecure'];
           $mail->Host       = $MAIL['SMTP_SERVER'];
+          if ($MAIL['SMTP_PORT']) $mail->Port = $MAIL['SMTP_PORT'];
           $mail->Username   = $MAIL['USER'];
           $mail->Password   = $MAIL['PWD'];
 
-          if (is_array($ToEmail)){
-            foreach ($ToEmail as $k=>$v){
-              $mail->AddAddress($v);
-            }
-          }else{
-            $mail->AddAddress($ToEmail);
+          foreach ($ToEmail as $k=>$v){
+            $mail->addAddress($v);
           }
 
-          $mail->SetFrom($FromEmail);
-        #      $mail->AddReplyTo($FromEmail);
+          $mail->setFrom($from);
+          if ($options['reply']) $mail->addReplyTo($options['reply']);
+          if ($options['cc']) $mail->addCC($options['cc']);
+          if ($options['bcc']) $mail->addBCC($options['bcc']);
+
           $mail->Subject = $Subj;
-
-          if ( preg_match('/^\s*<(!DOCTYPE|html)[^>]*>/', $Message) ){
+          $mail->Body = $Message;
+          if ( $is_html ){
+             $mail->isHTML(true);
              $mail->AltBody = 'To view the message, please use an HTML compatible email viewer!'; // optional - MsgHTML will create an alternate automatically
-             $mail->MsgHTML($Message);
-          }else{
-             $mail->Body = $Message;
           }
-        #      rw("before Send");
-          $res=$mail->Send();
-        #      rw($res);
-          $result=true;
 
-        } catch (phpmailerException $e) {
-          logger('WARN', $e->errorMessage());
+          foreach ($files as $key => $filepath) {
+            $mail->addAttachment($filepath, (intval($key)==$key?'':$key)); #if key is not a number - they key is filename
+          }
+
+          $result=true;
+          if(!$mail->send()) {
+            $result=false;
+            logger('WARN', 'Error sending email: '.$mail->ErrorInfo);
+          }
+
         } catch (Exception $e) {
           logger('WARN', $e->getMessage());
+          $result=false;
         }
 
       }else{
+        if ($MAIL['IS_SMTP']) logger('ERROR', 'mail() cannot send via SMTP');
+        if ($is_html) logger('WARN', 'mail() cannot send html emails');
+        if ($files) logger('WARN', 'mail() cannot send emails with file attachments');
+
         #send using usual php mailer
         $more="Content-Type: text/plain; charset=\"utf-8\" ; format=\"flowed\"\n";
-        if ($FromEmail) $more.="From: $FromEmail\n";
-        if ($isBCC) $more.="Bcc: $isBCC\n";
+        if ($from) $more.="From: $from\n";
+        if ($options['reply']) $more.="Reply-to: ".$options['reply']."\n";
+        if ($options['cc']) $more.="Cc: ".explode(',',$options['cc'])."\n";
+        if ($options['bcc']) $more.="Bcc: ".$options['bcc']."\n";
 
         if ( preg_match("/\W/", $Subj) ) $Subj="=?utf-8?B?".base64_encode($Subj)."?=";
 
-        if (!is_array($ToEmail)) $ToEmail=array($ToEmail);
         foreach ($ToEmail as $k=>$v){
             $res=mail($v, $Subj, $Message, $more);
             if ($res===FALSE){
-                logger('WARN', 'Error sending email');
+                logger('WARN', 'Error sending email: '. error_get_last()['message']);
                 $result=false;
             }
         }
@@ -523,37 +568,32 @@ class fw {
       return $result;
     }
 
-    // Administrator message alerter
+    // simple administrator message alerter
     public function send_email_admin($msg_body){
-        global $CONFIG;
-        logger('WARN', "ADMIN ALERT:", $msg_body);
-        $this->send_email($CONFIG['ADMIN_EMAIL'],'SITE SYSTEM ALERT!', $msg_body);
+      logger('WARN', "ADMIN ALERT:", $msg_body);
+      return $this->send_email($this->config->ADMIN_EMAIL,'SITE SYSTEM ALERT!', $msg_body);
     }
 
-    ################## SEND EMAIL FROM TEMPLATE in /emails path
-    /*
-     FIRST LINE IN TEMPLATE FILE - Message Subject
-     to_email, ps hash
+    /**
+     * Send email from text or html template in /template/emails
+     * FIRST LINE IN TEMPLATE FILE - Subject
+     * SECOND AND FURTHER LINES - Message body
+     * @param  [type] $to_email [description]
+     * @param  [type] $tpl      [description]
+     * @param  [type] $ps       [description]
+     * @param  [type] $options  [description]
+     * @return [type]           [description]
+     * Usage:
+     *   $ps=array(
+     *       'user' => $hU,
+     *   );
+     *   send_email_tpl( $hU['email'], 'email_invite.txt', $ps);
+     */
+    public function send_email_tpl($to_email, $tpl, $ps, $options){
+      $msg_body=parse_page('/emails', $tpl, $ps, 'v');
+      list($msg_subj, $msg_body)=preg_split("/\n/", $msg_body, 2);
 
-     sample:
-         $ps=array(
-             'user' => $hU,
-         );
-         send_email_tpl( $hU['email'], 'email_invite.txt', $ps);
-
-         OR
-         send_email_tpl( $hU['email'], 'email_invite.html', $ps);
-    */
-    public function send_email_tpl($to_email, $tpl, $ps, $isBCC='', $FromEmail=''){
-        $msg_body=parse_page('/emails', $tpl, $ps, 'v');
-        list($msg_subj, $msg_body)=$this->_email2subj_body($msg_body);
-
-        @$this->send_email($to_email, $msg_subj, $msg_body, $isBCC, $FromEmail);
-    }
-
-    // ****************** get first line from email - will be subject, return list(subj, body) #TODO - remove
-    private function _email2subj_body($message){
-        return preg_split("/\n/", $message, 2);
+      return $this->send_email($to_email, $msg_subj, $msg_body, $options);
     }
 
 ##########################  STATIC methods
@@ -577,11 +617,10 @@ class fw {
     #make url absolute
     # /some_site_url?aaaa => http://root_domain/ROOT_URL/some_site_url?aaaa
     public static function url2abs($url){
-        global $CONFIG;
+      global $CONFIG;
+      if (substr($url,0,1)=='/') $url=$CONFIG['ROOT_DOMAIN'].$CONFIG['ROOT_URL'].$url;
 
-        if (substr($url,0,1)=='/') $url=$CONFIG['ROOT_DOMAIN'].$CONFIG['ROOT_URL'].$url;
-
-        return $url;
+      return $url;
     }
 
 }
@@ -628,7 +667,7 @@ function reqh($name){
 # example: logger('DEBUG', 'hello there', $var);
 function logger(){
  global $CONFIG;
- $log_level = fw::LOG_LEVELS[$CONFIG['LOG_LEVEL']];
+ $log_level = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']];
 
  if (!$log_level) return;  #don't log if logger is off (for production)
 
@@ -639,7 +678,7 @@ function logger(){
      array_shift($args);
  }
 
- if (fw::LOG_LEVELS[$logtype] > $log_level ) return; #skip logging if requested level more than config's log level
+ if (fw::$LOG_LEVELS[$logtype] > $log_level ) return; #skip logging if requested level more than config's log level
 
  $arr=debug_backtrace();#0-logger(),1-func called logger,...
  $func = (isset($arr[1]) ? $arr[1] : '');
@@ -677,14 +716,16 @@ function logger(){
 
 }
 
-########################### for debugging with output right in the browser or console
+########################### for debugging with output right into the browser or console
 function rw($var){
- $is_html=$_SERVER['HTTP_HOST'] ? 1:0;
  if ( !is_scalar($var) ){
     $var=print_r($var,true);
-    if ($is_html) $var=preg_replace("/\n/", "<br>\n",$var);
  }
- echo $var.(($is_html)?"<br>":"")."\n";
+ if ($_SERVER['HTTP_HOST']){
+    echo "<pre>".$var."</pre><br>\n";
+ }else{
+    echo $var."\n";
+ }
  flush();
 }
 ########################### same
