@@ -278,19 +278,20 @@ abstract class FwController {
      * basic rule: after save we return to edit form screen. Or, if return_url set, to the return_url
      *
      * @param  integer $id new or updated form id
+     * @param  string $explicit - 'index', 'form' - explicit return to Index, ShowForm without auto-detection and skipping return_url
      * @return string     url
      */
-    public function get_return_location($id=null){
+    public function get_return_location($id=null, $explicit=''){
         $result='';
 
         #if no id passed - basically return to list url, if passed - return to edit url
-        if (is_null($id)){
+        if (is_null($id) || $explicit=='index'){
             $base_url = $this->base_url;
         }else{
             $base_url = $this->base_url.'/'.$id.'/edit';
         }
 
-        if ($this->return_url){
+        if ($this->return_url && !$explicit){
             if ($this->fw->is_json_expected()){
                 //if json - it's usually autosave - don't redirect back to return url yet
                 $result = $base_url.'?return_url='.Utils::escape_str($this->return_url).($this->related_id?'&related_id='.$this->related_id:'');
