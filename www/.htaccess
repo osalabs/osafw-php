@@ -4,6 +4,9 @@ RewriteBase /
 #RewriteRule ^css/site_\d+.css /css/site.css [L]
 #RewriteRule ^js/site_\d+.js /js/site.js [L]
 
+#deny access to templates
+RewriteRule ^template/ - [F,L,NC]
+
 #ignore assets dirs by fw engine
 RewriteRule ^(?:css|fonts|img|js|upload)/ - [L]
 

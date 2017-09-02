@@ -78,9 +78,11 @@ class Users extends FwModel {
 
         @session_destroy();
         session_start();
+        $_SESSION['is_logged']=true;
+        $_SESSION['XSS']=Utils::get_rand_str(16);  #setup XSS code
 
         #fill up session data
-        $this->set_def_session($id);
+        $this->session_reload($id);
         $_SESSION['just_logged']=1;
         $_SESSION['is_just_registered']=$is_just_registered;
         session_write_close();
@@ -94,7 +96,8 @@ class Users extends FwModel {
         $this->update_after_login($id);
     }
 
-    private function set_def_session($id){
+    public function session_reload($id=0){
+        if (!$id) $id=Utils::me();
         $hU=$this->one($id);
         foreach($hU as $key => $value){
             $_SESSION['user'][$key]=$value;
@@ -105,12 +108,6 @@ class Users extends FwModel {
         $lname = trim($_SESSION['user']['lname']);
         $_SESSION['user_name']=$fname.($fname?' ':'').$lname; #will be empty if no user name set
         $_SESSION['access_level']=$_SESSION['user']['access_level'];
-        $_SESSION['is_logged']=1;
-        $_SESSION['XSS']=Utils::get_rand_str(16);  #setup XSS code
-    }
-
-    public function session_reload(){
-        $this->set_def_session($_SESSION['user']['id']+0);
     }
 
     private function update_after_login($id) {
