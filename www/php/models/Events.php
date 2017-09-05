@@ -14,7 +14,7 @@ class Events extends FwModel {
 
     //add new record - override FwModel because we don't need to log this
     public function add($item) {
-        if (!isset($item['add_user_id'])) $item['add_user_id']=Utils::me();
+        if (!isset($item['add_users_id'])) $item['add_users_id']=Utils::me();
         $id=$this->db->insert($this->table_name, $item);
 
         return $id;
@@ -44,7 +44,7 @@ class Events extends FwModel {
             'item_id2'  => $item_id2,
             'iname'     => $iname,
             'records_affected' => $records_affected,
-            'add_user_id' => Utils::me(),
+            'add_users_id' => Utils::me(),
         );
         if (!is_null($fields)) $tolog['fields'] = json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK);
         return $this->db->insert($this->log_table_name, $tolog);

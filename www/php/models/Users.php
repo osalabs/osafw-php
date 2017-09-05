@@ -204,9 +204,9 @@ class Users extends FwModel {
 
     /**
      * return sql for limiting access according to current user ACL
-     * @param  string $alias optional, add_user_id field alias with dot. Example: 'c.'. If not provided - no alias used
-     * @param  string $field optional, add_user_id field name
-     * @return string        sql query string like " and add_user_id=".Utils::me()
+     * @param  string $alias optional, add_users_id field alias with dot. Example: 'c.'. If not provided - no alias used
+     * @param  string $field optional, add_users_id field name
+     * @return string        sql query string like " and add_users_id=".Utils::me()
      */
     public function sql_acl($alias='', $field=''){
         $result='';
@@ -214,7 +214,7 @@ class Users extends FwModel {
             //if we are admin user - allow access to all records
         }else{
             //if we are normal user - allows access only records we created
-            if (!$field) $field = 'add_user_id';
+            if (!$field) $field = 'add_users_id';
 
             $result=' and '.$alias.$field.'='.dbqi(Utils::me()).' ';
         }

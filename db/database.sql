@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS users (
 
     status              tinyint default 0,    /*0-ok, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
 
     PRIMARY KEY (id)
 ) DEFAULT CHARSET=utf8;
@@ -74,9 +74,9 @@ CREATE TABLE IF NOT EXISTS settings (
     is_user_edit        tinyint DEFAULT 0,  /* if 1 - use can edit this value*/
 
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
 
     PRIMARY KEY  (id),
     UNIQUE KEY (icode),
@@ -97,9 +97,9 @@ CREATE TABLE IF NOT EXISTS att_categories (
 
     status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
     PRIMARY KEY  (id)
 ) DEFAULT CHARSET=utf8;
 INSERT INTO att_categories (icode, iname) VALUES
@@ -126,9 +126,9 @@ CREATE TABLE IF NOT EXISTS att (
 
     status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (att_categories_id) REFERENCES att_categories(id)
 ) DEFAULT CHARSET=utf8;
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS att_table_link (
 
     status              tinyint default 0,    /*0-ok, 1-under update*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (att_id) REFERENCES att(id)
 ) DEFAULT CHARSET=utf8;
@@ -175,9 +175,9 @@ CREATE TABLE IF NOT EXISTS spages (
 
     status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (head_att_id) REFERENCES att(id)
 ) DEFAULT CHARSET=utf8;
@@ -204,9 +204,9 @@ CREATE TABLE IF NOT EXISTS categories (
 
     status              tinyint default 0,        /*0-ok, 127-deleted*/
     add_time            timestamp DEFAULT CURRENT_TIMESTAMP,                 /*date record added*/
-    add_user_id         int unsigned default 0,            /*user added record*/
+    add_users_id         int unsigned default 0,            /*user added record*/
     upd_time            timestamp,                 /*date record updated*/
-    upd_user_id         int unsigned default 0,            /*user added record*/
+    upd_users_id         int unsigned default 0,            /*user added record*/
 
     PRIMARY KEY (id),
     KEY (parent_id),
@@ -229,9 +229,9 @@ CREATE TABLE IF NOT EXISTS events (
 
     status              tinyint default 0,        /*0-ok, 127-deleted*/
     add_time            timestamp DEFAULT CURRENT_TIMESTAMP,                 /*date record added*/
-    add_user_id         int unsigned default 0,            /*user added record*/
+    add_users_id         int unsigned default 0,            /*user added record*/
     upd_time            timestamp,                 /*date record updated*/
-    upd_user_id         int unsigned default 0,            /*user added record*/
+    upd_users_id         int unsigned default 0,            /*user added record*/
 
     PRIMARY KEY (id),
     KEY (icode)
@@ -259,10 +259,10 @@ CREATE TABLE IF NOT EXISTS event_log (
     fields              text,       /*serialized json with related fields data (for history) in form {fieldname: data, fieldname: data}*/
 
     add_time            timestamp DEFAULT CURRENT_TIMESTAMP,                 /*date record added*/
-    add_user_id         int unsigned default 0,            /*user added record*/
+    add_users_id         int unsigned default 0,            /*user added record*/
 
     PRIMARY KEY (id),
     KEY (events_id),
-    KEY (add_user_id),
+    KEY (add_users_id),
     KEY (add_time)
 ) DEFAULT CHARSET=utf8;

@@ -61,7 +61,7 @@ abstract class FwModel {
 
     //add new record
     public function add($item) {
-        if (!isset($item['add_user_id'])) $item['add_user_id']=Utils::me();
+        if (!isset($item['add_users_id'])) $item['add_users_id']=Utils::me();
         $id=$this->db->insert($this->table_name, $item);
 
         $this->cache_remove($id);
@@ -72,7 +72,7 @@ abstract class FwModel {
 
     //update record
     public function update($id, $item) {
-        if (!isset($item['upd_user_id'])) $item['upd_user_id']=Utils::me();
+        if (!isset($item['upd_users_id'])) $item['upd_users_id']=Utils::me();
         $item['upd_time']='~!now()';
         $this->db->update($this->table_name, $item, $id);
 
