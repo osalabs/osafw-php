@@ -30,9 +30,9 @@ CREATE TABLE demos (
 
     status              tinyint default 0,    /*0-ok, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
 
     PRIMARY KEY (id),
     UNIQUE KEY (email)
@@ -49,9 +49,9 @@ CREATE TABLE demo_dicts (
 
     status              tinyint default 0,    /*0-ok, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
-    add_user_id         int unsigned default 0,
+    add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_user_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,
 
     PRIMARY KEY (id),
     UNIQUE KEY (iname)
