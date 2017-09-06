@@ -27,18 +27,18 @@ abstract class FwModel {
     public function one($id, $is_force=false) {
         $cache_key = $this->CACHE_PREFIX.$this->table_name.'*'.$id;
         if (!$is_force) {
-            $row = FwCache::get_value($cache_key);
+            $row = FwCache::getValue($cache_key);
         }
         if ($is_force || is_null($row)){
             $row = $this->db->row("select * from ".$this->table_name." where id=".$this->db->quote($id));
-            FwCache::set_value($cache_key, $row);
+            FwCache::setValue($cache_key, $row);
         }else{
             #logger('CACHE HIT!');
         }
         return $row;
     }
 
-    public function one_by_iname($iname) {
+    public function oneByIname($iname) {
         return $this->db->row("select * from ".$this->table_name." where iname=".$this->db->quote($iname));
     }
 
@@ -47,7 +47,7 @@ abstract class FwModel {
         return $row['iname'];
     }
 
-    public function full_name($id) {
+    public function getFullName($id) {
         $id+=0;
         $result = '';
 
@@ -64,9 +64,9 @@ abstract class FwModel {
         if (!isset($item['add_users_id'])) $item['add_users_id']=Utils::me();
         $id=$this->db->insert($this->table_name, $item);
 
-        $this->cache_remove($id);
+        $this->removeCache($id);
 
-        $this->fw->model('Events')->log_fields($this->table_name.'_add', $id, $item);
+        $this->fw->model('Events')->logFields($this->table_name.'_add', $id, $item);
         return $id;
     }
 
@@ -76,21 +76,21 @@ abstract class FwModel {
         $item['upd_time']='~!now()';
         $this->db->update($this->table_name, $item, $id);
 
-        $this->cache_remove($id);
+        $this->removeCache($id);
 
-        $this->fw->model('Events')->log_fields($this->table_name.'_upd', $id, $item);
+        $this->fw->model('Events')->logFields($this->table_name.'_upd', $id, $item);
         return $id;
     }
 
     #quickly add new record just with iname
     #if such iname exists - just id returned
     #RETURN id - for new or existing record
-    public function add_or_update_quick($iname){
+    public function addOrUpdateByIname($iname){
         $result=0;
         $iname=trim($iname);
         if (!strlen($iname)) return 0;
 
-        $item = $this->one_by_iname($iname);
+        $item = $this->oneByIname($iname);
         if ($item['id']){
             #exists
             $result = $item['id'];
@@ -107,7 +107,7 @@ abstract class FwModel {
     public function delete($id, $is_perm=NULL) {
         if ($is_perm){
             $this->db->delete($this->table_name, $id);
-            $this->fw->model('Events')->log_event($this->table_name.'_del', $id);
+            $this->fw->model('Events')->logEvent($this->table_name.'_del', $id);
         }else{
             $vars=array(
                 'status'    => 127,
@@ -115,23 +115,23 @@ abstract class FwModel {
             $this->update($id, $vars);
         }
 
-        $this->cache_remove($id);
+        $this->removeCache($id);
         return true;
     }
 
     //remove from cache - can be called from outside model if model table updated
-    public function cache_remove($id){
+    public function removeCache($id){
         $cache_key = $this->CACHE_PREFIX.$this->table_name.'*'.$id;
         FwCache::remove($cache_key);
     }
 
     //check if item exists for a given iname
-    public function is_exists_byfield($uniq_key, $field, $not_id=NULL) {
+    public function isExistsByField($uniq_key, $field, $not_id=NULL) {
         return $this->db->is_record_exists($this->table_name, $uniq_key, $field, $not_id);
     }
 
-    public function is_exists($uniq_key, $not_id=NULL) {
-        $this->is_exists_byfield($uniq_key, 'iname', $not_id);
+    public function isExists($uniq_key, $not_id=NULL) {
+        $this->isExistsByField($uniq_key, 'iname', $not_id);
     }
 
     #return standard list of id,iname where status=0 order by iname
@@ -140,11 +140,11 @@ abstract class FwModel {
         return $this->db->arr($sql);
     }
 
-    public function get_select_options($sel_id) {
-        return FormUtils::select_options_db($this->ilist(), $sel_id);
+    public function getSelectOptions($sel_id) {
+        return FormUtils::selectOptions($this->ilist(), $sel_id);
     }
 
-    public function get_multi_list($hsel_ids){
+    public function getMultiList($hsel_ids){
         $rows = $this->ilist();
         if (is_array($hsel_ids) && count($hsel_ids)){
             foreach ($rows as $k => $row) {
@@ -155,7 +155,7 @@ abstract class FwModel {
         return $rows;
     }
 
-    public function get_autocomplete_items($q, $limit=5) {
+    public function getAutocompleteList($q, $limit=5) {
         $sql = 'select iname from '.$this->table_name.'
                  where status=0
                   and iname like '.$this->db->quote('%'.$q.'%').'
@@ -167,36 +167,36 @@ abstract class FwModel {
     //****************** Item Upload Utils
 
     //simple upload of the file related to item
-    public function upload_file($id, $file){
-        $filepath = UploadUtils::upload_file($id, $this->get_upload_basedir(), $file);
+    public function uploadFile($id, $file){
+        $filepath = UploadUtils::uploadFile($id, $this->getUploadBaseDir(), $file);
         logger('DEBUG', "file uploaded to [$filepath]");
 
-        UploadUtils::upload_resize($filepath, UploadUtils::$IMG_RESIZE_DEF);
+        UploadUtils::uploadResize($filepath, UploadUtils::$IMG_RESIZE_DEF);
         return $filepath;
     }
 
-    public function get_upload_basedir(){
-        return UploadUtils::get_upload_basedir().'/'.$this->table_name;
+    public function getUploadBaseDir(){
+        return UploadUtils::getUploadBaseDir().'/'.$this->table_name;
     }
-    public function get_upload_baseurl(){
-        return UploadUtils::get_upload_baseurl().'/'.$this->table_name;
-    }
-
-
-    public function get_upload_dir($id){
-        return UploadUtils::get_upload_dir($id, $this->get_upload_basedir());
+    public function getUploadBaseUrl(){
+        return UploadUtils::getUploadBaseUrl().'/'.$this->table_name;
     }
 
-    public function get_upload_path($id, $ext, $size=''){
-        return UploadUtils::get_upload_path($id, $this->get_upload_basedir(), $ext, $size);
+
+    public function getUploadDir($id){
+        return UploadUtils::getUploadDir($id, $this->getUploadBaseDir());
     }
 
-    public function get_upload_url($id, $ext, $size=''){
-        return UploadUtils::get_upload_url($id, $this->get_upload_basedir(), $this->get_upload_baseurl(), $ext, $size);
+    public function getUploadPath($id, $ext, $size=''){
+        return UploadUtils::getUploadPath($id, $this->getUploadBaseDir(), $ext, $size);
     }
 
-    public function remove_upload($id, $ext){
-        UploadUtils::cleanup_upload($id, $this->get_upload_basedir(), $ext);
+    public function getUploadUrl($id, $ext, $size=''){
+        return UploadUtils::getUploadUrl($id, $this->getUploadBaseDir(), $this->getUploadBaseUrl(), $ext, $size);
+    }
+
+    public function removeUpload($id, $ext){
+        UploadUtils::cleanupUpload($id, $this->getUploadBaseDir(), $ext);
     }
 
 }//end of class

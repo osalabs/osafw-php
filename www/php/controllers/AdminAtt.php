@@ -25,26 +25,26 @@ class AdminAttController extends FwAdminController {
 
     public function IndexAction() {
         #get filters from the search form
-        $f = $this->get_filter();
+        $f = $this->initFilter();
 
-        $this->set_list_sorting();
+        $this->setListSorting();
 
         $this->list_where = ' status=0 ';
-        $this->set_list_search();
+        $this->setListSearch();
 
         //other filters add to $this->list_where here
         if ($this->list_filter['att_categories_id']>0){
             $this->list_where .= '  and att_categories_id='. dbqi($att_categories_id);
         }
 
-        $this->get_list_rows();
+        $this->getListRows();
         //add/modify rows from db
         $AttCat = $this->fw->model('AttCategories');
         foreach ($this->list_rows as $k => $row) {
             $this->list_rows[$k]['field'] = 'value';
             $this->list_rows[$k]['cat'] = $AttCat->one($row['att_categories_id']);
-            $this->list_rows[$k]['url_direct'] = $this->model->get_url_direct($row);
-            $this->list_rows[$k]['url_s'] = $this->model->get_url_direct($row,'s');
+            $this->list_rows[$k]['url_direct'] = $this->model->getUrlDirect($row);
+            $this->list_rows[$k]['url_s'] = $this->model->getUrlDirect($row,'s');
             $this->list_rows[$k]['fsize_human'] = Utils::bytes2str($row['fsize']);
         }
         $ps=array(
@@ -53,7 +53,7 @@ class AdminAttController extends FwAdminController {
             'pager'         => $this->list_pager,
             'f'             => $this->list_filter,
 
-            'select_att_categories_ids' => $AttCat->get_select_options($this->list_filter['att_categories_id'])
+            'select_att_categories_ids' => $AttCat->getSelectOptions($this->list_filter['att_categories_id'])
         );
         return $ps;
     }
@@ -80,14 +80,14 @@ class AdminAttController extends FwAdminController {
         $ps = array(
             'id'    => $id,
             'i'     => $item,
-            'add_users_id_name'  => fw::model('Users')->full_name($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->full_name($item['upd_users_id']),
+            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
+            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
 
             'fsize_human'       => Utils::bytes2str($item['fsize']),
-            'url'               => $this->model->get_url($id),
-            'url_m'             => ($item['is_image'] ? $this->model->get_url($id, 'm') : ''),
+            'url'               => $this->model->getUrl($id),
+            'url_m'             => ($item['is_image'] ? $this->model->getUrl($id, 'm') : ''),
 
-            'select_options_att_categories_id'      => fw::model('AttCategories')->get_select_options($item['att_categories_id']),
+            'select_options_att_categories_id'      => fw::model('AttCategories')->getSelectOptions($item['att_categories_id']),
         );
 
         return $ps;
@@ -97,47 +97,47 @@ class AdminAttController extends FwAdminController {
         $id = $form_id+0;
         $item = req('item');
         if (!is_array($item)) $item=array();
-        $files = UploadUtils::get_posted_files('file1');
+        $files = UploadUtils::getPostedFiles('file1');
 
         try{
             $this->Validate($id, $item, $files);
             #load old record if necessary
             #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
+            $itemdb = FormUtils::filter($item, $this->save_fields);
             if (!strlen($itemdb["iname"])) $itemdb["iname"] = 'new file upload';
             if (!$id) $itemdb['status']=1; #under upload
             if (!$itemdb['att_categories_id']) $itemdb['att_categories_id']=1; #default cat - general
 
 
             $is_add = ($id==0);
-            $id = $this->model_add_or_update($id, $itemdb);
+            $id = $this->modelAddOrUpdate($id, $itemdb);
 
             #Proceed upload
             if (count($files)) $this->model->upload($id, $files[0], $is_add);
 
-            if ($this->fw->get_response_expected_format()=='json'){
+            if ($this->fw->isJsonExpected()){
                 $item = $this->model->one($id);
                 return array('_json' => array(
                         'success'   => true,
                         'id'        => $id,
                         'item'      => $item,
-                        'url'       => $this->model->get_url_direct($item),
+                        'url'       => $this->model->getUrlDirect($item),
                 ));
             }else{
                 fw::redirect($this->base_url.'/'.$id.'/edit');
             }
 
         }catch( ApplicationException $ex ){
-            if ($this->fw->get_response_expected_format()=='json'){
+            if ($this->fw->isJsonExpected()){
                 return array('_json' => array(
                     'success'   => false,
                     'err_msg'   => $ex->getMessage(),
                     'id'        => $id,
                 ));
             }else{
-                $this->set_form_error($ex->getMessage());
-                $this->route_redirect("ShowForm");
+                $this->setFormError($ex->getMessage());
+                $this->routeRedirect("ShowForm");
             }
         }
     }
@@ -149,15 +149,15 @@ class AdminAttController extends FwAdminController {
         $item_old = array();
         if ($id>0){
             $item_old = $this->model->one($id);
-            $result= $result && $this->validate_required($item, $this->required_fields);
+            $result= $result && $this->validateRequired($item, $this->required_fields);
         }else{
             if (!count($files) || !$files[0]['size']){
                 $result = false;
-                $this->ferr('file1', 'NOFILE');
+                $this->setError('file1', 'NOFILE');
             }
         }
 
-        $this->validate_check_result($result);
+        $this->validateCheckResult($result);
     }
 
     public function SelectAction(){
@@ -166,20 +166,20 @@ class AdminAttController extends FwAdminController {
         $AttCat = $this->fw->model('AttCategories');
 
         if ($category_icode>''){
-            $att_cat = $AttCat->one_by_icode($category_icode);
+            $att_cat = $AttCat->oneByIcode($category_icode);
             if (count($att_cat)){
                 $att_categories_id = $att_cat['id'];
             }
         }
 
-        $rows = $this->model->ilist_by_category($att_categories_id);
+        $rows = $this->model->ilistByCategory($att_categories_id);
         foreach ($rows as $key => $row) {
-            $row['direct_url'] = $this->model->get_url_direct($row);
+            $row['direct_url'] = $this->model->getUrlDirect($row);
         }
 
         $ps=array(
             'att_dr' => $rows,
-            'select_att_categories_id' => $AttCat->get_select_options($att_categories_id),
+            'select_att_categories_id' => $AttCat->getSelectOptions($att_categories_id),
         );
         return $ps;
     }

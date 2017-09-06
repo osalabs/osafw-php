@@ -78,6 +78,13 @@ class Dispatcher {
     public $ROOT_URL;
     public $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
 
+    # leave just allowed chars in string - for routers: controller, action
+    # IN: raw name of the controller or action
+    # OUT: normalized name with only allowed chars
+    public static function RouteFixChars($str) {
+        return preg_replace("/[^A-Za-z0-9_-]+/", "", $str);
+    }
+
     function __construct($ROUTES=array(), $ROOT_URL='', $ROUTE_PREFIXES=array()) {
         $this->ROUTES = $ROUTES;
         $this->ROOT_URL = $ROOT_URL;
@@ -85,11 +92,11 @@ class Dispatcher {
     }
 
     # get route for method/uri with defaults
-    public function get_route() {
+    public function getRoute() {
         $method = $_SERVER['REQUEST_METHOD'];       #ex: POST, GET
         $uri    = $_SERVER['REQUEST_URI'];          #ex: /add/post/12390/alksjdla?qoeewlkj
 
-        $hroute = $this->_uri2route($method, $uri, $this->ROUTES);
+        $hroute = $this->uriToRoute($method, $uri, $this->ROUTES);
 
 /*
         #check/set defaults
@@ -109,17 +116,17 @@ class Dispatcher {
     }
 
 
-    public function run_controller($controller, $action, $aparams=array()){
+    public function runController($controller, $action, $aparams=array()){
         if (!$controller) throw new NoClassException();
         if (!$action) throw new NoClassMethodException();
-        return $this->call_class_method($controller.'Controller', $action.'Action', $aparams);
+        return $this->callClassMethod($controller.'Controller', $action.'Action', $aparams);
     }
 
     # call functions and methods
     # for classes - creates object instance first
     # IN: class name, method, params
     # OUT: throws NoClassException/NoClassMethodException if no class/method exists
-    public function call_class_method($class_name, $method, $aparams=array()){
+    public function callClassMethod($class_name, $method, $aparams=array()){
         logger('TRACE', "calling $class_name->$method", $aparams);
         try {
             if ($class_name){
@@ -140,28 +147,21 @@ class Dispatcher {
         }
     }
 
-    public function get_route_default_action($controller){
+    public function getRouteDefaultAction($controller){
         $class_name=$controller.'Controller';
         if ( !class_exists($class_name) ) throw new NoClassException();
         return $class_name::route_default_action;
     }
 
-    public function get_route_access_level($controller){
+    public function getRouteAccessLevel($controller){
         $class_name=$controller.'Controller';
         if ( !class_exists($class_name) ) throw new NoClassException();
         return $class_name::access_level;
     }
 
-    # leave just allowed chars in string - for routers: controller, action
-    # IN: raw name of the controller or action
-    # OUT: normalized name with only allowed chars
-    public static function _route_fix_chars($str) {
-        return preg_replace("/[^A-Za-z0-9_-]+/", "", $str);
-    }
-
     #IN: controller::action
     #OUT: array(controller, action)
-    public function split_route($route) {
+    public function splitRoute($route) {
         list($controller, $action)=explode('::',$route);
         if (!$controller){
           #TODO - global
@@ -173,9 +173,9 @@ class Dispatcher {
     }
 
     # string to route
-    # ususally strin is from $ROUTES
+    # ususally string is from $ROUTES
     public function str2route($str){
-        list($controller, $action)=$this->split_route($str);
+        list($controller, $action)=$this->splitRoute($str);
 
         #TODO handle controller prefix?
 
@@ -192,7 +192,7 @@ class Dispatcher {
         return $result;
     }
 
-    public function detect_oper($method, $id, $action_more) {
+    public function detectOperation($method, $id, $action_more) {
         //$oper= $uri1=='new'?'new':( isset($uri2)?$uri2:'' );
         $result = '';
 
@@ -249,7 +249,7 @@ class Dispatcher {
     #       action_more
     #       format
     #       params
-    private function _uri2route($method, $uri, $ROUTES){
+    public function uriToRoute($method, $uri, $ROUTES){
         $root_url = $this->ROOT_URL;
 
         $result = array();
@@ -270,7 +270,7 @@ class Dispatcher {
         foreach ($this->ROUTE_PREFIXES as $prefix) {
             $qprefix=preg_quote($prefix,'/');
             if ( preg_match('/^'.$qprefix.'/i', $uri) ){
-                $controller_prefix=$this->_route_fix_chars($prefix);
+                $controller_prefix=$this->RouteFixChars($prefix);
                 $uri = preg_replace('/^'.$qprefix.'/','',$uri);
                 break;
             }
@@ -292,7 +292,7 @@ class Dispatcher {
                         $uri=$ROUTES[$uri];
 
                     }else{  #otherwise - it's a direct class-method to call
-                        list($cur_controller,$cur_action)=$this->split_route($ROUTES[$uri]);
+                        list($cur_controller,$cur_action)=$this->splitRoute($ROUTES[$uri]);
                         $is_route_found=1;
                         break;
                     }
@@ -319,7 +319,7 @@ class Dispatcher {
 
            if ($is_match){
                 #foreach ($m[0] as $vv) { #go thru resourses
-                $cur_controller = $this->_route_fix_chars($m[1]);
+                $cur_controller = $this->RouteFixChars($m[1]);
                 if (!strlen($cur_controller)) throw new Exception("Wrong request", 1);
 
                 #TODO - capitalize controller name or not? or site-wide option?
@@ -337,7 +337,7 @@ class Dispatcher {
                     }
                 }
 
-                $rest_oper = $this->detect_oper($method, $cur_id, $cur_action_more);
+                $rest_oper = $this->detectOperation($method, $cur_id, $cur_action_more);
                 $cur_action=$this::$REST2METHOD_MAP[$rest_oper];
 
                 #check if there is mapping module => class present and replace dest class
@@ -349,17 +349,17 @@ class Dispatcher {
                 #otherwise detect controller/action/id.format/more_action
                 if ($uri){
                     @list($zzz, $cur_controller, $cur_action, $cur_id, $cur_action_more) = explode("/", $uri);
-                    $cur_controller  = $this->_route_fix_chars($cur_controller);
+                    $cur_controller  = $this->RouteFixChars($cur_controller);
                 }
 
                 #call default method $ROUTES['']
-                #@list($cur_controller,$cur_action)=$this->split_route($ROUTES['']);
+                #@list($cur_controller,$cur_action)=$this->splitRoute($ROUTES['']);
                 #logger('TRACE', "DEFAULT call $cur_controller->$cur_action()\n");
            }
         }
 
         $cur_controller  = $controller_prefix . $cur_controller;
-        $cur_action      = $this->_route_fix_chars($cur_action);
+        $cur_action      = self::RouteFixChars($cur_action);
         if (!strlen($cur_action)) $cur_action='Index';
         array_unshift($cur_aparams, $cur_id); #first param always is id
 

@@ -20,14 +20,14 @@ class Events extends FwModel {
         return $id;
     }
 
-    public function one_by_icode($icode){
+    public function oneByIcode($icode){
         return $this->db->row($this->table_name, array('icode'=>$icode));
     }
 
-    public function log_event($ev_icode, $item_id=0, $item_id2=0, $iname='', $records_affected=0, $fields=null){
-        if (!$this->fw->config->IS_LOG_EVENTS) return;
+    public function logEvent($ev_icode, $item_id=0, $item_id2=0, $iname='', $records_affected=0, $fields=null){
+        if (!$this->fw->config->IS_logEventS) return;
 
-        $ev = $this->one_by_icode($ev_icode);
+        $ev = $this->oneByIcode($ev_icode);
         if (!$ev){
             logger('INFO', 'No event defined for icode=['.$ev_icode.'], auto-creating');
             $ev=array(
@@ -51,8 +51,8 @@ class Events extends FwModel {
     }
 
     //just to log fields for particular record
-    public function log_fields($ev_icode, $item_id, $fields){
-        return $this->log_event($ev_icode, $item_id, 0, '', 1, $fields);
+    public function logFields($ev_icode, $item_id, $fields){
+        return $this->logEvent($ev_icode, $item_id, 0, '', 1, $fields);
     }
 
 }

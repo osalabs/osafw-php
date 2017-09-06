@@ -3,7 +3,7 @@
 Part of PHP osa framework  www.osalabs.com/osafw/php
 (c) 2009-2015 Oleg Savchuk www.osalabs.com
 
-2013-06-20 added image_resize_fixed
+2013-06-20 added resizeFixed
 */
 
 class ImageUtils {
@@ -18,7 +18,7 @@ class ImageUtils {
 
   //accept image file, max width, max height and out_file (default output to same file)
   //return list(new_w, new_h)
-  public static function image_resize($in_file, $maxw=0, $maxh=0, $out_file=''){
+  public static function resize($in_file, $maxw=0, $maxh=0, $out_file=''){
 
     if (!$out_file) $out_file=$in_file;
     if (!$maxw) $maxw=self::$MAX_RESIZE_WH[''][0];
@@ -27,7 +27,7 @@ class ImageUtils {
     # logger("resizing: [$in_file] $maxw/$maxh [$out_file]");
 
     $img_format='';
-    $img=self::open_image($in_file, $img_format);
+    $img=self::openImage($in_file, $img_format);
 
     if ($img==-1) return array(-1,-1); #no resize done because GD is not attached
 
@@ -78,14 +78,14 @@ class ImageUtils {
 
             $a=imagecopyresampled($s_img,$img,0,0,0,0,$new_w,$new_h,$old_w,$old_h);
 
-            self::save_image($s_img, $out_file, self::image_type($out_file, $img_format) );
+            self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format) );
 
             imagedestroy($s_img);
          }
 
       }else if ($out_file!=$in_file){
          //juse make copy
-         self::save_image($img, $out_file, $img_format);
+         self::saveImage($img, $out_file, $img_format);
       }
 
     #    logger("$new_w,$new_h ");
@@ -101,7 +101,7 @@ class ImageUtils {
   //********* opens gif, png, jpg image with check, return img format via ref $img_format
   //throws exception if
   //  no GD installed
-  public static function open_image($in_file, &$img_format){
+  public static function openImage($in_file, &$img_format){
 
     if ( ($img_format=='jpg' || preg_match("/\.jpe?g$/i", $in_file)) && function_exists('imagecreatefromjpeg') ){
       $img_format='jpg';
@@ -116,17 +116,17 @@ class ImageUtils {
       $img  = imagecreatefrompng($in_file);
     }
     else{
-      throw new Exception("no GD installed, required for open_image");
+      throw new Exception("no GD installed, required for openImage");
     }
 
     return $img;
   }
 
   //******************** save img from memory to file
-  public static function save_image($img, $out_file, $img_format=''){
-    if (!$img_format) $img_format=self::image_type($out_file);
+  public static function saveImage($img, $out_file, $img_format=''){
+    if (!$img_format) $img_format=self::imageType($out_file);
 
-    # logger("save_image as [$out_file] [$img_format]");
+    # logger("saveImage as [$out_file] [$img_format]");
 
     if ($img_format=='jpg'){
       imageinterlace($img, 1);          #make progressive jpeg
@@ -144,7 +144,7 @@ class ImageUtils {
     }
   }
 
-  public static function image_type($path, $default_ext=''){
+  public static function imageType($path, $default_ext=''){
     $pp=pathinfo($path);
     $ext=self::$IMG_EXT[ strtolower($pp['extension']) ];
 
@@ -161,7 +161,7 @@ class ImageUtils {
   //   0 - problem
   // throws exception if:
   //  no GD installed
-  public static function image_rotate($in_file, $dir, $out_file=''){
+  public static function rotate($in_file, $dir, $out_file=''){
     if (!$dir || !file_exists($in_file)) return 0;
 
     #logger("rotating: $in_file, $dir, $out_file");
@@ -171,21 +171,21 @@ class ImageUtils {
     if ($dir==1) $angle=-90;
 
     $img_format='';
-    $img=self::open_image($in_file, $img_format);
+    $img=self::openImage($in_file, $img_format);
 
-    if ($img==-1) throw new Exception("no GD installed, required for image_rotate"); #not done because GD is not attached
+    if ($img==-1) throw new Exception("no GD installed, required for rotate"); #not done because GD is not attached
 
     if (!function_exists('imagerotate')) {
       logger('WARN',"standard 'imagerotate' not exists, emulating...");
       ini_set("memory_limit", "128M");
-      $img==self::imagerotate_my($img, $angle, 0xFFFFFF);
+      $img==self::imagerotateEmulate($img, $angle, 0xFFFFFF);
     }else{
       $img=imagerotate($img, $angle, 0xFFFFFF);
     }
 
     #logger("rotating OK?");
 
-    self::save_image($img, $out_file, self::image_type($out_file, $img_format) );
+    self::saveImage($img, $out_file, self::imageType($out_file, $img_format) );
 
     imagedestroy($img);
 
@@ -199,7 +199,7 @@ class ImageUtils {
       Rotation is clockwise
   */
 
-  public static function imagerotate_my($srcImg, $angle, $bgcolor, $ignore_transparent = 0) {
+  public static function imagerotateEmulate($srcImg, $angle, $bgcolor, $ignore_transparent = 0) {
       function rotateX($x, $y, $theta){
           return $x * cos($theta) - $y * sin($theta);
       }
@@ -297,7 +297,7 @@ class ImageUtils {
   resize any image to fixed width/heigth with cropping if necessary!
   return: 1 - success, 0 - failed
   */
-  public static function image_resize_fixed($in_file, $w=0, $h=0, $out_file=''){
+  public static function resizeFixed($in_file, $w=0, $h=0, $out_file=''){
       if (!$out_file) $out_file=$in_file;
 
       if (!file_exists($in_file)){
@@ -306,7 +306,7 @@ class ImageUtils {
       }
 
       $img_format='';
-      $img=self::open_image($in_file, $img_format);
+      $img=self::openImage($in_file, $img_format);
 
       if ($img==-1) return array(-1,-1); #no resize done because GD is not attached
 
@@ -363,7 +363,7 @@ class ImageUtils {
       $a=imagecopyresampled($s_img,$img,0,0, $src_x,$src_y, $w,$h, $src_w,$src_h);
 
       //save result
-      self::save_image($s_img, $out_file, self::image_type($out_file, $img_format) );
+      self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format) );
 
       imagedestroy($s_img);
       return 1;

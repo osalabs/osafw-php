@@ -6,24 +6,29 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 
 class FormUtils {
   #simple email check
-  public static function is_email($email) {
+  public static function isEmail($email) {
     return preg_match("/[^@]+\@[^@]+/", $email);
   }
 
-  ########### usually used before calling get_sqlupdate_set and get_sqlinsert_set
-  # exmple: $IFORM=form2dbhash($FORM, 'fname lname address');
-  # from form hash $FORM
-  # fields $names(string) ...
-  # if is_exists (default true) - only values actually exists in input hash returned
-  public static function form2dbhash($FORM, $names, $is_exists=true){
+  /**
+   * filter posted $form extracting only specific field $names
+   * usually used before calling get_sqlupdate_set and get_sqlinsert_set
+   * $itemdb=FormUtils::filter($_POST, 'fname lname address');
+   *
+   * @param  array  $form       array of fields from posted form (usually $_POST)
+   * @param  string  $names     space separated field names
+   * @param  boolean $is_exists (default true) only values actually exists in input hash returned
+   * @return array              filtered fields, if value was array - converted to comma-separated string (for select multiple)
+   */
+  public static function filter($form, $names, $is_exists=true){
     $result=array();
-    if ( is_array($FORM) ){
+    if ( is_array($form) ){
         $anames=Utils::qw($names);
 
         #copy fields
         foreach ($anames as $name){
-          if (!$is_exists || array_key_exists($name, $FORM)) {
-            $v=$FORM[$name];
+          if (!$is_exists || array_key_exists($name, $form)) {
+            $v=$form[$name];
             #if form contains array - convert to comma-separated string (it's from select multiple)
             if (is_array($v)) $v = implode(',', $v);
             $result[$name]=$v;
@@ -34,14 +39,14 @@ class FormUtils {
     return $result;
   }
 
-  #similar to form2dbhash, but for checkboxes (as unchecked checkboxes doesn't passed from form)
+  #similar to filter(), but for checkboxes (as unchecked checkboxes doesn't passed from form)
   #RETURN: by ref itemdb - add fields with default_value or form value
-  public static function form2dbhash_checkboxes(&$itemdb, $FORM, $names, $default_value="0"){
-      if (is_array($FORM)){
+  public static function filterCheckboxes(&$itemdb, $form, $names, $default_value="0"){
+      if (is_array($form)){
         $anames=Utils::qw($names);
         foreach ($anames as $key => $fld) {
-            if (array_key_exists($fld, $FORM)){
-                $itemdb[$fld] = $FORM[$fld];
+            if (array_key_exists($fld, $form)){
+                $itemdb[$fld] = $form[$fld];
             }else{
                 $itemdb[$fld] = $default_value;
             }
@@ -50,7 +55,7 @@ class FormUtils {
   }
 
   #RETURN: array of pages for pagination
-  public static function get_pager($count, $pagenum, $pagesize=NULL){
+  public static function getPager($count, $pagenum, $pagesize=NULL){
     if (is_null($pagesize)) $pagesize = fw::i()->config->MAX_PAGE_ITEMS;
 
     $pager = array();
@@ -68,19 +73,19 @@ class FormUtils {
     return $pager;
   }
 
-  #select options for rows returned from db.array('select id, iname from ...')
-  public static function select_options_db($rows, $isel=NULL){
-    return self::select_options_al($rows, $isel);
-  }
-
-  # arr is array of Hashes with "id" and "iname" keys
-  # "id" key is optional, if not present - iname will be used for values too
-  # isel may contain multiple comma-separated values
-  public static function select_options_al($rows, $isel=NULL){
+  /**
+   * return <option>... html for $rows with selected $selected_id
+   * @param  array $rows        array of assoc arrays with "id" and "iname" keys, for ex returned from db.array('select id, iname from ...')
+   * @param  string $selected_id selected id, may contain multiple comma-separated values
+   * @return string              html: <option value="id1">iname1</option>...
+   *
+   * "id" key is optional, if not present - iname will be used for values too
+   */
+  public static function selectOptions($rows, $selected_id=NULL){
     $result = '';
-    if (is_null($isel)) $isel='';
+    if (is_null($selected_id)) $selected_id='';
 
-    $asel = explode(',', $isel);
+    $asel = explode(',', $selected_id);
     #trim all elements, so it would be simplier to compare
     foreach ($asel as $k => $v) {
       $asel[$k] = trim($v);
@@ -104,36 +109,8 @@ class FormUtils {
     return $result;
   }
 
-
-  /*#*********************************************************************
-  #Function: get_combo_select_sql
-  #Purpose : create HTML for select based on SQL data
-  #Params  : sql, selected value
-  #Returns : HTML string
-  #Comment : SQL should return 2 fields: id - option value, iname - option desc
-  #*********************************************************************
-  */
-  public static function get_combo_select_sql($sql, $sel_value){
-
-   $rows=db_array($sql);
-
-   $result='';
-   foreach ($rows as $k => $row) {
-      $value=$row['id'];
-      $desc=$row['iname'];
-      if (!$value && !$desc){continue;}
-      if ($value==$sel_value){
-         $result.="<option value=\"$value\" selected>$desc\n";
-      }
-      else{
-         $result.="<option value=\"$value\">$desc\n";
-      }
-   }
-   return $result;
-  }
-
   # RETURN: true or false depending if $value is date and if it's date - add to $item 3 key/values for day/mon/year
-  public static function combo4date($value, &$item, $field_prefix){
+  public static function comboForDate($value, &$item, $field_prefix){
     $t = strtotime($value);
     if ($t===FALSE){
       return FALSE;

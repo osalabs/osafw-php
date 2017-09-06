@@ -36,7 +36,7 @@ abstract class FwController {
     public $list_where=' status<>127 '; // where sql to use in list sql, by default - return all non-deleted(status=127) records
     public $list_count;                 // count of list rows returned from db
     public $list_rows;                  // list rows returned from db (array of hashes)
-    public $list_pager;                 // pager for the list from FormUtils::get_pager
+    public $list_pager;                 // pager for the list from FormUtils::getPager
     public $return_url;                 // url to return after SaveAction successfully completed, passed via request
     public $related_id;                 // related id, passed via request. Controller should limit view to items related to this id
     public $related_field_name;         // if set and $related_id passed - list will be filtered on this field
@@ -53,12 +53,12 @@ abstract class FwController {
     }
 
     ############### helpers - shortcuts from fw
-    public function route_redirect($action, $controller=NULL, $args=NULL) {
-        $this->fw->route_redirect($action, $controller, $args);
+    public function routeRedirect($action, $controller=NULL, $args=NULL) {
+        $this->fw->routeRedirect($action, $controller, $args);
     }
 
     //add fields name to form error hash
-    public function ferr($field_name, $error_type=true) {
+    public function setError($field_name, $error_type=true) {
         $this->fw->GLOBAL['ERR'][$field_name]=$error_type;
     }
 
@@ -66,7 +66,7 @@ abstract class FwController {
     #if request param 'dofilter' passed - session filters cleaned
     #get filter values from request and overwrite saved in session
     #save back to session and return
-    public function get_filter(){
+    public function initFilter(){
         #each filter remembered in session linking to controller.action
         $session_key = '_filter_'.$this->fw->GLOBAL['controller.action'];
         $sfilter = $_SESSION[ $session_key ];
@@ -93,9 +93,9 @@ abstract class FwController {
 
     /**
      * set list sorting fields - list_orderby and list_orderdir according to $this->list_filter filter
-     * @param array $f array of filter params from $this->get_filter, should contain sortby, sortdir
+     * @param array $f array of filter params from $this->initFilter, should contain sortby, sortdir
      */
-    public function set_list_sorting() {
+    public function setListSorting() {
 
         #default sorting
         list($sortdef_field, $sortdef_dir) = Utils::qw($this->list_sortdef);
@@ -127,7 +127,7 @@ abstract class FwController {
     /**
      * add to $this->list_where search conditions from $this->list_filter['s'] and based on fields in $this->search_fields
      */
-    public function set_list_search() {
+    public function setListSearch() {
         #$this->list_where =' 1=1 '; #override initial in child if necessary
 
         $s = trim($this->list_filter['s']);
@@ -163,9 +163,9 @@ abstract class FwController {
      * perform 2 queries to get list of rows
      * @return int $this->list_count count of rows obtained from db
      * @return array of arrays $this->list_rows list of rows
-     * @return string $this->list_pager pager from FormUtils::get_pager
+     * @return string $this->list_pager pager from FormUtils::getPager
      */
-    public function get_list_rows() {
+    public function getListRows() {
         $this->list_count = $this->fw->db->value("select count(*) from {$this->list_view} where " . $this->list_where);
         if ($this->list_count){
             $offset = $this->list_filter['pagenum']*$this->list_filter['pagesize'];
@@ -173,7 +173,7 @@ abstract class FwController {
 
             $sql = "SELECT * FROM {$this->list_view} WHERE {$this->list_where} ORDER BY {$this->list_orderby} LIMIT {$offset}, {$limit}";
             $this->list_rows = $this->fw->db->arr($sql);
-            $this->list_pager = FormUtils::get_pager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
+            $this->list_pager = FormUtils::getPager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
         }else{
             $this->list_rows = array();
             $this->list_pager = array();
@@ -181,7 +181,7 @@ abstract class FwController {
 
         #if related_id defined - add it to each row
         if ($this->related_id>''){
-            Utils::array_inject($this->list_rows, array('related_id' => $this->related_id));
+            Utils::arrayInject($this->list_rows, array('related_id' => $this->related_id));
         }
 
         //add/modify rows from db - use in override child class
@@ -201,12 +201,12 @@ abstract class FwController {
      * @param integer $id   item id, could be 0 for new item
      * @param array   $item fields from the form
      */
-    public function set_save_itemdb($id, $item){
+    public function getSaveFields($id, $item){
         #load old record if necessary
         #$item_old = $this->model->one($id);
 
-        $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
-        FormUtils::form2dbhash_checkboxes($itemdb, $item, $this->save_fields_checkboxes);
+        $itemdb = FormUtils::filter($item, $this->save_fields);
+        FormUtils::filterCheckboxes($itemdb, $item, $this->save_fields_checkboxes);
 
         return $itemdb;
     }
@@ -218,7 +218,7 @@ abstract class FwController {
      * @param  array or space-separated string $afields field names required to be non-empty (trim used)
      * @return boolean        true if all required field names non-empty
      */
-    public function validate_required($item, $afields) {
+    public function validateRequired($item, $afields) {
         $result=true;
 
         if (!is_array($item)) $item=array();
@@ -229,10 +229,10 @@ abstract class FwController {
         foreach ($afields as $fld) {
             if ($fld>'' && (!array_key_exists($fld, $item) || !strlen(trim($item[$fld])) ) ) {
                 $result=false;
-                $this->ferr($fld);
+                $this->setError($fld);
             }
         }
-        if (!$result) $this->ferr('REQUIRED', true);
+        if (!$result) $this->setError('REQUIRED', true);
 
         return $result;
     }
@@ -241,18 +241,18 @@ abstract class FwController {
     //optional $result param - to use from external validation check
     //throw ValidationException exception if global ERR non-empty
     //also set global ERR[INVALID] if ERR non-empty, but ERR[REQUIRED] not true
-    public function validate_check_result($result=true) {
+    public function validateCheckResult($result=true) {
         if ($this->fw->GLOBAL['ERR']['REQUIRED']){
             $result=false;
         }
         if ( count($this->fw->GLOBAL['ERR']) && !$this->fw->GLOBAL['ERR']['REQUIRED'] ){
-            $this->ferr('INVALID', true);
+            $this->setError('INVALID', true);
             $result=false;
         }
         if (!$result) throw new ValidationException('');
     }
 
-    public function set_form_error($err_msg){
+    public function setFormError($err_msg){
         $this->fw->GLOBAL['err_msg']=$err_msg;
     }
 
@@ -262,7 +262,7 @@ abstract class FwController {
      * @param  array $fields    hash of field/values
      * @return int              new autoincrement id (if added) or old id (if update). Also set fw->flash
      */
-    public function model_add_or_update($id, $fields){
+    public function modelAddOrUpdate($id, $fields){
         if ($id>0){
             $this->model->update($id, $fields);
             $this->fw->flash("record_updated", 1);
@@ -281,7 +281,7 @@ abstract class FwController {
      * @param  string $explicit - 'index', 'form' - explicit return to Index, ShowForm without auto-detection and skipping return_url
      * @return string     url
      */
-    public function get_return_location($id=null, $explicit=''){
+    public function getReturnLocation($id=null, $explicit=''){
         $result='';
 
         #if no id passed - basically return to list url, if passed - return to edit url
@@ -292,9 +292,9 @@ abstract class FwController {
         }
 
         if ($this->return_url && !$explicit){
-            if ($this->fw->is_json_expected()){
+            if ($this->fw->isJsonExpected()){
                 //if json - it's usually autosave - don't redirect back to return url yet
-                $result = $base_url.'?return_url='.Utils::escape_str($this->return_url).($this->related_id?'&related_id='.$this->related_id:'');
+                $result = $base_url.'?return_url='.Utils::urlescape($this->return_url).($this->related_id?'&related_id='.$this->related_id:'');
             }else{
                 $result = $this->return_url;
             }

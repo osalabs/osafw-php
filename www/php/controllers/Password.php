@@ -27,27 +27,27 @@ class PasswordController extends FwController {
 
         try{
             $this->Validate($id, $item);
-            $user = $this->model->one_by_email($item['login']);
+            $user = $this->model->oneByEmail($item['login']);
 
-            $this->fw->send_email_tpl( $user['login'], 'email_pwd.txt', $user);
+            $this->fw->sendEmailTpl( $user['login'], 'email_pwd.txt', $user);
 
             fw::redirect($this->base_url.'/(Sent)');
 
         }catch( ApplicationException $ex ){
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("Index");
+            $this->setFormError($ex->getMessage());
+            $this->routeRedirect("Index");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, "login");
+        $result= $this->validateRequired($item, "login");
 
         if ($result){
-            $user = $this->model->one_by_email($item['login']);
-            if (!count($user)) $this->ferr('login', 'WRONG');
+            $user = $this->model->oneByEmail($item['login']);
+            if (!count($user)) $this->setError('login', 'WRONG');
         }
 
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
 }//end of class

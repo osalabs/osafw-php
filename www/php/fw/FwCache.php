@@ -20,7 +20,7 @@ class FwCache{
      * @param  string $key key to lookup in cache
      * @return mixed
      */
-    public static function get_value($key){
+    public static function getValue($key){
         return self::$storage[$key];
     }
 
@@ -30,7 +30,7 @@ class FwCache{
      * @param  mixed $value value to be placed in cache
      * @return nothing
      */
-    public static function set_value($key, $value){
+    public static function setValue($key, $value){
         self::$storage[$key]=$value;
     }
 

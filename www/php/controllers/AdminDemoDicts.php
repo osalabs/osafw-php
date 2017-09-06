@@ -24,8 +24,8 @@ class AdminDemoDictsController extends FwAdminController {
     }
 
     //override due to custom search filter on status
-    public function set_list_search() {
-        parent::set_list_search();
+    public function setListSearch() {
+        parent::setListSearch();
 
         if ($this->list_filter['status']>''){
             $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
@@ -33,7 +33,7 @@ class AdminDemoDictsController extends FwAdminController {
     }
 
     //override if necessary: IndexAction, ShowAction, ShowFormAction, Validate, DeleteAction, Export, SaveMultiAction
-    //or override just: set_list_search, set_list_rows, set_save_itemdb
+    //or override just: setListSearch, set_list_rows, getSaveFields
 
 }//end of class
 

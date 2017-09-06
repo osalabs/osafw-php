@@ -34,8 +34,8 @@ class AdminDemosController extends FwAdminController {
     }
 
     //override due to custom search filter on status
-    public function set_list_search() {
-        parent::set_list_search();
+    public function setListSearch() {
+        parent::setListSearch();
 
         if ($this->list_filter['status']>''){
             $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
@@ -43,8 +43,8 @@ class AdminDemosController extends FwAdminController {
     }
 
     // override get list rows as list need to be modified
-    public function get_list_rows() {
-        parent::get_list_rows();
+    public function getListRows() {
+        parent::getListRows();
 
         #add/modify rows from db
         foreach ($this->list_rows as $k => $row) {
@@ -64,17 +64,17 @@ class AdminDemosController extends FwAdminController {
         $ps = array(
             'id'    => $id,
             'i'     => $item,
-            'add_users_id_name'  => fw::model('Users')->full_name($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->full_name($item['upd_users_id']),
+            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
+            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
 
             'parent'            => $this->model->one( $item['parent_id'] ),
             'demo_dicts'        => $this->model_related->one( $item['demo_dicts_id'] ),
             'dict_link_auto'    => $this->model_related->one( $item['dict_link_auto_id'] ),
-            'multi_datarow'     => $this->model_related->get_multi_list( $dict_link_multi ),
+            'multi_datarow'     => $this->model_related->getMultiList( $dict_link_multi ),
             'att'               => fw::model('Att')->one($item['att_id']+0),
-            'att_links'         => fw::model('Att')->get_att_links($this->model->table_name, $id),
+            'att_links'         => fw::model('Att')->getAttLinks($this->model->table_name, $id),
         );
 
         return $ps;
@@ -104,33 +104,33 @@ class AdminDemosController extends FwAdminController {
         $ps = array(
             'id'    => $id,
             'i'     => $item,
-            'add_users_id_name'  => fw::model('Users')->full_name($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->full_name($item['upd_users_id']),
+            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
+            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
 
             #read dropdowns lists from db
-            'select_options_parent_id'      => $this->model->get_select_options_parent( $item['parent_id'] ),
-            'select_options_demo_dicts_id'  => $this->model_related->get_select_options( $item['demo_dicts_id'] ),
+            'select_options_parent_id'      => $this->model->getSelectOptionsParent( $item['parent_id'] ),
+            'select_options_demo_dicts_id'  => $this->model_related->getSelectOptions( $item['demo_dicts_id'] ),
             'dict_link_auto_id_iname'       => $item['dict_link_auto_id'] ? $this->model_related->iname( $item['dict_link_auto_id'] ) : $item['dict_link_auto_id_iname'],
-            'multi_datarow'                 => $this->model_related->get_multi_list( $dict_link_multi ),
+            'multi_datarow'                 => $this->model_related->getMultiList( $dict_link_multi ),
             'att'                           => fw::model('Att')->one($item['att_id']+0),
-            'att_links'                     => fw::model('Att')->get_att_links($this->model->table_name, $id),
+            'att_links'                     => fw::model('Att')->getAttLinks($this->model->table_name, $id),
         );
         #combo date
-        #TODO FormUtils::combo4date( $item['fdate_combo'], $ps, 'fdate_combo');
+        #TODO FormUtils::comboForDate( $item['fdate_combo'], $ps, 'fdate_combo');
 
         return $ps;
     }
 
     // override to modify some fields before save
-    public function set_save_itemdb($id, $item){
-        $itemdb=parent::set_save_itemdb($id, $item);
+    public function getSaveFields($id, $item){
+        $itemdb=parent::getSaveFields($id, $item);
 
         #load old record if necessary
         #$item_old = $this->model->one($id);
 
-        $itemdb['dict_link_auto_id'] = $this->model_related->add_or_update_quick( $item['dict_link_auto_id_iname'] );
+        $itemdb['dict_link_auto_id'] = $this->model_related->addOrUpdateByIname( $item['dict_link_auto_id_iname'] );
         $itemdb['dict_link_multi'] = FormUtils::multi2ids( req('dict_link_multi') );
         $itemdb['fdate_pop']= DateUtils::Str2SQL($itemdb['fdate_pop']);
         #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');
@@ -140,36 +140,36 @@ class AdminDemosController extends FwAdminController {
     }
 
     // override because we need to update att links
-    public function model_add_or_update($id, $fields){
-        $id=parent::model_add_or_update($id, $fields);
+    public function modelAddOrUpdate($id, $fields){
+        $id=parent::modelAddOrUpdate($id, $fields);
 
-        fw::model('Att')->update_att_links($this->model->table_name, $id, reqh('att'));
+        fw::model('Att')->updateAttLinks($this->model->table_name, $id, reqh('att'));
 
         return $id;
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, $this->required_fields);
+        $result= $this->validateRequired($item, $this->required_fields);
 
         //check $result here used only to disable further validation if required fields validation failed
         if ($result){
-            if ($this->model->is_exists( $item['email'], $id ) ){
-                $this->ferr('email', 'EXISTS');
+            if ($this->model->isExists( $item['email'], $id ) ){
+                $this->setError('email', 'EXISTS');
             }
 
-            if (!FormUtils::is_email( $item['email'] ) ){
-                $this->ferr('email', 'WRONG');
+            if (!FormUtils::isEmail( $item['email'] ) ){
+                $this->setError('email', 'WRONG');
             }
         }
 
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
-    public function AjaxAutocompleteAction(){
+    public function AutocompleteAction(){
         $query = reqs('q');
 
         $ps=array(
-            '_json' => $this->model_related->get_autocomplete_items($query),
+            '_json' => $this->model_related->getAutocompleteList($query),
         );
         return $ps;
     }

@@ -22,12 +22,12 @@ class AdminSettingsController extends FwAdminController {
 
     public function IndexAction() {
         #get filters from the search form
-        $f = $this->get_filter();
+        $f = $this->initFilter();
 
-        $this->set_list_sorting();
+        $this->setListSorting();
 
         $this->list_where = ' 1=1 ';
-        $this->set_list_search();
+        $this->setListSearch();
 
         //other filters add to $this->list_where here
         //if search - no category
@@ -35,7 +35,7 @@ class AdminSettingsController extends FwAdminController {
             $this->list_where .= ' and icat='.$this->fw->db->quote($f['icat']);
         }
 
-        $this->get_list_rows();
+        $this->getListRows();
         //add/modify rows from db
         /*
         foreach ($this->list_rows as $k => $row) {
@@ -61,9 +61,9 @@ class AdminSettingsController extends FwAdminController {
             #load old record if necessary
             #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
+            $itemdb = FormUtils::filter($item, $this->save_fields);
             #TODO - checkboxes support
-            #FormUtils::form2dbhash_checkboxes($itemdb, $item, 'is_checkbox');
+            #FormUtils::filterCheckboxes($itemdb, $item, 'is_checkbox');
 
             $id = $this->model->update($id, $itemdb);
 
@@ -73,17 +73,17 @@ class AdminSettingsController extends FwAdminController {
             fw::redirect($this->base_url.'/'.$id.'/edit');
 
         }catch( ApplicationException $ex ){
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("ShowForm");
+            $this->setFormError($ex->getMessage());
+            $this->routeRedirect("ShowForm");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, $this->required_fields);
+        $result= $this->validateRequired($item, $this->required_fields);
 
         if ($id==0) throw new ApplicationException("Wrong Settings ID");
 
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
 }//end of class

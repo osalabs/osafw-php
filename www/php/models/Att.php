@@ -20,14 +20,14 @@ class Att extends FwModel {
         if ($is_perm){
             //first, remove files
             $item = $this->one($id);
-            $this->remove_upload($id, $item['ext']);
+            $this->removeUpload($id, $item['ext']);
         }
 
         parent::delete($id, $is_perm);
     }
 
     #return list of records for the att category where status=0 order by add_time desc
-    public function ilist_by_category($att_categories_id) {
+    public function ilistByCategory($att_categories_id) {
         $where = array(
             'status'    => 0,
         );
@@ -38,7 +38,7 @@ class Att extends FwModel {
         return $this->db->arr($this->table_name, $where, 'add_time desc');
     }
 
-    public function ilist_by_one_tn($rel_table_name, $rel_item_id) {
+    public function ilistByOneTable($rel_table_name, $rel_item_id) {
         $where = array(
             'status'        => 0,
             'table_name'    => $rel_table_name,
@@ -51,18 +51,18 @@ class Att extends FwModel {
     /**
      * upload one posted file in $field_name field to item $id
      * @param  int      $id         item id
-     * @param  array    $file       one assoc array from get_posted_files()
+     * @param  array    $file       one assoc array from getPostedFiles()
      * @return none
      */
     public function upload($id, $file, $is_add = false){
         //put file to /upload/module dir with default thumbnails
-        $filepath = $this->upload_file($id, $file);
+        $filepath = $this->uploadFile($id, $file);
 
         //get file info (ext, name, size, is_image)
         //update db
-        $ext = UploadUtils::upload_ext($filepath);
+        $ext = UploadUtils::uploadExt($filepath);
         $item=array(
-            'is_image'  => UploadUtils::is_img_ext($ext),
+            'is_image'  => UploadUtils::isImgExt($ext),
             'fname'     => $file['name'],
             'fsize'     => filesize($filepath),
             'ext'       => $ext,
@@ -74,12 +74,12 @@ class Att extends FwModel {
 
     /**
      * upload multiple files, add att records and link with ONE table/item_id
-     * @param array $files              UploadUtils::get_posted_files('file1')
+     * @param array $files              UploadUtils::getPostedFiles('file1')
      * @param string $rel_table_name    related table
      * @param string $rel_item_id       related itemid
      * @return array of inserted ids
      */
-    public function add_and_upload_one_tn($files, $rel_table_name, $rel_item_id){
+    public function addAndUploadOneTable($files, $rel_table_name, $rel_item_id){
         $result=array();
         foreach ($files as $key => $file) {
             $fields=array(
@@ -97,13 +97,13 @@ class Att extends FwModel {
         return $result;
     }
 
-    public function get_att_links($table_name, $id){
+    public function getAttLinks($table_name, $id){
         if (!$id || !$table_name) return array();
         return $this->db->arr('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name='.$this->db->quote($table_name).' and atl.item_id='.dbqi($id));
     }
 
     //add/update att_table_links
-    public function update_att_links($table_name, $id, $form_att){
+    public function updateAttLinks($table_name, $id, $form_att){
         if (!is_array($form_att)) return;
 
         $me_id = Utils::me();
@@ -150,7 +150,7 @@ class Att extends FwModel {
     }
 
     //return correct url
-    public function get_url($id, $size=''){
+    public function getUrl($id, $size=''){
         if (!$id) return '';
 
         #if /Att need to be on offline folder
@@ -167,15 +167,15 @@ class Att extends FwModel {
     // OR overloaded
     // if you already have item, must contain: item("id"), item("ext")
     // $item, $size=''
-    public function get_url_direct($id_or_item, $size=''){
+    public function getUrlDirect($id_or_item, $size=''){
         if (is_array($id_or_item)){
-            return $this->get_upload_url($id_or_item['id'], $id_or_item['ext'], $size);
+            return $this->getUploadUrl($id_or_item['id'], $id_or_item['ext'], $size);
 
         }else{
             if (!$id_or_item) return '';
             $item = $this->one($id_or_item);
             if (!count($item)) return '';
-            return $this->get_url_direct($item, $size);
+            return $this->getUrlDirect($item, $size);
         }
     }
 
@@ -184,15 +184,15 @@ class Att extends FwModel {
     #if no file found OR file status<>0 - throws ApplicationException
     #$is_private - if true - send private cache headers, instead of public
     #Optimized: returns 304 if file not modified according to If-Modified-Since http header
-    public function transmit_file($id, $size='', $disposition='attachment', $is_private=false){
+    public function transmitFile($id, $size='', $disposition='attachment', $is_private=false){
         $item = $this->one($id);
         #validation
         if (!count($item)) throw new ApplicationException('No file specified');
         if ($item['status']<>0) throw new ApplicationException('Access Denied');
 
-        $size = UploadUtils::check_size($size);
+        $size = UploadUtils::checkSize($size);
 
-        $filepath = $this->get_upload_path($id, $item['ext'], $size);
+        $filepath = $this->getUploadPath($id, $item['ext'], $size);
         $filetime = filemtime($filepath);
 
         $cache_time = 2592000; #30 days
@@ -211,11 +211,11 @@ class Att extends FwModel {
         }
 
         $filename = str_replace('"', "'", $item['iname']); #quote filename
-        header('Content-type: '.UploadUtils::get_mime4ext($item['ext']));
+        header('Content-type: '.UploadUtils::getMimeForExt($item['ext']));
         header("Content-Length: " . filesize($filepath));
         header('Content-Disposition: '.$disposition.'; filename="'.$filename.'"');
 
-        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, ".UploadUtils::get_mime4ext($item['ext']));
+        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, ".UploadUtils::getMimeForExt($item['ext']));
         $fp = fopen($filepath, 'rb');
         fpassthru($fp);
     }

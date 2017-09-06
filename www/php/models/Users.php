@@ -15,11 +15,11 @@ class Users extends FwModel {
         $this->table_name = 'users';
     }
 
-    public function one_by_email($email) {
+    public function oneByEmail($email) {
         return $this->db->row("select * from ".$this->table_name." where email=".$this->db->quote($email));
     }
 
-    public function full_name($id) {
+    public function getFullName($id) {
         $result='';
         $item = $this->one($id);
         if ($item['id']){
@@ -36,7 +36,7 @@ class Users extends FwModel {
         return $this->db->arr($sql);
     }
 
-    public function get_multi_list($hsel_ids, $min_acl=null){
+    public function getMultiList($hsel_ids, $min_acl=null){
         $rows = $this->ilist($min_acl);
         if (is_array($hsel_ids) && count($hsel_ids)){
             foreach ($rows as $k => $row) {
@@ -47,56 +47,53 @@ class Users extends FwModel {
         return $rows;
     }
 
-    public function add_or_update($login, $pwd, $item){
+    public function addOrUpdate($login, $pwd, $item){
         $result=0;
-        $itemold=$this->one_by_email($login);
+        $itemold=$this->oneByEmail($login);
         $item['pwd']=$pwd;
         if ($itemold){
             $this->update($itemold['id'], $item);
             $result=$itemold['id'];
         }else{
-            $result=parent::add($item);
+            $result=$this->add($item);
         }
         return $result;
     }
 
     public function add($item) {
-        if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::get_rand_str(8); #generate password
+        if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::getRandStr(8); #generate password
         $id=parent::add($item);
         return $id;
     }
 
-    public function is_exists($email, $not_id=NULL) {
-        return parent::is_exists_byfield($email, 'email', $not_id);
-    }
-    public function is_email_exists($email) {
-        return $this->db->value("select 1 from ".$this->table_name." where email=".$this->db->quote($email)) ? true : false;
+    public function isExists($email, $not_id=NULL) {
+        return $this->isExistsByField($email, 'email', $not_id);
     }
 
-    public function do_login($id) {
+    public function doLogin($id) {
         $is_just_registered=$_SESSION['is_just_registered']+0;
 
         @session_destroy();
         session_start();
         $_SESSION['is_logged']=true;
-        $_SESSION['XSS']=Utils::get_rand_str(16);  #setup XSS code
+        $_SESSION['XSS']=Utils::getRandStr(16);  #setup XSS code
 
         #fill up session data
-        $this->session_reload($id);
+        $this->reloadSession($id);
         $_SESSION['just_logged']=1;
         $_SESSION['is_just_registered']=$is_just_registered;
         session_write_close();
 
-        $this->fw->model('Events')->log_event('login', $id);
+        $this->fw->model('Events')->logEvent('login', $id);
 
         //set permanent login if requested
-        //if ($_REQUEST['is_remember']) create_perm_cookie($id);
-        $this->create_perm_cookie($id);  #in this project no need is_remember
+        //if ($_REQUEST['is_remember']) createPermCookie($id);
+        $this->createPermCookie($id);  #in this project no need is_remember
 
-        $this->update_after_login($id);
+        $this->updateAfterLogin($id);
     }
 
-    public function session_reload($id=0){
+    public function reloadSession($id=0){
         if (!$id) $id=Utils::me();
         $hU=$this->one($id);
         foreach($hU as $key => $value){
@@ -110,7 +107,7 @@ class Users extends FwModel {
         $_SESSION['access_level']=$_SESSION['user']['access_level'];
     }
 
-    private function update_after_login($id) {
+    private function updateAfterLogin($id) {
         $hU=$this->one($id);
         #TODO add_notify_log($GLOBAL['NOTIFY_LOG_LOGIN'], $id, 0, $hU);
 
@@ -136,10 +133,10 @@ class Users extends FwModel {
         $this->db->update($this->table_name, $vars, $id);
     }
 
-    public function create_perm_cookie($id){
+    public function createPermCookie($id){
         $root_domain0=$this->fw->config->ROOT_DOMAIN0;
 
-        $cookie_id=substr(Utils::get_rand_str(16).time(),0,32);
+        $cookie_id=substr(Utils::getRandStr(16).time(),0,32);
 
         $vars=array(
             'cookie_id' => $cookie_id,
@@ -153,8 +150,8 @@ class Users extends FwModel {
         return $cookie_id;
     }
 
-    # check for permanent login cookie and if it's present - do_login
-    public function check_permanent_login(){
+    # check for permanent login cookie and if it's present - doLogin
+    public function checkPermanentLogin(){
         $root_domain0=$this->fw->config->ROOT_DOMAIN0;
 
         $result = false;
@@ -174,7 +171,7 @@ class Users extends FwModel {
             if ($u_id>0){
                 $result=true;
                 #logger("PERMANENT LOGIN");
-                $this->do_login($u_id);
+                $this->doLogin($u_id);
             }else{
                 #cookie is not found in DB - clean it (so it will not put load on DB during next pages)
                 setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/", (preg_match('/\./',$root_domain0))?'.'.$root_domain0:'' );
@@ -183,7 +180,7 @@ class Users extends FwModel {
         return $result;
     }
 
-    public function remove_perm_cookie(){
+    public function removePermCookie(){
         $cookie_id=$_COOKIE[ self::$PERM_COOKIE_NAME ];
 
         setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
@@ -196,7 +193,7 @@ class Users extends FwModel {
 
     }
 
-    public function is_access($access_str) {
+    public function isAccess($access_str) {
         $req_level=self::$ACL[$access_str]+0;
 
         return $_SESSION['user']['access_level']>=$req_level ? true : false;
@@ -210,7 +207,7 @@ class Users extends FwModel {
      */
     public function sql_acl($alias='', $field=''){
         $result='';
-        if (self::is_access('MODER')){
+        if (self::isAccess('MODER')){
             //if we are admin user - allow access to all records
         }else{
             //if we are normal user - allows access only records we created

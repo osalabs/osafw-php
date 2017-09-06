@@ -33,13 +33,13 @@ class FwAdminController extends FwController {
 
     public function IndexAction() {
         #get filters from the search form
-        $f = $this->get_filter();
+        $f = $this->initFilter();
 
-        $this->set_list_sorting();
-        $this->set_list_search();
+        $this->setListSorting();
+        $this->setListSearch();
         //other filters add to $this->list_where here
 
-        $this->get_list_rows();
+        $this->getListRows();
         //add/modify rows from db
         /*
         foreach ($this->list_rows as $k => $row) {
@@ -65,8 +65,8 @@ class FwAdminController extends FwController {
         $ps = array(
             'id'    => $id,
             'i'     => $item,
-            'add_users_id_name'  => fw::model('Users')->full_name($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->full_name($item['upd_users_id']),
+            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
+            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
@@ -92,8 +92,8 @@ class FwAdminController extends FwController {
         $ps = array(
             'id'    => $id,
             'i'     => $item,
-            'add_users_id_name'  => fw::model('Users')->full_name($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->full_name($item['upd_users_id']),
+            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
+            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
@@ -112,18 +112,18 @@ class FwAdminController extends FwController {
         try{
             $this->Validate($id, $item);
 
-            $itemdb=$this->set_save_itemdb($id, $item);
+            $itemdb=$this->getSaveFields($id, $item);
 
-            $id = $this->model_add_or_update($id, $itemdb);
+            $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            $location = $this->get_return_location($id);
+            $location = $this->getReturnLocation($id);
 
         }catch( ApplicationException $ex ){
             $success=false;
-            $this->set_form_error($ex->getMessage());
+            $this->setFormError($ex->getMessage());
         }
 
-        if ($this->fw->is_json_expected()){
+        if ($this->fw->isJsonExpected()){
             return array('_json'=>array(
                 'id'        => $id,
                 'is_new'    => $is_new,
@@ -138,22 +138,22 @@ class FwAdminController extends FwController {
             if ($success){
                 fw::redirect($location);
             }else{
-                $this->route_redirect("ShowForm");
+                $this->routeRedirect("ShowForm");
             }
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, $this->required_fields);
+        $result= $this->validateRequired($item, $this->required_fields);
 
 /*
         if ($result){
-            if ($this->model->is_exists( $item['iname'], $id ) ){
-                $this->ferr('iname', 'EXISTS');
+            if ($this->model->isExists( $item['iname'], $id ) ){
+                $this->setError('iname', 'EXISTS');
             }
         }
 */
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
     public function ShowDeleteAction($id){
@@ -172,7 +172,7 @@ class FwAdminController extends FwController {
         $this->model->delete($id);
 
         $this->fw->flash("onedelete", 1);
-        fw::redirect($this->get_return_location());
+        fw::redirect($this->getReturnLocation());
     }
 
     public function SaveMultiAction(){
@@ -189,7 +189,7 @@ class FwAdminController extends FwController {
         }
 
         $this->fw->flash("multidelete", $ctr);
-        fw::redirect($this->get_return_location());
+        fw::redirect($this->getReturnLocation());
     }
 
 }//end of class

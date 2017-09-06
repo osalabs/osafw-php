@@ -54,10 +54,10 @@ class fw {
 
         #initial fixes
         if (get_magic_quotes_gpc()){
-            $_POST = array_map(array('Utils','kill_magic_quotes'), $_POST);
-            $_GET = array_map(array('Utils','kill_magic_quotes'), $_GET);
-            $_COOKIE = array_map(array('Utils','kill_magic_quotes'), $_COOKIE);
-            $_REQUEST= array_map(array('Utils','kill_magic_quotes'), $_REQUEST);
+            $_POST = array_map(array('Utils','killMagicQuotes'), $_POST);
+            $_GET = array_map(array('Utils','killMagicQuotes'), $_GET);
+            $_COOKIE = array_map(array('Utils','killMagicQuotes'), $_COOKIE);
+            $_REQUEST= array_map(array('Utils','killMagicQuotes'), $_REQUEST);
         }
 
         #setup user's language to use by template engine
@@ -69,7 +69,7 @@ class fw {
         $fw->config = (object)$CONFIG; #set fw config
 
         # and now run dispatcher
-        FwHooks::global_init();
+        FwHooks::initRequest();
 
         //fw vairables
         $fw->page_layout = $CONFIG['PAGE_LAYOUT'];
@@ -81,9 +81,9 @@ class fw {
         $_SESSION['_flash']=array();
 
         $fw->dispatcher = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES);
-        $fw->route = $fw->dispatcher->get_route();
+        $fw->route = $fw->dispatcher->getRoute();
 
-        $fw->run_route();
+        $fw->runRoute();
 
         $total_time = microtime(true) - $start_time;
         logger('INFO', '*** REQUEST END in '.number_format($total_time,10).'s, '.number_format(1/$total_time, 3).'/s');
@@ -97,6 +97,12 @@ class fw {
         return fw::$instance;
     }
 
+    /**
+     * return model object
+     * usage: $model = fw::model('Users');
+     * @param  [type] $model_class [description]
+     * @return [type]              [description]
+     */
     public static function model($model_class){
         $fw = fw::i();
         if ( array_key_exists(strtolower($model_class), $fw->models_cache) ){
@@ -156,20 +162,20 @@ class fw {
         }
     }
 
-    public function run_route(){
+    public function runRoute(){
         try {
             $this->auth($this->route);
-            #logger("BEFORE CALL render_route", $this->route);
-            $this->render_route($this->route);
+            #logger("BEFORE CALL renderRoute", $this->route);
+            $this->renderRoute($this->route);
 
         } catch (AuthException $ex) {
-            $this->handle_page_error(401, $ex->getMessage(), $ex);
+            $this->handlePageError(401, $ex->getMessage(), $ex);
 
         } catch (NoClassMethodException $ex) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
 
-            $default_action = $this->dispatcher->get_route_default_action($this->route['controller']);
+            $default_action = $this->dispatcher->getRouteDefaultAction($this->route['controller']);
             if ($default_action=='index'){
                 $this->route['action']='Index';
 
@@ -186,7 +192,7 @@ class fw {
             }
 
             try {
-                $this->render_route($this->route);
+                $this->renderRoute($this->route);
 
             } catch (NoClassMethodException $ex2) {
                 #if no method - just call parser() - show template from /cur_controller/cur_action dir
@@ -196,30 +202,30 @@ class fw {
 
         } catch (NoClassException $ex) {
             #if can't call class - class doesn't exists - show 404 error
-            $this->handle_page_error(404, $ex->getMessage(), $ex);
+            $this->handlePageError(404, $ex->getMessage(), $ex);
 
         } catch (ExitException $ex) {
             #not a problem - just graceful exit
             logger('TRACE', "Exit Exception (normal behaviour, usually due to redirect)");
 
         } catch (BadAccessException $ex) {
-            $this->handle_page_error(401, $ex->getMessage(), $ex);
+            $this->handlePageError(401, $ex->getMessage(), $ex);
 
         } catch (ApplicationException $ex){
-            $this->handle_page_error( ($ex->getCode()?$ex->getCode():500), $ex->getMessage(), $ex);
+            $this->handlePageError( ($ex->getCode()?$ex->getCode():500), $ex->getMessage(), $ex);
 
         } catch (Exception $ex) {
-            $this->handle_page_error(500, $ex->getMessage(), $ex);
+            $this->handlePageError(500, $ex->getMessage(), $ex);
         }
     }
 
-    public function render_route($route){
+    public function renderRoute($route){
         #remember in G for rendering
         $this->GLOBAL['controller']=$route['controller'];
         $this->GLOBAL['controller.action']=$route['controller'].'.'.$route['action'];
         $this->GLOBAL['controller.action.id']=$route['controller'].'.'.$route['action'].'.'.$route['id'];
 
-        $ps = $this->dispatcher->run_controller($route['controller'],$route['action'], $route['params']);
+        $ps = $this->dispatcher->runController($route['controller'],$route['action'], $route['params']);
 
         #if action doesn't returned array - assume action rendered page by itself
         if ( is_array($ps) ){
@@ -228,7 +234,7 @@ class fw {
     }
 
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
-    public function is_json_expected($route=NULL){
+    public function isJsonExpected($route=NULL){
         if (!is_array($route)) $route = $this->route;
 
         if ($route['format']=='json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])){
@@ -237,7 +243,7 @@ class fw {
             return 0;
         }
     }
-    public function get_response_expected_format($route=NULL){
+    public function getResponseExpectedFormat($route=NULL){
         if (!is_array($route)) $route = $this->route;
         $result = '';
 
@@ -253,12 +259,12 @@ class fw {
     }
 
     # TODO $args
-    public function route_redirect($action, $controller=NULL, $params=NULL) {
+    public function routeRedirect($action, $controller=NULL, $params=NULL) {
         $this->route['action']=$action;
         if ( !is_null($controller) ) $this->route['controller']=$controller;
         if ( !is_null($params) ) $this->route['params']=$params;
 
-        $this->run_route();
+        $this->runRoute();
     }
 
     # simple auth check based on /controller/action - and rules filled in in Config class
@@ -292,7 +298,7 @@ class fw {
 
         if (is_null($rule_level)){
             #rule not found in config - try Controller.access_level
-            $rule_level = $this->dispatcher->get_route_access_level($this->route['controller']);
+            $rule_level = $this->dispatcher->getRouteAccessLevel($this->route['controller']);
         }
 
         if (is_null($rule_level)){
@@ -307,19 +313,19 @@ class fw {
         return true;
     }
 
-    public function handle_page_error($error_code, $error_message='', $exeption=NULL){
+    public function handlePageError($error_code, $error_message='', $exeption=NULL){
         $custom_error_route = $this->dispatcher->ROUTES[$error_code];
         if ($custom_error_route>''){
             $route=@$this->dispatcher->str2route($custom_error_route);
         }
 
-        logger('ERROR', "Dispatcher - handle_page_error : $error_code $error_message", $route);
+        logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message", $route);
 
         $is_error_processed = false;
         if ($route){
             //custom error handling route
             try {
-                $this->render_route($route);
+                $this->renderRoute($route);
                 $is_error_processed = true;
 
             } catch (NoClassException $ex) {
@@ -370,7 +376,7 @@ class fw {
     # to return only specific content for json - set ps("_json")=array(...)
     # to override page template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
     #
-    # TODO: (not for json) to perform route_redirect - set ps("_route_redirect"), ps("_route_redirect_controller"), ps("_route_redirect_args")
+    # TODO: (not for json) to perform routeRedirect - set ps("_route_redirect"), ps("_route_redirect_controller"), ps("_route_redirect_args")
     # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
     public function parser() {
         $args=func_get_args();
@@ -402,7 +408,7 @@ class fw {
             throw Exception("parser - wrong call");
         }
 
-        $out_format = $this->get_response_expected_format();
+        $out_format = $this->getResponseExpectedFormat();
         if ($out_format == 'json'){
             if (isset($ps['_json'])){
                 if ($ps['_json']===TRUE){
@@ -440,7 +446,7 @@ class fw {
         }else{
             #any other formats - call controller's Export($out_format)
             logger('DEBUG', "export $out_format using ".$this->route['controller']."Controller.Export()");
-            $this->dispatcher->call_class_method($this->route['controller'].'Controller','Export', array($ps, $out_format));
+            $this->dispatcher->callClassMethod($this->route['controller'].'Controller','Export', array($ps, $out_format));
         }
     }
 
@@ -470,7 +476,7 @@ class fw {
     *                          files => array(filepath, filepath, ...) or array(filename => filepath)
     * @return bool   true if message sent successfully
     */
-    public function send_email($ToEmail, $Subj, $Message, $options=array()){
+    public function sendEmail($ToEmail, $Subj, $Message, $options=array()){
       $MAIL= $this->config->MAIL;
       $result=true;
 
@@ -569,9 +575,9 @@ class fw {
     }
 
     // simple administrator message alerter
-    public function send_email_admin($msg_body){
+    public function sendEmailAdmin($msg_body){
       logger('WARN', "ADMIN ALERT:", $msg_body);
-      return $this->send_email($this->config->ADMIN_EMAIL,'SITE SYSTEM ALERT!', $msg_body);
+      return $this->sendEmail($this->config->ADMIN_EMAIL,'SITE SYSTEM ALERT!', $msg_body);
     }
 
     /**
@@ -587,13 +593,13 @@ class fw {
      *   $ps=array(
      *       'user' => $hU,
      *   );
-     *   send_email_tpl( $hU['email'], 'email_invite.txt', $ps);
+     *   sendEmailTpl( $hU['email'], 'email_invite.txt', $ps);
      */
-    public function send_email_tpl($to_email, $tpl, $ps, $options){
+    public function sendEmailTpl($to_email, $tpl, $ps, $options){
       $msg_body=parse_page('/emails', $tpl, $ps, 'v');
       list($msg_subj, $msg_body)=preg_split("/\n/", $msg_body, 2);
 
-      return $this->send_email($to_email, $msg_subj, $msg_body, $options);
+      return $this->sendEmail($to_email, $msg_subj, $msg_body, $options);
     }
 
 ##########################  STATIC methods

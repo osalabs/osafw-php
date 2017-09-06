@@ -8,18 +8,18 @@
 */
 class FwHooks {
     //general global initializations before route dispatched
-    public static function global_init() {
+    public static function initRequest() {
         $me_id=Utils::me();
 
         #permanent login support
         if (!$me_id){
-           fw::model('Users')->check_permanent_login();
+           fw::model('Users')->checkPermanentLogin();
            $me_id=Utils::me();
         }
 
         #if (!isset($_SESSION['categories'])) $_SESSION['categories']=fw::model('Categories')->ilist();
         #'also force set XSS code
-        if (!isset($_SESSION['XSS'])) $_SESSION['XSS']=Utils::get_rand_str(16);
+        if (!isset($_SESSION['XSS'])) $_SESSION['XSS']=Utils::getRandStr(16);
     }
 
 }

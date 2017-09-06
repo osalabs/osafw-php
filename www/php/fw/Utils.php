@@ -11,9 +11,9 @@ class Utils {
         return @$_SESSION['user']['id']+0;
     }
 
-    public static function kill_magic_quotes($value){
+    public static function killMagicQuotes($value){
         $value = is_array($value) ?
-                  array_map( array('Utils','kill_magic_quotes'), $value) :
+                  array_map( array('Utils','killMagicQuotes'), $value) :
                   stripslashes($value);
         return $value;
     }
@@ -50,7 +50,7 @@ class Utils {
     }
 
     //get string with random chars A-Fa-f0-9
-    public static function get_rand_str($len){
+    public static function getRandStr($len){
         $result='';
         $chars=array("A","B","C","D","E","F","a","b","c","d","e","f",0,1,2,3,4,5,6,7,8,9);
         for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars))];
@@ -59,7 +59,7 @@ class Utils {
 
     //get icode with a given length based on a full set A-Za-z0-9
     //default length is 4
-    public static function get_icode($len=4){
+    public static function getIcode($len=4){
         $result='';
         $chars=array(0,1,2,3,4,5,6,7,8,9);
         for($i=ord('A');$i<=ord('Z');$i++) $chars[]=chr($i);
@@ -69,7 +69,7 @@ class Utils {
         return $result;
     }
 
-    public static function escape_str($str){
+    public static function urlescape($str){
         return urlencode($str);
     }
 
@@ -87,21 +87,14 @@ class Utils {
         return preg_replace("/%%[^%]*%%/","",$aaa);  //remove special tags too
     }
 
-    public static function quotestr($str){
-        $str=n2br($str);
-        $str=str_replace('"','""',$str);
-
-        return '"'.$str.'"';
-    }
-
     /**
      * for each row in $rows add array keys/values to this row
-     * usage: Utils::array_inject($this->list_rows, array('related_id' => $this->related_id));
+     * usage: Utils::arrayInject($this->list_rows, array('related_id' => $this->related_id));
      * @param  array $rows  array of assoc arrays
      * @param  array $toadd keys/values to add
      * @return none, $rows changed by ref
      */
-    public static function array_inject(&$rows, $toadd){
+    public static function arrayInject(&$rows, $toadd){
         foreach ($rows as $k => $row) {
             #array merge
             foreach ($toadd as $key => $value) {
@@ -116,13 +109,14 @@ class Utils {
      * @param  array $fields plain array - field names
      * @return string one csv line with properly quoted values and "\n" at the end
      */
-    public static function to_csv_row($row, $fields){
+    public static function toCSVRow($row, $fields){
         $result='';
 
         foreach ($fields as $key => $fld) {
             $str = $row[$fld];
             if ( preg_match('/[",]/', $str) ){
-                $str = quotestr($str);
+                //quote string
+                $str='"'.str_replace('"','""',n2br($str)).'"';
             }
             $result.=(($result)?",":"").$str;
         }
@@ -130,8 +124,8 @@ class Utils {
         return $result."\n";
     }
 
-    public static function get_csv_export($rows, $fields=''){
-        $result='';
+    //export $rows with $fields into csv format and echo to output
+    public static function exportCSV($rows, $fields=''){
         if (!is_array($fields)) $fields = static::qh($fields);
 
         #headers - if no fields set - read first row and get header names
@@ -147,27 +141,27 @@ class Utils {
         }
         $headers_str=implode(',', $fields_header);
 
-        $result=$headers_str."\n";
+        echo $headers_str."\n";
         foreach ($rows as $key => $row) {
-            $result.=static::to_csv_row($row, $fields);
+            echo static::toCSVRow($row, $fields);
         }
 
-        return $result;
+        echo $result;
     }
 
     /**
-     * write reponse as csv
+     * output response as csv
      * @var array   $rows   array of hashes from db_array
      * @var string|array $fields fields to export - string for qh or hash - (fieldname => field name in header), default - all export fields
      * @var string $filename human name of the file for browser, default "export.csv"
      */
-    public static function response_csv($rows, $fields='', $filename='export.csv'){
+    public static function responseCSV($rows, $fields='', $filename='export.csv'){
         $filename = str_replace('"', "'", $filename); #quote filename
 
         header('Content-type: text/csv');
         header('Content-Disposition: attachment; filename="'.$filename.'"');
 
-        echo static::get_csv_export($rows, $fields);
+        static::exportCSV($rows, $fields);
     }
 
 
@@ -226,7 +220,7 @@ class Utils {
      * @param array $to_file optional, save response to file (for file downloads)
      * @return string content received. FALSE if error
      */
-    public static function load_url($url, $params=null, $headers=null, $to_file=''){
+    public static function loadURL($url, $params=null, $headers=null, $to_file=''){
         logger('TRACE', "CURL load from: [$url]", $params, $headers, $to_file);
         $cu = curl_init();
 
@@ -275,7 +269,7 @@ class Utils {
     }
 
     #send file to URL with optional params using curl
-    public static function send_file_to_url($url, $from_file, $params=null, $headers=null){
+    public static function sendFileToURL($url, $from_file, $params=null, $headers=null){
         logger('TRACE', "CURL post file [$from_file] to: [$url]", $params, $headers);
         $cu = curl_init();
 
@@ -319,7 +313,7 @@ class Utils {
      * @param array $to_file optional, save response to file (for file downloads)
      * @return array json data received. FALSE if error
      */
-    public static function post_json($url, $json, $to_file=''){
+    public static function postJson($url, $json, $to_file=''){
         $jsonstr = json_encode($json);
 
         $headers=array(
@@ -327,7 +321,7 @@ class Utils {
             'Content-Type: application/json',
             'Content-Length: ' . strlen($jsonstr),
         );
-        $result=static::load_url($url, $jsonstr, $headers, $to_file);
+        $result=static::loadURL($url, $jsonstr, $headers, $to_file);
         if ($result!==FALSE) {
             if ($to_file>''){
                 #if it was file transfer, just construct successful response
@@ -349,14 +343,14 @@ class Utils {
      * @param array $headers optional, additional headers
      * @return array json data received. FALSE if error
      */
-    public static function get_json($url, $to_file='',$headers=null){
+    public static function getJson($url, $to_file='',$headers=null){
 
         $headers2=array(
             'Accept: application/json'
         );
         if (is_array($headers)) $headers2 = array_merge($headers2, $headers);
 
-        $result=static::load_url($url, null, $headers2, $to_file);
+        $result=static::loadURL($url, null, $headers2, $to_file);
         if ($result!==FALSE) {
             if ($to_file>''){
                 #if it was file transfer, just construct successful response
@@ -375,7 +369,7 @@ class Utils {
      * return parsed json from the POST request
      * @return array json or FALSE
      */
-    public static function get_posted_json(){
+    public static function getPostedJson(){
         $raw = file_get_contents("php://input");
         return json_decode($raw, true);
     }

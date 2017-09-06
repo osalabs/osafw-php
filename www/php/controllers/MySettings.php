@@ -7,7 +7,7 @@ class MySettingsController extends FwController {
     public $model_name = 'Users';
 
     public function IndexAction() {
-        $this->route_redirect("ShowForm");
+        $this->routeRedirect("ShowForm");
     }
 
     public function ShowFormAction() {
@@ -41,32 +41,32 @@ class MySettingsController extends FwController {
         try{
             $this->Validate($id, $item);
 
-            $vars = FormUtils::form2dbhash($item, 'email fname lname address1 address2 city state zip phone');
+            $vars = FormUtils::filter($item, 'email fname lname address1 address2 city state zip phone');
             $this->model->update($id, $vars);
 
             $this->fw->flash("record_updated", true);
             fw::redirect($this->base_url);
 
         }catch( ApplicationException $ex ){
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("ShowForm");
+            $this->setFormError($ex->getMessage());
+            $this->routeRedirect("ShowForm");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, "email");
+        $result= $this->validateRequired($item, "email");
 
         if ($result){
-            if ($this->model->is_exists( $item['email'], $id ) ){
-                $this->ferr('email', 'EXISTS');
+            if ($this->model->isExists( $item['email'], $id ) ){
+                $this->setError('email', 'EXISTS');
             }
 
-            if (!FormUtils::is_email( $item['email'] ) ){
-                $this->ferr('email', 'WRONG');
+            if (!FormUtils::isEmail( $item['email'] ) ){
+                $this->setError('email', 'WRONG');
             }
         }
 
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
 }//end of class

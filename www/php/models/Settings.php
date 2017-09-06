@@ -14,16 +14,16 @@ class Settings extends FwModel {
     */
 
     public static function read($icode){
-        return fw::model('Settings')->get_value($icode);
+        return fw::model('Settings')->getValue($icode);
     }
     public static function readi($icode){
-        return (fw::model('Settings')->get_value($icode))+0;
+        return (fw::model('Settings')->getValue($icode))+0;
     }
     public static function readd($icode){
-        return Utils::f2date(fw::model('Settings')->get_value($icode));
+        return Utils::f2date(fw::model('Settings')->getValue($icode));
     }
     public static function write($icode, $value){
-        return fw::model('Settings')->set_value($icode, $value);
+        return fw::model('Settings')->setValue($icode, $value);
     }
 
     public function __construct() {
@@ -32,23 +32,23 @@ class Settings extends FwModel {
         $this->table_name = 'settings';
     }
 
-    public function one_by_icode($icode, $is_force=false) {
+    public function oneByIcode($icode, $is_force=false) {
         $cache_key = $this->CACHE_PREFIX.$this->table_name.'*'.$icode;
         if (!$is_force) {
-            $row = FwCache::get_value($cache_key);
+            $row = FwCache::getValue($cache_key);
         }
         if ($is_force || is_null($row)){
             $row = $this->db->row($this->table_name, array('icode'=>$icode));
-            FwCache::set_value($cache_key, $row);
+            FwCache::setValue($cache_key, $row);
         }
         return $row;
     }
 
-    public function get_value($icode){
-        return $this->one_by_icode($icode)['ivalue'];
+    public function getValue($icode){
+        return $this->oneByIcode($icode)['ivalue'];
     }
-    public function set_value($icode, $ivalue){
-        $item = $this->one_by_icode($icode);
+    public function setValue($icode, $ivalue){
+        $item = $this->oneByIcode($icode);
         $fields=array(
             'ivalue'    => $ivalue
         );
@@ -63,8 +63,8 @@ class Settings extends FwModel {
         }
     }
 
-    public function is_exists($icode, $not_id=NULL) {
-        return parent::is_exists($icode, 'icode', $not_id);
+    public function isExists($icode, $not_id=NULL) {
+        return parent::isExists($icode, 'icode', $not_id);
     }
 
 }

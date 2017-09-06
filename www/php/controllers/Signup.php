@@ -15,7 +15,7 @@ class SignupController extends FwAdminController {
     }
 
     public function IndexAction() {
-        $this->fw->route_redirect("ShowForm");
+        $this->fw->routeRedirect("ShowForm");
     }
 
     public function ShowFormAction($form_id) {
@@ -51,45 +51,45 @@ class SignupController extends FwAdminController {
             #load old record if necessary
             #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
+            $itemdb = FormUtils::filter($item, $this->save_fields);
 
-            $id = $this->model_add_or_update($id, $itemdb);
+            $id = $this->modelAddOrUpdate($id, $itemdb);
 
             #signup confirmaiton email
             $user = $this->model->one($id);
             $ps=array(
                 'user' => $user,
             );
-            $this->fw->send_email_tpl( $user['email'], 'signup.txt', $ps);
+            $this->fw->sendEmailTpl( $user['email'], 'signup.txt', $ps);
 
-            $this->model->do_login( $id );
+            $this->model->doLogin( $id );
             fw::redirect($this->fw->config->LOGGED_DEFAULT_URL);
 
         }catch( ApplicationException $ex ){
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("ShowForm");
+            $this->setFormError($ex->getMessage());
+            $this->routeRedirect("ShowForm");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, $this->required_fields);
+        $result= $this->validateRequired($item, $this->required_fields);
 
         //result here used only to disable further validation if required fields validation failed
         if ($result){
-            if ($this->model->is_exists( $item['email'], $id ) ){
-                $this->ferr('email', 'EXISTS');
+            if ($this->model->isExists( $item['email'], $id ) ){
+                $this->setError('email', 'EXISTS');
             }
 
-            if (!FormUtils::is_email( $item['email'] ) ){
-                $this->ferr('email', 'WRONG');
+            if (!FormUtils::isEmail( $item['email'] ) ){
+                $this->setError('email', 'WRONG');
             }
 
             if ( $item['pwd']>"" && $item['pwd']!=$item['pwd2'] ){
-                $this->ferr('pwd', 'WRONG');
+                $this->setError('pwd', 'WRONG');
             }
         }
 
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
 }//end of class

@@ -45,14 +45,14 @@ class LoginController extends FwController {
             }
 
             if (!strlen($login) || !strlen($pwd) ) {
-                $this->ferr("REGISTER", True);
+                $this->setError("REGISTER", True);
                 throw new ApplicationException("");
             }
 
             $hU = $this->fw->db->row("select * from users where email=".$this->fw->db->quote($login)." and pwd=".$this->fw->db->quote($pwd));
             if ( !isset($hU['access_level']) || $hU['status']!=0 ) throw new ApplicationException(lng("User Authentication Error"));
 
-            $this->model->do_login( $hU['id'] );
+            $this->model->doLogin( $hU['id'] );
 
             if ($gourl && !preg_match("/^http/i", $gourl)){ #if url set and not external url (hack!) given
                 fw::redirect($gourl);
@@ -62,14 +62,14 @@ class LoginController extends FwController {
 
         }catch( ApplicationException $ex){
             $this->fw->GLOBAL['err_ctr']=reqi('err_ctr')+1;
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("Index");
+            $this->setFormError($ex->getMessage());
+            $this->routeRedirect("Index");
         }
     }
 
     public function SaveFacebook() {
 
-        $item=FormUtils::form2dbhash($_REQUEST, 'access_token id email first_name last_name name username gender link locale timezone verified');
+        $item=FormUtils::filter($_REQUEST, 'access_token id email first_name last_name name username gender link locale timezone verified');
         #TODO better validate
         if (!$item['access_token'] || !$item['id']) throw new ApplicationException("Wrong facebook data", 1);
 
@@ -86,7 +86,7 @@ class LoginController extends FwController {
         $users_id=0;
 
         #first - check by email
-        $hU=$this->model->one_by_email($item['email']);
+        $hU=$this->model->oneByEmail($item['email']);
         if ($hU['id']){
             $users_id=$hU['id'];
         }
@@ -149,7 +149,7 @@ class LoginController extends FwController {
 
         #automatically login the user
         $_SESSION['is_just_registered']=1;
-        $this->model->do_login($users_id);
+        $this->model->doLogin($users_id);
 
         $ps=array(
             'status'    => 0,
@@ -159,13 +159,13 @@ class LoginController extends FwController {
     }
 
     public function LogoffAction() {
-        $this->fw->model('Events')->log_event('logoff', Utils::me());
+        $this->fw->model('Events')->logEvent('logoff', Utils::me());
 
         //delete session
         $_SESSION = array();
         session_destroy();
 
-        $this->model->remove_perm_cookie();
+        $this->model->removePermCookie();
 
         fw::redirect($this->fw->config->UNLOGGED_DEFAULT_URL);
     }

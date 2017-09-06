@@ -13,8 +13,8 @@ class Categories extends FwModel {
         return $this->db->arr("select * from ".$this->table_name." where status=0 $where order by parent_id, prio desc, iname");
     }
 
-    public function get_select_options($sel_id, $parent_id=NULL) {
-        return FormUtils::select_options_db($this->ilist($parent_id), $sel_id);
+    public function getSelectOptions($sel_id, $parent_id=NULL) {
+        return FormUtils::selectOptions($this->ilist($parent_id), $sel_id);
     }
 
 }

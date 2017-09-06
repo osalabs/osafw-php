@@ -28,7 +28,7 @@ class WebFormMailerController extends FwController {
             $msg_body.=$key.' = '.$value."\n";
         }
 
-        $this->fw->send_email($mail_to, $mail_subject, $msg_body);
+        $this->fw->sendEmail($mail_to, $mail_subject, $msg_body);
 
         //need to add root_domain, so no one can use our redirector for bad purposes
         fw::redirect($this->fw->GLOBAL['ROOT_DOMAIN'].$redirect_to);

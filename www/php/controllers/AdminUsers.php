@@ -19,10 +19,10 @@ class AdminUsersController extends FwAdminController {
     public $search_fields = 'email fname lname';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
                                             //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
 
-    public function set_list_search() {
+    public function setListSearch() {
         $this->list_where=' 1=1 ';
 
-        parent::set_list_search();
+        parent::setListSearch();
 
         if ($this->list_filter['status']>''){
             $this->list_where .= ' and status='.$this->fw->db->quote($this->list_filter['status']);
@@ -46,36 +46,36 @@ class AdminUsersController extends FwAdminController {
             #load old record if necessary
             #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::form2dbhash($item, $this->save_fields);
+            $itemdb = FormUtils::filter($item, $this->save_fields);
             if (!strlen($itemdb['pwd'])) unset($itemdb['pwd']);
 
-            $id = $this->model_add_or_update($id, $itemdb);
+            $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            if ($id==Utils::me()) $this->model->session_reload();
+            if ($id==Utils::me()) $this->model->reloadSession();
 
             fw::redirect($this->base_url.'/'.$id.'/edit');
 
         }catch( ApplicationException $ex ){
-            $this->set_form_error($ex->getMessage());
-            $this->route_redirect("ShowForm");
+            $this->setFormError($ex->getMessage());
+            $this->routeRedirect("ShowForm");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validate_required($item, $this->required_fields);
+        $result= $this->validateRequired($item, $this->required_fields);
 
         //result here used only to disable further validation if required fields validation failed
         if ($result){
-            if ($this->model->is_exists( $item['email'], $id ) ){
-                $this->ferr('email', 'EXISTS');
+            if ($this->model->isExists( $item['email'], $id ) ){
+                $this->setError('email', 'EXISTS');
             }
 
-            if (!FormUtils::is_email( $item['email'] ) ){
-                $this->ferr('email', 'WRONG');
+            if (!FormUtils::isEmail( $item['email'] ) ){
+                $this->setError('email', 'WRONG');
             }
         }
 
-        $this->validate_check_result();
+        $this->validateCheckResult();
     }
 
     public function Export($ps, $format) {
@@ -87,7 +87,7 @@ class AdminUsersController extends FwAdminController {
             'email'   => 'Email',
             'add_time' => 'Added',
         );
-        Utils::response_csv($ps['list_rows'], $fields, "members.csv");
+        Utils::responseCSV($ps['list_rows'], $fields, "members.csv");
     }
 
     //send email notification with password
@@ -95,7 +95,7 @@ class AdminUsersController extends FwAdminController {
         $id=$form_id+0;
 
         $user = $this->model->one($id);
-        $this->fw->send_email_tpl( $user['email'], 'email_pwd.txt', $user);
+        $this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
 
         return array(
             '_json' => array(
