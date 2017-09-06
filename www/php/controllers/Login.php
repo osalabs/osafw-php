@@ -159,7 +159,7 @@ class LoginController extends FwController {
     }
 
     public function LogoffAction() {
-        $this->fw->model('Events')->logEvent('logoff', Utils::me());
+        $this->fw->model('FwEvents')->log('logoff', Utils::me());
 
         //delete session
         $_SESSION = array();

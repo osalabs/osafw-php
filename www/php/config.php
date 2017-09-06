@@ -74,6 +74,7 @@ $FW_CONFIG = array(
     'LOGGER_MESSAGE_TYPE'   => 3, #3 - default to $site_error_log
     'LOG_LEVEL'             => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
     'IS_DEV'                => false, #NEVER set to true on live environments
+    'IS_LOG_FWEVENTS'       => true, #by default log all changes via FwEvents
 
     'IS_SIGNUP'             => true,  #set to false to disable Sign Up module
     'LOGGED_DEFAULT_URL'    => '/Main',

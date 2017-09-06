@@ -219,8 +219,8 @@ INSERT INTO categories (iname) VALUES
 ;
 
 /*event types for log*/
--- DROP TABLE IF EXISTS events;
-CREATE TABLE IF NOT EXISTS events (
+-- DROP TABLE IF EXISTS fwevents;
+CREATE TABLE IF NOT EXISTS fwevents (
     id                  int unsigned NOT NULL auto_increment,
     icode               varchar(64) NOT NULL default '',
 
@@ -236,16 +236,16 @@ CREATE TABLE IF NOT EXISTS events (
     PRIMARY KEY (id),
     KEY (icode)
 ) DEFAULT CHARSET=utf8;
-INSERT INTO events (icode, iname) VALUES ('login',    'User login');
-INSERT INTO events (icode, iname) VALUES ('logoff',   'User logoff');
-INSERT INTO events (icode, iname) VALUES ('chpwd',    'User changed login/pwd');
-INSERT INTO events (icode, iname) VALUES ('users_add',    'New user added');
-INSERT INTO events (icode, iname) VALUES ('users_upd',    'User updated');
-INSERT INTO events (icode, iname) VALUES ('users_del',    'User deleted');
+INSERT INTO fwevents (icode, iname) VALUES ('login',    'User login');
+INSERT INTO fwevents (icode, iname) VALUES ('logoff',   'User logoff');
+INSERT INTO fwevents (icode, iname) VALUES ('chpwd',    'User changed login/pwd');
+INSERT INTO fwevents (icode, iname) VALUES ('users_add',    'New user added');
+INSERT INTO fwevents (icode, iname) VALUES ('users_upd',    'User updated');
+INSERT INTO fwevents (icode, iname) VALUES ('users_del',    'User deleted');
 
 /* log of all user-initiated events */
--- DROP TABLE IF EXISTS event_log;
-CREATE TABLE IF NOT EXISTS event_log (
+-- DROP TABLE IF EXISTS fwevents_log;
+CREATE TABLE IF NOT EXISTS fwevents_log (
     id                  bigint unsigned NOT NULL auto_increment,
     events_id           int unsigned NOT NULL DEFAULT 0,           /* event type */
 

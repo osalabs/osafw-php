@@ -66,7 +66,7 @@ abstract class FwModel {
 
         $this->removeCache($id);
 
-        $this->fw->model('Events')->logFields($this->table_name.'_add', $id, $item);
+        $this->fw->model('FwEvents')->logFields($this->table_name.'_add', $id, $item);
         return $id;
     }
 
@@ -78,7 +78,7 @@ abstract class FwModel {
 
         $this->removeCache($id);
 
-        $this->fw->model('Events')->logFields($this->table_name.'_upd', $id, $item);
+        $this->fw->model('FwEvents')->logFields($this->table_name.'_upd', $id, $item);
         return $id;
     }
 
@@ -107,7 +107,7 @@ abstract class FwModel {
     public function delete($id, $is_perm=NULL) {
         if ($is_perm){
             $this->db->delete($this->table_name, $id);
-            $this->fw->model('Events')->logEvent($this->table_name.'_del', $id);
+            $this->fw->model('FwEvents')->log($this->table_name.'_del', $id);
         }else{
             $vars=array(
                 'status'    => 127,

@@ -3,13 +3,13 @@
 Events/Event logging model class
 */
 
-class Events extends FwModel {
-    public $log_table_name = 'event_log';
+class FwEvents extends FwModel {
+    public $log_table_name = 'fwevents_log';
 
     public function __construct() {
         parent::__construct();
 
-        $this->table_name = 'events';
+        $this->table_name = 'fwevents';
     }
 
     //add new record - override FwModel because we don't need to log this
@@ -24,8 +24,8 @@ class Events extends FwModel {
         return $this->db->row($this->table_name, array('icode'=>$icode));
     }
 
-    public function logEvent($ev_icode, $item_id=0, $item_id2=0, $iname='', $records_affected=0, $fields=null){
-        if (!$this->fw->config->IS_logEventS) return;
+    public function log($ev_icode, $item_id=0, $item_id2=0, $iname='', $records_affected=0, $fields=null){
+        if (!$this->fw->config->IS_LOG_FWEVENTS) return;
 
         $ev = $this->oneByIcode($ev_icode);
         if (!$ev){
@@ -52,7 +52,7 @@ class Events extends FwModel {
 
     //just to log fields for particular record
     public function logFields($ev_icode, $item_id, $fields){
-        return $this->logEvent($ev_icode, $item_id, 0, '', 1, $fields);
+        return $this->log($ev_icode, $item_id, 0, '', 1, $fields);
     }
 
 }
