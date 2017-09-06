@@ -305,6 +305,36 @@ abstract class FwController {
         return $result;
     }
 
+    /**
+     * standard processing after SaveAction()
+     * usage: return $this->afterSave($success, $location, $id, $is_new);
+     * @param  boolean $success  save success or not
+     * @param  string  $location client redirect to this location
+     * @param  integer $id       old or new id
+     * @param  boolean $is_new   new id or not
+     * @return ps array of json response or none (will be redirected to new location or ShowForm)
+     */
+    public function afterSave($success=true, $location='', $id=0, $is_new=false){
+        if ($this->fw->isJsonExpected()){
+            return array('_json'=>array(
+                'success'   => $success,
+                'err_msg'   => $this->fw->GLOBAL['err_msg'],
+                'location'  => $location,
+                'id'        => $id,
+                'is_new'    => $is_new,
+                #TODO - add ERR field errors here
+            ));
+        }else{
+            #if save success - return redirect
+            #if save failed - return back to add/edit form
+            if ($success){
+                fw::redirect($location);
+            }else{
+                $this->routeRedirect("ShowForm");
+            }
+        }
+    }
+
     ######################### Default Actions
 
     public function IndexAction() {

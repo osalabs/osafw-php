@@ -123,24 +123,7 @@ class FwAdminController extends FwController {
             $this->setFormError($ex->getMessage());
         }
 
-        if ($this->fw->isJsonExpected()){
-            return array('_json'=>array(
-                'id'        => $id,
-                'is_new'    => $is_new,
-                'location'  => $location,
-                'success'   => $success,
-                'err_msg'   => $this->fw->GLOBAL['err_msg'],
-                #TODO - add ERR field errors here
-            ));
-        }else{
-            #if save success - return redirect
-            #if save failed - return back to add/edit form
-            if ($success){
-                fw::redirect($location);
-            }else{
-                $this->routeRedirect("ShowForm");
-            }
-        }
+        return $this->afterSave($success, $location, $id, $is_new);
     }
 
     public function Validate($id, $item) {
