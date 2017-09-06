@@ -77,7 +77,7 @@ class FwAdminController extends FwController {
     public function ShowFormAction($form_id) {
         $id = $form_id+0;
 
-        if ($this->fw->route['method']=='GET' ){
+        if ($this->fw->isGetRequest()){
             if ($id>0){
                 $item = $this->model->one($id);
             }else{

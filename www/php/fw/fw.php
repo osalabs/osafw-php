@@ -21,7 +21,7 @@ class fw {
     public $dispatcher;
     public $db;
 
-    public $route = array(); #current request route data
+    public $route; #current request route data, stdClass
     public $ROUTES = array();
     public $GLOBAL = array();     #"global" vars, initialized with $CONFIG
     public $config;               #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
@@ -175,19 +175,19 @@ class fw {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
 
-            $default_action = $this->dispatcher->getRouteDefaultAction($this->route['controller']);
+            $default_action = $this->dispatcher->getRouteDefaultAction($this->route->controller);
             if ($default_action=='index'){
-                $this->route['action']='Index';
+                $this->route->action='Index';
 
             }elseif($default_action=='show'){
                 #assume action is id and use ShowAction
-                $this->route['id']=$this->route['action'];
-                $this->route['params'][0]=$this->route['id'];
-                $this->route['action']='Show';
+                $this->route->id=$this->route->action;
+                $this->route->params[0]=$this->route->id;
+                $this->route->action='Show';
             }else{
                 #if no default action set - this is special case action - this mean action should be got form REST's 'id'
-                if ($this->route['id']>''){
-                    $this->route['action']= $this->route['id'];
+                if ($this->route->id>''){
+                    $this->route->action= $this->route->id;
                 }
             }
 
@@ -221,11 +221,11 @@ class fw {
 
     public function renderRoute($route){
         #remember in G for rendering
-        $this->GLOBAL['controller']=$route['controller'];
-        $this->GLOBAL['controller.action']=$route['controller'].'.'.$route['action'];
-        $this->GLOBAL['controller.action.id']=$route['controller'].'.'.$route['action'].'.'.$route['id'];
+        $this->GLOBAL['controller']=$route->controller;
+        $this->GLOBAL['controller.action']=$route->controller.'.'.$route->action;
+        $this->GLOBAL['controller.action.id']=$route->controller.'.'.$route->action.'.'.$route->id;
 
-        $ps = $this->dispatcher->runController($route['controller'],$route['action'], $route['params']);
+        $ps = $this->dispatcher->runController($route->controller,$route->action, $route->params);
 
         #if action doesn't returned array - assume action rendered page by itself
         if ( is_array($ps) ){
@@ -233,26 +233,35 @@ class fw {
         }
     }
 
+    /**
+     * return true if current request is GET request
+     * @param  string  $value [description]
+     * @return boolean        [description]
+     */
+    public function isGetRequest($value=''){
+        return $this->fw->route->method=='GET';
+    }
+
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
     public function isJsonExpected($route=NULL){
-        if (!is_array($route)) $route = $this->route;
+        if (!is_object($route)) $route = $this->route;
 
-        if ($route['format']=='json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])){
+        if ($route->format=='json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])){
             return 1;
         }else{
             return 0;
         }
     }
     public function getResponseExpectedFormat($route=NULL){
-        if (!is_array($route)) $route = $this->route;
+        if (!is_object($route)) $route = $this->route;
         $result = '';
 
-        if ($route['format']=='json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
+        if ($route->format=='json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
             $result = 'json';
-        }elseif ($route['format']=='pjax' || @$_SERVER['HTTP_X_REQUESTED_WITH']>'' ) {
+        }elseif ($route->format=='pjax' || @$_SERVER['HTTP_X_REQUESTED_WITH']>'' ) {
             $result = 'pjax';
         }else{
-            $result = $route['format'];
+            $result = $route->format;
         }
 
         return $result;
@@ -260,9 +269,9 @@ class fw {
 
     # TODO $args
     public function routeRedirect($action, $controller=NULL, $params=NULL) {
-        $this->route['action']=$action;
-        if ( !is_null($controller) ) $this->route['controller']=$controller;
-        if ( !is_null($params) ) $this->route['params']=$params;
+        $this->route->action=$action;
+        if ( !is_null($controller) ) $this->route->controller=$controller;
+        if ( !is_null($params) ) $this->route->params=$params;
 
         $this->runRoute();
     }
@@ -275,16 +284,16 @@ class fw {
         $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS, CASE_LOWER);
 
         #XSS check for all requests that modify data
-        if ( (reqs("XSS") || $this->route['method'] == "POST" || $this->route['method'] == "PUT" || $this->route['method'] == "DELETE")
+        if ( (reqs("XSS") || $this->route->method == "POST" || $this->route->method == "PUT" || $this->route->method == "DELETE")
             && $_SESSION["XSS"] > "" && $_SESSION["XSS"] <> reqs("XSS")
-            && !in_array($this->route['controller'], $this->config->NO_XSS) //no XSS check for selected controllers
+            && !in_array($this->route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
            throw new AuthException("XSS Error");
         }
 
         #access level check
-        $path = strtolower('/'.$this->route['controller'].'/'.$this->route['action']);
-        $path2 = strtolower('/'.$this->route['controller']);
+        $path = strtolower('/'.$this->route->controller.'/'.$this->route->action);
+        $path2 = strtolower('/'.$this->route->controller);
 
         $current_level = -1;
         if (isset($_SESSION['access_level'])) $current_level=$_SESSION['access_level'];
@@ -298,7 +307,7 @@ class fw {
 
         if (is_null($rule_level)){
             #rule not found in config - try Controller.access_level
-            $rule_level = $this->dispatcher->getRouteAccessLevel($this->route['controller']);
+            $rule_level = $this->dispatcher->getRouteAccessLevel($this->route->controller);
         }
 
         if (is_null($rule_level)){
@@ -381,12 +390,12 @@ class fw {
     public function parser() {
         $args=func_get_args();
         $basedir='';
-        $controller = $this->route['controller'];
-        if ( $this->route['prefix'] ){
-            $basedir.= '/'.$this->route['prefix'];
-            $controller=preg_replace('/^'.preg_quote($this->route['prefix']).'/i', '', $controller);
+        $controller = $this->route->controller;
+        if ( $this->route->prefix ){
+            $basedir.= '/'.$this->route->prefix;
+            $controller=preg_replace('/^'.preg_quote($this->route->prefix).'/i', '', $controller);
         }
-        $basedir.='/'.$controller.'/'.$this->route['action'];
+        $basedir.='/'.$controller.'/'.$this->route->action;
         $basedir=strtolower($basedir);
         $layout=$this->page_layout;
         $ps=array();
@@ -445,8 +454,8 @@ class fw {
 
         }else{
             #any other formats - call controller's Export($out_format)
-            logger('DEBUG', "export $out_format using ".$this->route['controller']."Controller.Export()");
-            $this->dispatcher->callClassMethod($this->route['controller'].'Controller','Export', array($ps, $out_format));
+            logger('DEBUG', "export $out_format using ".$this->route->controller."Controller.Export()");
+            $this->dispatcher->callClassMethod($this->route->controller.'Controller','Export', array($ps, $out_format));
         }
     }
 

@@ -96,23 +96,11 @@ class Dispatcher {
         $method = $_SERVER['REQUEST_METHOD'];       #ex: POST, GET
         $uri    = $_SERVER['REQUEST_URI'];          #ex: /add/post/12390/alksjdla?qoeewlkj
 
-        $hroute = $this->uriToRoute($method, $uri, $this->ROUTES);
+        $route = $this->uriToRoute($method, $uri, $this->ROUTES);
+        #logger("ROUTE found:", $route);
+        logger('DEBUG', "ROUTE: ".$route->method.' '.$route->controller.'.'.$route->action.' id='.$route->id.' '.$route->action_more);
 
-/*
-        #check/set defaults
-        if (!$hroute['controller']) {
-            $hroute['controller']   = self::def_controller;
-            $hroute['action']       = self::def_action;
-        }
-        if (!$hroute['action']) {
-            $hroute['action']       = self::def_action;
-        }
-*/
-
-        #logger("ROUTE found:", $hroute);
-        logger('DEBUG', "ROUTE: ".$hroute['method'].' '.$hroute['controller'].'.'.$hroute['action'].' id='.$hroute['id'].' '.$hroute['action_more']);
-
-        return $hroute;
+        return $route;
     }
 
 
@@ -363,16 +351,16 @@ class Dispatcher {
         if (!strlen($cur_action)) $cur_action='Index';
         array_unshift($cur_aparams, $cur_id); #first param always is id
 
-        $result=array(
-           'method'     => $method,
-           'prefix'     => $controller_prefix,
-           'controller' => $cur_controller,
-           'action'     => $cur_action,
-           'id'         => $cur_id,
-           'action_more'=> $cur_action_more,
-           'format'     => $cur_format,
-           'params'     => $cur_aparams,
-        );
+        $result=new stdClass;
+        $result->method      = $method;
+        $result->prefix      = $controller_prefix;
+        $result->controller  = $cur_controller;
+        $result->action      = $cur_action;
+        $result->id          = $cur_id;
+        $result->action_more = $cur_action_more;
+        $result->format      = $cur_format;
+        $result->params      = $cur_aparams;
+
         logger('TRACE', 'ROUTER RESULT=', $result);
         return $result;
     }

@@ -21,7 +21,7 @@ class SignupController extends FwAdminController {
     public function ShowFormAction($form_id) {
         $id = $form_id+0;
 
-        if ($this->fw->route['method']=='GET' ){
+        if ($this->fw->isGetRequest()){
             if ($id>0){
                 $item = $this->model->one($id);
             }else{
@@ -31,7 +31,7 @@ class SignupController extends FwAdminController {
             }
         }else{
             $itemdb = $id ? $this->model->one($id) : array();
-            $item = array_merge($itemdb, req('item'));
+            $item = array_merge($itemdb, reqh('item'));
         }
 
         $ps = array(
@@ -44,7 +44,7 @@ class SignupController extends FwAdminController {
 
     public function SaveAction($form_id) {
         $id = $form_id+0;
-        $item = req('item');
+        $item = reqh('item');
 
         try{
             $this->Validate($id, $item);

@@ -39,7 +39,7 @@ class AdminUsersController extends FwAdminController {
 
     public function SaveAction($form_id) {
         $id = $form_id+0;
-        $item = req('item');
+        $item = reqh('item');
 
         try{
             $this->Validate($id, $item);

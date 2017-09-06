@@ -13,7 +13,7 @@ class MySettingsController extends FwController {
     public function ShowFormAction() {
         $id = Utils::me();
 
-        if ($this->fw->route['method']=='GET' ){
+        if ($this->fw->isGetRequest()){
             if ($id>0){
                 $item = $this->model->one($id);
             }else{
@@ -23,7 +23,7 @@ class MySettingsController extends FwController {
             }
         }else{
             $itemdb = $this->model->one($id);
-            $item = array_merge($itemdb, req('item'));
+            $item = array_merge($itemdb, reqh('item'));
         }
 
         $ps = array(
@@ -36,7 +36,7 @@ class MySettingsController extends FwController {
 
     public function SaveAction() {
         $id = Utils::me();
-        $item = req('item');
+        $item = reqh('item');
 
         try{
             $this->Validate($id, $item);

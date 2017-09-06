@@ -6,11 +6,11 @@ class PasswordController extends FwController {
     public $model_name = 'Users';
 
     public function IndexAction() {
-        if ($this->fw->route['method']=='GET' ){
+        if ($this->fw->isGetRequest()){
             #defaults
             $item=array();
         }else{
-            $item = req('item');
+            $item = reqh('item');
         }
 
         $ps = array(
@@ -22,7 +22,7 @@ class PasswordController extends FwController {
     }
 
     public function SaveAction() {
-        $item = req('item');
+        $item = reqh('item');
         $item['login']=trim($item['login']);
 
         try{

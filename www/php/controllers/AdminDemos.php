@@ -85,7 +85,7 @@ class AdminDemosController extends FwAdminController {
         $id = $form_id+0;
         $dict_link_multi=array();
 
-        if ($this->fw->route['method']=='GET' ){
+        if ($this->fw->isGetRequest()){
             if ($id>0){
                 $item = $this->model->one($id);
                 $item["ftime_str"] = DateUtils::int2timestr( $item["ftime"] );

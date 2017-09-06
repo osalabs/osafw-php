@@ -9,8 +9,8 @@ class LoginController extends FwController {
     }
 
     public function IndexAction() {
-        $item = req('item');
-        if ( !isset($item) ){
+        $item = reqh('item');
+        if (!$item){
             #defaults
             $item=array(
             );

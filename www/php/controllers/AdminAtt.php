@@ -62,7 +62,7 @@ class AdminAttController extends FwAdminController {
         $id = $form_id+0;
         $dict_link_multi=array();
 
-        if ($this->fw->route['method']=='GET' ){
+        if ($this->fw->isGetRequest()){
             if ($id>0){
                 $item = $this->model->one($id);
             }else{
@@ -72,8 +72,7 @@ class AdminAttController extends FwAdminController {
             }
         }else{
             $itemdb = $id ? $this->model->one($id) : array();
-            $item = req('item');
-            if (!is_array($item)) $item=array();
+            $item = reqh('item');
             $item = array_merge($itemdb, $item);
         }
 
@@ -95,8 +94,7 @@ class AdminAttController extends FwAdminController {
 
     public function SaveAction($form_id) {
         $id = $form_id+0;
-        $item = req('item');
-        if (!is_array($item)) $item=array();
+        $item = reqh('item');
         $files = UploadUtils::getPostedFiles('file1');
 
         try{
