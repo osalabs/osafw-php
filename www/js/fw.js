@@ -56,7 +56,7 @@ window.fw={
     fw.make_table_list(".list");
 
     //autosubmit filter on change TODO test
-    $(document).on('change', 'form[data-list-filter][data-autosubmit] :input:visible:not(data-nosubmit)', function(){
+    $(document).on('change', 'form[data-list-filter][data-autosubmit] :input:visible:not([data-nosubmit])', function(){
         this.form.submit();
     });
 
