@@ -13,9 +13,9 @@ if (!id){
 function on_send_pwd(e) {
     $.getJSON('<~../url>/(SendPwd)/<~id>', function(data){
         if (data.success){
-            hint_ok('Password reminder email sent');
+            fw.ok('Password reminder email sent');
         }else{
-            hint_error('Server error occured');
+            fw.error('Server error occured');
         }
     });
 }

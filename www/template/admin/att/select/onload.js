@@ -13,7 +13,7 @@ $modal.off('click', '.thumbs a').on('click', '.thumbs a', function (e) {
 //refresh if category changed
 $modal.find('select[name="item[att_categories_id]"]').on('change', function(e){
     var url = $modal.data('load-url')+'?att_categories_id='+$(this).val();
-    $modal.find('.modal-content').html(HTML_LOADING).load( url );
+    $modal.find('.modal-content').find('.thumbs').html(fw.HTML_LOADING).end().load( url );
 });
 
 $modal.find('input[type=file]').on('change', function(e){
@@ -29,7 +29,7 @@ $modal.find('form').ajaxForm({
     dataType : 'json',
     beforeSubmit: function(arr, $form, options) {
         if ( !$form.find("input[type=file]").val() ){
-            hint_error("Please select file first!");
+            fw.error("Please select file first!");
             return false;
         }
     // The array of form data takes the following form:
@@ -42,7 +42,7 @@ $modal.find('form').ajaxForm({
             $modal.trigger('select.modal-att', [data.id, data.iname, data.url, data.is_image ] );
             $modal.modal('hide');
         }else{
-            hint_error(data.err_msg);
+            fw.error(data.err_msg);
         }
     }
 });

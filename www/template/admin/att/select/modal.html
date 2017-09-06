@@ -9,7 +9,7 @@
 function modal_att_open($att_category, on_select_callback){
     var $modal = $('#modal-att').modal('show');
     var url = $modal.data('load-url')+'?category='+$att_category;
-    $modal.find('.modal-content').html(HTML_LOADING).load( url );
+    $modal.find('.modal-content').html(fw.HTML_LOADING).load( url );
 
     if ($.isFunction(on_select_callback)){
         $modal.off('select.modal-att').on('select.modal-att', on_select_callback);

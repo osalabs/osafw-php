@@ -25,7 +25,7 @@
             if (cd.types.contains && cd.types.contains('text/html') || cd.types.indexOf && cd.types.indexOf('text/html')>-1 ){
                 var data = cd.getData('text/html');
                 data = toMarkdown(data);
-                field_insert_at_cursor(this, data);
+                fw.field_insert_at_cursor(this, data);
                 e.preventDefault();
             }
         })
