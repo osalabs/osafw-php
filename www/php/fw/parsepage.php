@@ -46,6 +46,7 @@
  2014-11-25 - changed to use $CONFIG global var instead site_root, site_templ...
  2014-11-28 - fixed: sec2date now detect '0000-00-00 00:00:00' and return empty string
  2017-03-08 - fixed: quote special PHP $ and \\12345
+ 2017-09-24 - parse_radio_tag changed to bootstrap4
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -620,9 +621,10 @@ function parse_radio_tag($basedir, $tpl_path, $hf, $attrs){
     $str_checked='';
     if ($value==$sel_value) $str_checked=" checked='checked' ";
 
-    $result.="<label class='radio $delim'><input type='radio' name=\"$name\" value=\"$value\" $str_checked>$desc</label>";
+    #$result.="<label class='radio $delim'><input type='radio' name=\"$name\" value=\"$value\" $str_checked>$desc</label>"; #bootstrap3
+    $result.="<div class='form-check $delim'><label class='form-check-label'><input class='form-check-input' type='radio' name=\"$name\" value=\"$value\" $str_checked> $desc</label></div>"; #bootstrap4
  }
- return $result;
+ return $result; #bootstrap4
 }
 
 ############

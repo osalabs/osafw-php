@@ -80,7 +80,7 @@ $FW_CONFIG = array(
     'LOGGED_DEFAULT_URL'    => '/Main',
     'UNLOGGED_DEFAULT_URL'  => '/',
 
-    'SITE_TEMPLATES'        => $site_root.'/template',
+    'SITE_TEMPLATES'        => $site_root.'/template4',
     'PUBLIC_UPLOAD_DIR'     => $site_root.'/upload',
     'PUBLIC_UPLOAD_URL'     => $root_url.'/upload',
 

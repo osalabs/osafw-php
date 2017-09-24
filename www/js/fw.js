@@ -20,7 +20,7 @@ window.fw={
     if (!title) title='<i class="glyphicon glyphicon-info-sign"></i> Alert';
     var $modal=$('#fw-modal-alert');
     if (!$modal.length){//add template to document
-      $(document.body).append('<div class="modal fade" tabindex="-1" role="dialog" id="fw-modal-alert"><div class="modal-dialog modal-sm" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title"></h4></div><div class="modal-body"><p></p></div><div class="modal-footer"><button type="button" class="btn btn-primary btn-block" data-dismiss="modal">OK</button></div></div></div></div>');
+      $(document.body).append('<div class="modal fade" tabindex="-1" role="dialog" id="fw-modal-alert"><div class="modal-dialog modal-sm" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"></h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body"><p></p></div><div class="modal-footer"><button type="button" class="btn btn-primary btn-block" data-dismiss="modal">OK</button></div></div></div></div>');
       $modal=$('#fw-modal-alert');
     }
     $modal.modal('show').find('.modal-title').html(title).end().find('.modal-body p').html(content);
@@ -41,7 +41,7 @@ window.fw={
     if (!title) title='<i class="glyphicon glyphicon-question-sign"></i> Confirm';
     var $modal=$('#fw-modal-confirm');
     if (!$modal.length){//add template to document
-      $(document.body).append('<div class="modal fade" tabindex="-1" role="dialog" id="fw-modal-confirm"><div class="modal-dialog modal-sm" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title"></h4></div><div class="modal-body"><p></p></div><div class="modal-footer"><button type="button" class="btn btn-primary" data-dismiss="modal">OK</button><button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button></div></div></div></div>');
+      $(document.body).append('<div class="modal fade" tabindex="-1" role="dialog" id="fw-modal-confirm"><div class="modal-dialog modal-sm" role="document"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"></h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div><div class="modal-body"><p></p></div><div class="modal-footer"><button type="button" class="btn btn-primary" data-dismiss="modal">OK</button><button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button></div></div></div></div>');
       $modal=$('#fw-modal-confirm');
     }
     $modal.modal('show').find('.modal-title').html(title).end().find('.modal-body p').html(content);
