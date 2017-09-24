@@ -136,6 +136,12 @@ table.list .sortable {
 
 .pagination .active a {font-weight:bold}
 
+.pagination select {
+    display: inline-block;
+    width: auto;
+    vertical-align: top;
+}
+
 form .required:before {
     content: "*";
     color:#ff0000;
@@ -185,12 +191,6 @@ form .has-danger .invalid-feedback {
 }
 .twitter-typeahead .tt-hint {
     top: -3px !important;
-}
-
-.pagination select {
-    display: inline-block;
-    width: auto;
-    vertical-align: top;
 }
 
 .filter_option label {
