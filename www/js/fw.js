@@ -303,7 +303,7 @@ window.fw={
     var sortdir=$sh.data('sortdir');
 
     var sort_img= (sortdir=='desc') ? 'glyphicon-arrow-up' : 'glyphicon-arrow-down';
-    $tbl.find('.sortable[data-sort="'+sortby+'"]').addClass('active-sort').prepend('<span class="glyphicon '+sort_img+' pull-right"></span>');
+    $tbl.find('.sortable[data-sort="'+sortby+'"]').addClass('active-sort').prepend('<span class="glyphicon '+sort_img+' float-right"></span>');
 
     $tbl.on('click', '.sortable', function() {
       var $td=$(this);
