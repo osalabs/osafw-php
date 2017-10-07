@@ -41,8 +41,11 @@ abstract class FwController {
     public $related_id;                 // related id, passed via request. Controller should limit view to items related to this id
     public $related_field_name;         // if set and $related_id passed - list will be filtered on this field
 
+    protected $db;
+
     public function __construct() {
         $this->fw = fw::i();
+        $this->db = $this->fw->db;
 
         $this->return_url=reqs('return_url');
         $this->related_id=reqs('related_id');
@@ -132,8 +135,8 @@ abstract class FwController {
 
         $s = trim($this->list_filter['s']);
         if ( strlen($s) && $this->search_fields){
-            $like_quoted=$this->fw->db->quote('%'.$s.'%');
-            $exact_quoted=$this->fw->db->quote($s);
+            $like_quoted=$this->db->quote('%'.$s.'%');
+            $exact_quoted=$this->db->quote($s);
 
             $afields = Utils::qw($this->search_fields);
             foreach ($afields as $key => $fieldsand) {
@@ -155,7 +158,7 @@ abstract class FwController {
 
         #if related id and field name set - filter on it
         if ($this->related_id>'' && $this->related_field_name){
-            $this->list_where .= ' and '.$this->fw->db->quote_ident($this->related_field_name).'='.$this->fw->db->quote($this->related_id);
+            $this->list_where .= ' and '.$this->db->quote_ident($this->related_field_name).'='.$this->db->quote($this->related_id);
         }
     }
 
@@ -166,7 +169,7 @@ abstract class FwController {
      * @return string $this->list_pager pager from FormUtils::getPager
      */
     public function getListRows() {
-        $this->list_count = $this->fw->db->value("select count(*) from {$this->list_view} where " . $this->list_where);
+        $this->list_count = $this->db->value("select count(*) from {$this->list_view} where " . $this->list_where);
         if ($this->list_count){
             $offset = $this->list_filter['pagenum']*$this->list_filter['pagesize'];
             $limit  = $this->list_filter['pagesize'];

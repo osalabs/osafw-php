@@ -53,7 +53,7 @@ class Utils {
     public static function getRandStr($len){
         $result='';
         $chars=array("A","B","C","D","E","F","a","b","c","d","e","f",0,1,2,3,4,5,6,7,8,9);
-        for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars))];
+        for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars)-1)];
         return $result;
     }
 
@@ -65,7 +65,7 @@ class Utils {
         for($i=ord('A');$i<=ord('Z');$i++) $chars[]=chr($i);
         for($i=ord('a');$i<=ord('z');$i++) $chars[]=chr($i);
 
-        for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars))];
+        for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars)-1)];
         return $result;
     }
 
