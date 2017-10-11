@@ -604,7 +604,7 @@ class fw {
      *   );
      *   sendEmailTpl( $hU['email'], 'email_invite.txt', $ps);
      */
-    public function sendEmailTpl($to_email, $tpl, $ps, $options){
+    public function sendEmailTpl($to_email, $tpl, $ps, $options=array()){
       $msg_body=parse_page('/emails', $tpl, $ps, 'v');
       list($msg_subj, $msg_body)=preg_split("/\n/", $msg_body, 2);
 
