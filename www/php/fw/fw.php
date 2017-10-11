@@ -239,7 +239,7 @@ class fw {
      * @return boolean        [description]
      */
     public function isGetRequest($value=''){
-        return $this->fw->route->method=='GET';
+        return $this->route->method=='GET';
     }
 
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
