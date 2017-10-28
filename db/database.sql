@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
 
     notes               text,
     phone               varchar(16) NOT NULL default '',
+    att_id              int unsigned NOT NULL,  /*avatar*/
 
     login_time          datetime,               /*Last login time */
     login_ip            char(15),                /*last remote ip*/
