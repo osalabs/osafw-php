@@ -12,7 +12,9 @@
         <a class="btn btn-default" href="<~../url><~/common/list/relid>"><i class="glyphicon glyphicon-menu-left"></i> `Return back to list`</a>
         <a class="btn btn-default" href="<~../url>/new<~/common/list/relid>"><i class="glyphicon glyphicon-plus"></i> `Add New`</a>
         <~add_sub if="id" inline>
-          <a class="btn btn-default" href="<~../url>/new?parent_id=<~id>"><i class="glyphicon glyphicon-plus"></i> `Add New Sub-Page`</a>
+          <~add_sub2 unless="i[is_home]" inline>
+            <a class="btn btn-default" href="<~../url>/new?parent_id=<~id>"><i class="glyphicon glyphicon-plus"></i> `Add New Sub-Page`</a>
+          </~add_sub2>
         </~add_sub>
      </div>
     </div>
@@ -133,7 +135,7 @@
           <label class="col-form-label col-md-3" for="pub_time">`Publish date`</label>
           <div class="col-md-3">
             <div class="input-group date">
-              <input id="pub_time" name="item[pub_time]" maxlength="10" value="<~i[pub_time] date>" type="text" class="form-control">
+              <input id="pub_time" name="item[pub_time]" maxlength="10" value="<~i[pub_time] date="m/d/Y">" type="text" class="form-control">
               <span class="input-group-btn"><button class="btn btn-default" type="button"><i class="glyphicon glyphicon-calendar"></i></button></span>
             </div>
           </div>
@@ -163,6 +165,7 @@
 </form>
 
 <~sub_block if="id" inline>
+ <~sub_block2 unless="i[is_home]" inline>
 <h3>Sub-Pages</h3>
 
 <p>
@@ -174,4 +177,5 @@
   <li><a href="<~../url>/<~id>/edit"><~iname></a></li>
   </~subpages>
 </ul>
+ </~sub_block2>
 </~sub_block>

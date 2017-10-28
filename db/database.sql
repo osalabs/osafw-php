@@ -163,7 +163,6 @@ CREATE TABLE IF NOT EXISTS spages (
     idesc               text,                          /*page contents, markdown*/
     head_att_id         int unsigned NULL,                               /*optional head banner image*/
 
-    iname_tagline       varchar(64) NOT NULL DEFAULT '',       /*page tagline*/
     idesc_left          text,                          /*left sidebar content, markdown*/
     idesc_right         text,                          /*right sidebar content, markdown*/
     meta_keywords       varchar(255) NOT NULL DEFAULT '',      /*meta keywords*/
@@ -174,7 +173,10 @@ CREATE TABLE IF NOT EXISTS spages (
     prio                int NOT NULL DEFAULT 0,                 /* 0 is normal and lowest priority*/
     is_home             int DEFAULT 0,                          /* 1 is for home page (non-deletable page*/
 
-    status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
+    custom_css          text,                          /*custom page css*/
+    custom_js           text,                          /*custom page js*/
+
+    status              tinyint default 0,    /*0-ok, 10-not published, 127-deleted*/
     add_time            timestamp default CURRENT_TIMESTAMP,
     add_users_id         int unsigned default 0,
     upd_time            timestamp,
@@ -188,7 +190,8 @@ CREATE INDEX spages_url ON spages (url);
 --TRUNCATE TABLE spages;
 INSERT INTO spages (parent_id, url, iname) VALUES
 (0,'','Home') -- 1
-,(1,'test','Test sub-home page') -- 2
+,(0,'test-top','Test top level page') -- 2
+,(2,'sub','Test sub-top level page') -- 3
 ;
 update spages set is_home=1 where id=1;
 

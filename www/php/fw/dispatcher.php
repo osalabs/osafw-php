@@ -77,6 +77,7 @@ class Dispatcher {
     public $ROUTES = array();
     public $ROOT_URL;
     public $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
+    public $request_url; #last url processed by uriToRoute
 
     # leave just allowed chars in string - for routers: controller, action
     # IN: raw name of the controller or action
@@ -245,6 +246,7 @@ class Dispatcher {
         if ($root_url) $uri=preg_replace("/^".preg_quote($root_url,'/')."/", '', $uri);   #remove root_url if any
         $uri=preg_replace("/\?.*/",'',$uri);  #remove query if any , ex. /add/post/12390/alksjdla
         $uri=preg_replace("!/$!", '', $uri); #remove last /
+        $this->request_url = $uri;
         logger('INFO','*** REQUEST START ['.$uri.']');
 
         #check if method override exits

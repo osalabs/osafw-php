@@ -21,6 +21,7 @@ class fw {
     public $dispatcher;
     public $db;
 
+    public $request_url; #current request url (relative to application url)
     public $route; #current request route data, stdClass
     public $ROUTES = array();
     public $GLOBAL = array();     #"global" vars, initialized with $CONFIG
@@ -82,6 +83,7 @@ class fw {
 
         $fw->dispatcher = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES);
         $fw->route = $fw->dispatcher->getRoute();
+        $fw->request_url = $fw->dispatcher->request_url;
 
         $fw->runRoute();
 
@@ -171,6 +173,22 @@ class fw {
         } catch (AuthException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
 
+        } catch (NoClassException $ex) {
+            #if can't call class - class doesn't exists - use Home->NotFoundAction
+            logger('DEBUG', "No controller found for controller=[".$this->route->controller."], using default Home");
+            $this->route->prefix='';
+            $this->route->controller='Home';
+            $this->route->action='NotFound';
+            $this->route->id='';
+
+            try {
+                $this->renderRoute($this->route);
+
+            } catch (NoClassMethodException $ex2) {
+                logger('WARN', "No HomeController->NotFoundAction found");
+                $this->handlePageError(404, $ex->getMessage(), $ex);
+                return;
+            }
         } catch (NoClassMethodException $ex) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
@@ -199,10 +217,6 @@ class fw {
                 logger('WARN', "Default parser");
                 $this->parser();
             }
-
-        } catch (NoClassException $ex) {
-            #if can't call class - class doesn't exists - show 404 error
-            $this->handlePageError(404, $ex->getMessage(), $ex);
 
         } catch (ExitException $ex) {
             #not a problem - just graceful exit
@@ -353,7 +367,8 @@ class fw {
             $err_msg = $error_message ? $error_message : ($err_code_desc ? $err_code_desc : "PAGE NOT YET IMPLEMENTED [$uri] ");
 
             $ps=array(
-                'success'   =>  0,
+                '_json'     =>  true, #also allow return urls by json
+                'success'   =>  false,
                 'err_code'  =>  $error_code,
                 'err_msg'   =>  $err_msg,
                 'err_time'  => time(),
@@ -414,7 +429,7 @@ class fw {
             $ps = &$args[2];
             if (count($args)==4) $out_filename = &$args[3];
         }else{
-            throw Exception("parser - wrong call");
+            throw new Exception("parser - wrong call");
         }
 
         $out_format = $this->getResponseExpectedFormat();
