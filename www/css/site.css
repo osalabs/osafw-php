@@ -52,7 +52,7 @@ fieldset[disabled] .btn-default.active {
 /************ fw
 */
 table.list .sortable {
-    color: #0088cc;
+    color: #007bff;
     text-decoration: underline;
     cursor: pointer;
 }
