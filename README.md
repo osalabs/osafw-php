@@ -1,7 +1,7 @@
 # osafw-php
 PHP web framework
 
-## Features
+## Dev Features
 
 - simple and straight in development and maintenance
 - **MVC-like** code, data, templates are split
@@ -22,12 +22,20 @@ PHP web framework
 - integrated auth - simple flat access levels auth
 - use of well-known 3rd party libraries
   - [jQuery](http://jquery.com)
-  - [Twitter Bootstrap 3](http://getbootstrap.com)
+  - [Twitter Bootstrap 4](http://getbootstrap.com)
   - [jQuery Form](https://github.com/malsup/form)
   - jGrowl
   - markdown libs
   - others... (TODO)
-  
+
+## End-User Features out of the box
+
+- membership access
+- simple Pages CMS (ability to edit pages, upload images/files)
+- uploads manager
+- members manager
+- contact us form
+
 ## Demo
 
 TODO
@@ -56,4 +64,4 @@ Debugging is much easier with these 3 globally available functions:
 Check your error.log file. It should be one level up from /www by default.
 Better to use `logger()` than `rw()` as it writes everything to file, not to browser/screen, keeping UI
 
-`$SITE_CONFIG` (defined in config files) contains `IS_DEBUG` parameter. If it's false - `logger()` will not write anything. Usually you want to set `IS_DEBUG` to `false` on production site and `true` for development/test.
+`$SITE_CONFIG` (defined in config files) contains `LOG_LEVEL` parameter. If it's `false` - `logger()` will not write anything. Usually you want to set `LOG_LEVEL` to `false` or `INFO|WARN|ERROR|FATAL` on production site and `ALL|TRACE|DEBUG` for development/test.
