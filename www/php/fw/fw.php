@@ -111,7 +111,11 @@ class fw {
             return $fw->models_cache[$model_class];
         }
         #logger($model_class);
-        $object = new $model_class($fw);
+        try {
+            $object = new $model_class($fw);
+        } catch (NoClassException $ex) {
+            throw new NoModelException("Model class not found: $model_class");
+        }
         $fw->models_cache[$model_class] = $object;
         return $object;
     }
@@ -126,7 +130,9 @@ class fw {
     public function autoload($class_name){
         $dirs = array();
         $bdir = dirname(__FILE__).'/';
+        $is_controller=false;
         if ( preg_match('/Controller$/', $class_name) ){
+            $is_controller=true;
             $dirs[]= $bdir.'../controllers/';
             if ($class_name!=='FwController' && $class_name!=='FwAdminController') $class_name=preg_replace("/Controller$/", "", $class_name);
         }else{
@@ -154,7 +160,13 @@ class fw {
             }
         }
 
-        if (!$file_found) throw new NoClassException("Class not found: $class_name");
+        if (!$file_found) {
+            if ($is_controller){
+                throw new NoControllerException("Controller class not found: $class_name");
+            }else{
+                throw new NoClassException("Class not found: $class_name");
+            }
+        }
         try {
             #logger("before include [$file_found]");
             include_once $file_found;
@@ -173,9 +185,9 @@ class fw {
         } catch (AuthException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
 
-        } catch (NoClassException $ex) {
-            #if can't call class - class doesn't exists - use Home->NotFoundAction
-            logger('DEBUG', "No controller found for controller=[".$this->route->controller."], using default Home");
+        } catch (NoControllerException $ex) {
+            #requested controller not found - use Home->NotFoundAction
+            logger('DEBUG', "No controller found [".$this->route->controller."], using default HomeController->NotFoundAction()");
             $this->route->prefix='';
             $this->route->controller='Home';
             $this->route->action='NotFound';
@@ -185,10 +197,16 @@ class fw {
                 $this->renderRoute($this->route);
 
             } catch (NoClassMethodException $ex2) {
-                logger('WARN', "No HomeController->NotFoundAction found");
+                logger('WARN', "No HomeController->NotFoundAction() found");
                 $this->handlePageError(404, $ex->getMessage(), $ex);
                 return;
             }
+
+        } catch (NoClassException $ex) {
+            #if can't call class - this is server error
+            $this->handlePageError(500, $ex->getMessage(), $ex);
+            return;
+
         } catch (NoClassMethodException $ex) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
@@ -342,7 +360,8 @@ class fw {
             $route=@$this->dispatcher->str2route($custom_error_route);
         }
 
-        logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message", $route);
+        logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
+        if ($error_code>=500) logger('DEBUG', $exeption->getTraceAsString());
 
         $is_error_processed = false;
         if ($route){
@@ -376,7 +395,8 @@ class fw {
             if ($this->GLOBAL['LOG_LEVEL']=='DEBUG' && $_SESSION['access_level']==100){
                 $ps['is_dump'] = true;
                 if (!is_null($exeption)){
-                    $ps['DUMP_STACK'] = $exeption->getTraceAsString();
+                    //remove unnecessary site root path
+                    $ps['DUMP_STACK'] = str_replace( $this->config->SITE_ROOT, "", $exeption->getTraceAsString() );
                 }
                 $ps['DUMP_FORM'] = print_r($_REQUEST,true);
                 $ps['DUMP_SESSION'] = print_r($_SESSION,true);
@@ -703,7 +723,7 @@ function logger(){
 
  $args=func_get_args();
  $logtype = 'DEBUG'; #default log type
- if (count($args)>0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL)$/", $args[0], $m) ){
+ if (count($args)>0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL)$/", $args[0], $m) ){
      $logtype = $m[1];
      array_shift($args);
  }
