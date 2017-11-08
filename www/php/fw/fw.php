@@ -565,7 +565,14 @@ class fw {
             $mail->addAddress($v);
           }
 
-          $mail->setFrom($from);
+          #if from is in form: 'NAME <EMAIL>' - parse it
+          if (preg_match("/^(.+)\s+<(.+)>$/", $from, $m)){
+            $mail->setFrom($m[2], $m[1]);
+          }else{
+            #from is usual email address
+            $mail->setFrom($from);
+          }
+
           if ($options['reply']) $mail->addReplyTo($options['reply']);
           if ($options['cc']) $mail->addCC($options['cc']);
           if ($options['bcc']) $mail->addBCC($options['bcc']);
@@ -584,7 +591,7 @@ class fw {
           $result=true;
           if(!$mail->send()) {
             $result=false;
-            logger('WARN', 'Error sending email: '.$mail->ErrorInfo);
+            logger('WARN', 'Error sending email via PHPMailer: '.$mail->ErrorInfo);
           }
 
         } catch (Exception $e) {
@@ -609,7 +616,7 @@ class fw {
         foreach ($ToEmail as $k=>$v){
             $res=mail($v, $Subj, $Message, $more);
             if ($res===FALSE){
-                logger('WARN', 'Error sending email: '. error_get_last()['message']);
+                logger('WARN', 'Error sending email via mail(): '. error_get_last()['message']);
                 $result=false;
             }
         }
