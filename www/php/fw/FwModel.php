@@ -137,7 +137,7 @@ abstract class FwModel {
     }
 
     public function isExists($uniq_key, $not_id=NULL) {
-        $this->isExistsByField($uniq_key, 'iname', $not_id);
+        return $this->isExistsByField($uniq_key, 'iname', $not_id);
     }
 
     #return standard list of id,iname where status=0 order by iname
