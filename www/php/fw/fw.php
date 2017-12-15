@@ -585,7 +585,7 @@ class fw {
           }
 
           foreach ($files as $key => $filepath) {
-            $mail->addAttachment($filepath, (intval($key)==$key?'':$key)); #if key is not a number - they key is filename
+            $mail->addAttachment($filepath, (intval($key)===$key?'':$key)); #if key is not a number - they key is filename
           }
 
           $result=true;
