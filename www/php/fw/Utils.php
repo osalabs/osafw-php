@@ -8,7 +8,7 @@ class Utils {
 
     //just return logged user id
     public static function me() {
-        return @$_SESSION['user']['id']+0;
+        return @$_SESSION['user_id']+0;
     }
 
     public static function killMagicQuotes($value){
