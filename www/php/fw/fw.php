@@ -253,6 +253,7 @@ class fw {
 
     public function renderRoute($route){
         #remember in G for rendering
+        $this->GLOBAL['route']=$route;
         $this->GLOBAL['controller']=$route->controller;
         $this->GLOBAL['controller.action']=$route->controller.'.'.$route->action;
         $this->GLOBAL['controller.action.id']=$route->controller.'.'.$route->action.'.'.$route->id;

@@ -47,6 +47,7 @@
  2014-11-28 - fixed: sec2date now detect '0000-00-00 00:00:00' and return empty string
  2017-03-08 - fixed: quote special PHP $ and \\12345
  2017-09-24 - parse_radio_tag changed to bootstrap4
+ 2018-01-18 - support for <~object[property]>
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -385,6 +386,8 @@ function hfvalue($tag, &$hf){
        $k=preg_replace("/\].*?/",'',$arr[$i]);  #remove last ]
        if ( is_array($ptr) && array_key_exists($k, $ptr) ){
           $ptr=&$ptr[ $k ];
+       }elseif ( is_object($ptr) && property_exists($ptr, $k)){
+          $ptr=$ptr->$k;
        }else{
           $ptr=&$empty_val; #looks like there are just no such key in array OR $ptr is not an array at all - so return empty value
           break;
@@ -750,7 +753,6 @@ function parse_cache_template($page,$hf,$out_filename=''){
 
 #############
 function htmlescape($str){
-
  $str=preg_replace("/&/",'&amp;', $str);
  $str=preg_replace('/"/','&quot;', $str);
  $str=preg_replace("/'/",'&#039;', $str);
