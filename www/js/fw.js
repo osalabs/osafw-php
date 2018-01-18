@@ -242,6 +242,7 @@ window.fw={
                   $f.data('is-ajaxsubmit',false);
                   //hint_error(data.err_msg ? data.err_msg : 'Auto-save error. Press Save manually.');
               }
+              $f.trigger('autosave-success',[data]);
           },
           error: function function_name (argument) {
               //console.log('ajaxSubmit error', data);
