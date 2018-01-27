@@ -70,7 +70,7 @@ $FW_CONFIG = array(
                 'IS_LOG'    => true, #enable logging via fw
                 ),
 
-    'site_error_log'        => $site_root_offline.'/logs/error.log',
+    'site_error_log'        => $site_root_offline.'/logs/osafw.log',
     'LOGGER_MESSAGE_TYPE'   => 3, #3 - default to $site_error_log
     'LOG_LEVEL'             => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
     'IS_DEV'                => false, #NEVER set to true on live environments
@@ -115,7 +115,7 @@ $FW_CONFIG = array(
     'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
     'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
 
-    'SITE_VERSION'          => '0.17.0502',
+    'SITE_VERSION'          => '0.18.0127', #also used to re-load css/js to avoid browser cacheing
 
     ########### place site specific configuration variables here:
     'SITE_VAR'              => false,

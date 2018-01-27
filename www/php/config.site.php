@@ -27,7 +27,6 @@ $SITE_CONFIG=array(
                 'SQL_SERVER'=> '', # if empty - MySQL
                 'IS_LOG'    => true,
                 ),
-    #'site_error_log'    => $FW_CONFIG['SITE_ROOT_OFFLINE'].'/error.log',
     'LOG_LEVEL'          => 'INFO', #use WARN|ERROR|FATAL|OFF for production, use INFO temporary to see SQL queries in production
 );
 

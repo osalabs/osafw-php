@@ -34,7 +34,7 @@ class LoginController extends FwController {
             $login  = trim($_REQUEST['item']['login']);
             $pwd    = $_REQUEST['item']['pwdh'];
             if ($_REQUEST["item"]["chpwd"] == "1") $pwd = $_REQUEST['item']['pwd'];
-            $pwd = substr(trim($pwd), 0, 32);
+            $pwd = substr(trim($pwd), 0, 64);
             $gourl = reqs('gourl');
 
             #for dev only - login as first admin

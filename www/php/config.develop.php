@@ -27,7 +27,6 @@ $SITE_CONFIG=array(
                 'SQL_SERVER'=> '', # if empty - MySQL
                 'IS_LOG'    => true,
                 ),
-    'site_error_log'    => $FW_CONFIG['SITE_ROOT_OFFLINE'].'/error.log',
     'IS_DEV'            => true, #to enable developer features
     'LOG_LEVEL'         => 'DEBUG', #use ALL|TRACE|DEBUG for development
     'IS_SIGNUP'         => true,

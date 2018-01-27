@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     access_level        int default 0,               /*General user access level, 0 - customer, 100-site admin*/
 
     email               varchar(128) NOT NULL default '',
-    pwd                 varchar(32) NOT NULL default '',
+    pwd                 varchar(64) NOT NULL default '',
 
     title               varchar(8) NOT NULL default '',
     fname               varchar(64) NOT NULL default '',
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS users (
     PRIMARY KEY (id)
 ) DEFAULT CHARSET=utf8;
 insert into users (access_level, email, pwd, fname, lname, add_time)
-VALUES (100, 'admin@admin.com', 'CHANGE_ME', 'Website', 'Admin', now());
+VALUES (100, 'admin@admin.com', UUID(), 'Website', 'Admin', now());
 
 /*user cookies (for permanent sessions)*/
 -- DROP TABLE IF EXISTS user_cookie;
