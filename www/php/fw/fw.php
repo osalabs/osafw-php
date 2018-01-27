@@ -42,14 +42,11 @@ class fw {
         'ALL'   => 70,  #just log everything
     );
 
-    # run web application
+    # run web application request
     # should be called in index.php
     public static function run($ROUTES=array()){
-        global $CONFIG;
         $start_time = microtime(true);
         $fw = fw::i();
-
-        spl_autoload_register(array($fw, 'autoload'));
 
         session_start();  #start session on each request
 
@@ -62,18 +59,10 @@ class fw {
         }
 
         #setup user's language to use by template engine
-        if (isset($_SESSION['lang'])){
-           $CONFIG['LANG']=$_SESSION['lang'];
-        }else{
-           $CONFIG['LANG']=$CONFIG['LANG_DEF'];  #use default language
-        }
-        $fw->config = (object)$CONFIG; #set fw config
+        if (isset($_SESSION['lang'])) $fw->config->LANG = $_SESSION['lang'];
 
         # and now run dispatcher
         FwHooks::initRequest();
-
-        //fw vairables
-        $fw->page_layout = $CONFIG['PAGE_LAYOUT'];
 
         #save flash to current var and update session
         if (isset($_SESSION['_flash'])){
@@ -122,8 +111,17 @@ class fw {
 
     public function __construct() {
         global $CONFIG;
+        spl_autoload_register(array($this, 'autoload'));
+
         $this->GLOBAL = $CONFIG;
-        $this->db = new DB($CONFIG['DB']); #prepare db object (will connect on demand)
+        $CONFIG['LANG']=$CONFIG['LANG_DEF'];  #use default language
+
+        # fw vairables
+        $this->config = (object)$CONFIG; #set fw config
+        $this->page_layout = $this->config->PAGE_LAYOUT;
+
+        # prepare db object (will connect on demand)
+        $this->db = new DB($this->config->DB);
     }
 
     //autoload controller/model classes
@@ -268,11 +266,18 @@ class fw {
 
     /**
      * return true if current request is GET request
-     * @param  string  $value [description]
-     * @return boolean        [description]
+     * @return boolean
      */
-    public function isGetRequest($value=''){
+    public function isGetRequest(){
         return $this->route->method=='GET';
+    }
+
+    /**
+     * return true if script runs not under web server (i.e. cron script)
+     * @return boolean
+     */
+    public function isOffline(){
+        return (PHP_SAPI === 'cli');
     }
 
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
