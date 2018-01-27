@@ -50,6 +50,7 @@ class DevConfigureController extends FwController {
 
         $ps['is_error_log']=false;
         if (is_writable($this->fw->config->site_error_log)) $ps['is_error_log']=true;
+        $ps['error_log_size']=Utils::bytes2str(filesize($this->fw->config->site_error_log));
 
         return $ps;
     }
