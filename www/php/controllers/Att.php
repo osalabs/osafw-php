@@ -30,7 +30,7 @@ class AttController extends FwController {
                 $this->model->transmitFile($id, $size, 'inline');
             }else{
                 #if it's not an image and requested preview - return std image
-                header('location: '.$this->fw->config->ROOT_URL.'/img/att_file.png');
+                header('location: '.$this->fw->config->ASSETS_URL.'/img/att_file.png');
 
                 // $filepath = $this->fw->config->site_root.'/img/att_file.png'; # TODO move to web.config or to model?
                 // header('Content-type: '.UploadUtils::getMimeForExt($item['ext']));
