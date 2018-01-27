@@ -91,9 +91,12 @@
       <label class="col-form-label col-md-3" for="dict_link_multi">DemoDicts Multi</label>
       <div class="col-md-9">
         <div class="field-multi-value">
-             <~multi_datarow repeat inline>
-               <div class="checkbox"><label><input type="checkbox" name="dict_link_multi[<~id>]" value="1" <~/common/checked if="is_checked">> <~iname></label></div>
-             </~multi_datarow>
+          <~multi_datarow repeat inline>
+            <div class="custom-control custom-checkbox">
+              <input type="checkbox" class="custom-control-input" id="dict_link_multi$<~id>" name="dict_link_multi[<~id>]" value="1" <~/common/checked if="is_checked">>
+              <label class="custom-control-label" for="dict_link_multi$<~id>"><~iname></label>
+            </div>
+          </~multi_datarow>
         </div>
       </div>
     </div>
@@ -116,17 +119,16 @@
     <div class="form-group row <~/common/error if="ERR[fyesno]">">
       <label class="col-form-label col-md-3" for="fyesno">Yes or No</label>
       <div class="col-md-9">
-        <~/common/sel/yn.sel radio="i[fyesno]" name="item[fyesno]" delim="form-check-inline">
+        <~/common/sel/yn.sel radio="i[fyesno]" name="item[fyesno]" delim="custom-control-inline">
       </div>
     </div>
 
     <div class="form-group row <~/common/error if="ERR[is_checkbox]">">
       <label class="col-form-label col-md-3" for="is_checkbox">Checkbox</label>
       <div class="col-md-9">
-        <div class="form-check">
-          <label class="form-check-label">
-            <input class="form-check-input" type="checkbox" name="item[is_checkbox]" value="1" <~/common/checked if="i[is_checkbox]">> Yes
-          </label>
+        <div class="custom-control custom-checkbox custom-control-inline">
+          <input class="custom-control-input" type="checkbox" id="is_checkbox" name="item[is_checkbox]" value="1" <~/common/checked if="i[is_checkbox]">>
+          <label class="custom-control-label" for="is_checkbox">Yes</label>
         </div>
       </div>
     </div>
@@ -154,7 +156,7 @@
       <div class="col-md-3">
         <div class="input-group date">
           <input id="fdate_pop" name="item[fdate_pop]" maxlength="10" value="<~i[fdate_pop] date="m/d/Y">" type="text" class="form-control">
-          <span class="input-group-btn"><button class="btn btn-default" type="button"><i class="glyphicon glyphicon-calendar"></i></button></span>
+          <div class="input-group-append"><button class="btn btn-outline-secondary" type="button"><i class="glyphicon glyphicon-calendar"></i></button></div>
         </div>
       </div>
     </div>

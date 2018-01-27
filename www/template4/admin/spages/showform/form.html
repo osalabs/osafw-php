@@ -33,12 +33,12 @@
       <label class="col-form-label col-md-3 <~/common/required unless="i[is_home]">" for="url">`Url`</label>
       <div class="col-md-9">
         <div class="input-group">
-            <span class="input-group-addon"><~parent_url>/</span>
+            <div class="input-group-prepend"><span class="input-group-text"><~parent_url>/</span></div>
             <input id="url" name="item[url]" maxlength="255" value="<~i[url]>" type="text" class="form-control" <~/common/required unless="i[is_home]"> <~/common/disabled if="i[is_home]">>
-            <span class="input-group-btn">
+            <div class="input-group-append">
                 <!--button class="btn btn-default" type="button">Go!</button-->
-                <a href="<~full_url>" target="_blank" class="btn btn-default btn-sm">View <i class="glyphicon glyphicon-new-window"></i></a>
-            </span>
+                <a href="<~full_url>" target="_blank" class="btn btn-outline-secondary" title="View"><i class="glyphicon glyphicon-new-window"></i></a>
+            </div>
         </div>
       </div>
     </div>

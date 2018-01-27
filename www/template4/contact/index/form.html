@@ -32,10 +32,9 @@
     <div class="form-group row <~/common/error if="ERR[emailupdates]">">
       <label class="col-form-label col-md-3" for="emailupdates"></label>
       <div class="col-md-9">
-        <div class="form-check">
-          <label class="form-check-label">
-            <input class="form-check-input" type="checkbox" name="emailupdates" value="1" <~/common/checked if="i[emailupdates]">> Sign up for email updates
-          </label>
+        <div class="custom-control custom-checkbox custom-control-inline">
+          <input class="custom-control-input" type="checkbox" id="emailupdates" name="item[emailupdates]" value="1" <~/common/checked if="i[emailupdates]">>
+          <label class="custom-control-label" for="emailupdates">Sign up for email updates</label>
         </div>
       </div>
     </div>
