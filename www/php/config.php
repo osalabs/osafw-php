@@ -83,6 +83,7 @@ $FW_CONFIG = array(
     'SITE_TEMPLATES'        => $site_root.'/template',
     'PUBLIC_UPLOAD_DIR'     => $site_root.'/upload',
     'PUBLIC_UPLOAD_URL'     => $root_url.'/upload',
+    'ASSETS_URL'            => $root_url.'/assets',
 
     #page layout templates - relative to SITE_TEMPLATES dir
     'PAGE_LAYOUT'              => '/layout.html',       #default layout for all pages

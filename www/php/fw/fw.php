@@ -21,6 +21,7 @@ class fw {
     public $dispatcher;
     public $db;
 
+    public $request_url; #current request url (relative to application url)
     public $route; #current request route data, stdClass
     public $ROUTES = array();
     public $GLOBAL = array();     #"global" vars, initialized with $CONFIG
@@ -82,6 +83,7 @@ class fw {
 
         $fw->dispatcher = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES);
         $fw->route = $fw->dispatcher->getRoute();
+        $fw->request_url = $fw->dispatcher->request_url;
 
         $fw->runRoute();
 
@@ -109,7 +111,11 @@ class fw {
             return $fw->models_cache[$model_class];
         }
         #logger($model_class);
-        $object = new $model_class($fw);
+        try {
+            $object = new $model_class($fw);
+        } catch (NoClassException $ex) {
+            throw new NoModelException("Model class not found: $model_class");
+        }
         $fw->models_cache[$model_class] = $object;
         return $object;
     }
@@ -124,7 +130,9 @@ class fw {
     public function autoload($class_name){
         $dirs = array();
         $bdir = dirname(__FILE__).'/';
+        $is_controller=false;
         if ( preg_match('/Controller$/', $class_name) ){
+            $is_controller=true;
             $dirs[]= $bdir.'../controllers/';
             if ($class_name!=='FwController' && $class_name!=='FwAdminController') $class_name=preg_replace("/Controller$/", "", $class_name);
         }else{
@@ -152,7 +160,13 @@ class fw {
             }
         }
 
-        if (!$file_found) throw new NoClassException("Class not found: $class_name");
+        if (!$file_found) {
+            if ($is_controller){
+                throw new NoControllerException("Controller class not found: $class_name");
+            }else{
+                throw new NoClassException("Class not found: $class_name");
+            }
+        }
         try {
             #logger("before include [$file_found]");
             include_once $file_found;
@@ -170,6 +184,28 @@ class fw {
 
         } catch (AuthException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
+
+        } catch (NoControllerException $ex) {
+            #requested controller not found - use Home->NotFoundAction
+            logger('DEBUG', "No controller found [".$this->route->controller."], using default HomeController->NotFoundAction()");
+            $this->route->prefix='';
+            $this->route->controller='Home';
+            $this->route->action='NotFound';
+            $this->route->id='';
+
+            try {
+                $this->renderRoute($this->route);
+
+            } catch (NoClassMethodException $ex2) {
+                logger('WARN', "No HomeController->NotFoundAction() found");
+                $this->handlePageError(404, $ex->getMessage(), $ex);
+                return;
+            }
+
+        } catch (NoClassException $ex) {
+            #if can't call class - this is server error
+            $this->handlePageError(500, $ex->getMessage(), $ex);
+            return;
 
         } catch (NoClassMethodException $ex) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
@@ -200,10 +236,6 @@ class fw {
                 $this->parser();
             }
 
-        } catch (NoClassException $ex) {
-            #if can't call class - class doesn't exists - show 404 error
-            $this->handlePageError(404, $ex->getMessage(), $ex);
-
         } catch (ExitException $ex) {
             #not a problem - just graceful exit
             logger('TRACE', "Exit Exception (normal behaviour, usually due to redirect)");
@@ -221,6 +253,7 @@ class fw {
 
     public function renderRoute($route){
         #remember in G for rendering
+        $this->GLOBAL['route']=$route;
         $this->GLOBAL['controller']=$route->controller;
         $this->GLOBAL['controller.action']=$route->controller.'.'.$route->action;
         $this->GLOBAL['controller.action.id']=$route->controller.'.'.$route->action.'.'.$route->id;
@@ -239,7 +272,7 @@ class fw {
      * @return boolean        [description]
      */
     public function isGetRequest($value=''){
-        return $this->fw->route->method=='GET';
+        return $this->route->method=='GET';
     }
 
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
@@ -328,7 +361,8 @@ class fw {
             $route=@$this->dispatcher->str2route($custom_error_route);
         }
 
-        logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message", $route);
+        logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
+        if ($error_code>=500) logger('DEBUG', $exeption->getTraceAsString());
 
         $is_error_processed = false;
         if ($route){
@@ -353,7 +387,8 @@ class fw {
             $err_msg = $error_message ? $error_message : ($err_code_desc ? $err_code_desc : "PAGE NOT YET IMPLEMENTED [$uri] ");
 
             $ps=array(
-                'success'   =>  0,
+                '_json'     =>  true, #also allow return urls by json
+                'success'   =>  false,
                 'err_code'  =>  $error_code,
                 'err_msg'   =>  $err_msg,
                 'err_time'  => time(),
@@ -361,7 +396,8 @@ class fw {
             if ($this->GLOBAL['LOG_LEVEL']=='DEBUG' && $_SESSION['access_level']==100){
                 $ps['is_dump'] = true;
                 if (!is_null($exeption)){
-                    $ps['DUMP_STACK'] = $exeption->getTraceAsString();
+                    //remove unnecessary site root path
+                    $ps['DUMP_STACK'] = str_replace( $this->config->SITE_ROOT, "", $exeption->getTraceAsString() );
                 }
                 $ps['DUMP_FORM'] = print_r($_REQUEST,true);
                 $ps['DUMP_SESSION'] = print_r($_SESSION,true);
@@ -414,7 +450,7 @@ class fw {
             $ps = &$args[2];
             if (count($args)==4) $out_filename = &$args[3];
         }else{
-            throw Exception("parser - wrong call");
+            throw new Exception("parser - wrong call");
         }
 
         $out_format = $this->getResponseExpectedFormat();
@@ -530,7 +566,14 @@ class fw {
             $mail->addAddress($v);
           }
 
-          $mail->setFrom($from);
+          #if from is in form: 'NAME <EMAIL>' - parse it
+          if (preg_match("/^(.+)\s+<(.+)>$/", $from, $m)){
+            $mail->setFrom($m[2], $m[1]);
+          }else{
+            #from is usual email address
+            $mail->setFrom($from);
+          }
+
           if ($options['reply']) $mail->addReplyTo($options['reply']);
           if ($options['cc']) $mail->addCC($options['cc']);
           if ($options['bcc']) $mail->addBCC($options['bcc']);
@@ -543,13 +586,13 @@ class fw {
           }
 
           foreach ($files as $key => $filepath) {
-            $mail->addAttachment($filepath, (intval($key)==$key?'':$key)); #if key is not a number - they key is filename
+            $mail->addAttachment($filepath, (intval($key)===$key?'':$key)); #if key is not a number - they key is filename
           }
 
           $result=true;
           if(!$mail->send()) {
             $result=false;
-            logger('WARN', 'Error sending email: '.$mail->ErrorInfo);
+            logger('WARN', 'Error sending email via PHPMailer: '.$mail->ErrorInfo);
           }
 
         } catch (Exception $e) {
@@ -574,7 +617,7 @@ class fw {
         foreach ($ToEmail as $k=>$v){
             $res=mail($v, $Subj, $Message, $more);
             if ($res===FALSE){
-                logger('WARN', 'Error sending email: '. error_get_last()['message']);
+                logger('WARN', 'Error sending email via mail(): '. error_get_last()['message']);
                 $result=false;
             }
         }
@@ -604,7 +647,7 @@ class fw {
      *   );
      *   sendEmailTpl( $hU['email'], 'email_invite.txt', $ps);
      */
-    public function sendEmailTpl($to_email, $tpl, $ps, $options){
+    public function sendEmailTpl($to_email, $tpl, $ps, $options=array()){
       $msg_body=parse_page('/emails', $tpl, $ps, 'v');
       list($msg_subj, $msg_body)=preg_split("/\n/", $msg_body, 2);
 
@@ -688,7 +731,7 @@ function logger(){
 
  $args=func_get_args();
  $logtype = 'DEBUG'; #default log type
- if (count($args)>0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL)$/", $args[0], $m) ){
+ if (count($args)>0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL)$/", $args[0], $m) ){
      $logtype = $m[1];
      array_shift($args);
  }

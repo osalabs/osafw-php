@@ -96,15 +96,13 @@ class Users extends FwModel {
     public function reloadSession($id=0){
         if (!$id) $id=Utils::me();
         $hU=$this->one($id);
-        foreach($hU as $key => $value){
-            $_SESSION['user'][$key]=$value;
-        }
 
-        $_SESSION['login']=$_SESSION['user']['email'];
-        $fname = trim($_SESSION['user']['fname']);
-        $lname = trim($_SESSION['user']['lname']);
+        $_SESSION['user_id']=$id;
+        $_SESSION['login']=$hU['email'];
+        $fname = trim($hU['fname']);
+        $lname = trim($hU['lname']);
         $_SESSION['user_name']=$fname.($fname?' ':'').$lname; #will be empty if no user name set
-        $_SESSION['access_level']=$_SESSION['user']['access_level'];
+        $_SESSION['access_level']=$hU['access_level'];
     }
 
     private function updateAfterLogin($id) {
@@ -196,7 +194,7 @@ class Users extends FwModel {
     public function isAccess($access_str) {
         $req_level=self::$ACL[$access_str]+0;
 
-        return $_SESSION['user']['access_level']>=$req_level ? true : false;
+        return $_SESSION['access_level']>=$req_level ? true : false;
     }
 
     /**

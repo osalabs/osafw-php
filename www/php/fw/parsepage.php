@@ -46,6 +46,9 @@
  2014-11-25 - changed to use $CONFIG global var instead site_root, site_templ...
  2014-11-28 - fixed: sec2date now detect '0000-00-00 00:00:00' and return empty string
  2017-03-08 - fixed: quote special PHP $ and \\12345
+ 2017-09-24 - parse_radio_tag changed to bootstrap4
+ 2018-01-18 - support for <~object[property]>
+ 2018-01-27 - parse_radio_tag changed to bootstrap4 custom radio
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -122,8 +125,8 @@ select="var" - this tag tell parser to load file and use it as value|display for
      <option value=""> - select -
      <~./fcombo.sel select="fcombo">
      </select>
-radio="var" name="YYY" [delim="ZZZ"]- this tag tell parser to load file and use it as value|display for <input type=radio> tags, example:
-     <~./fradio.sel radio="fradio" name="item[fradio]" delim="&nbsp;">
+radio="var" name="YYY" [delim="CLASSNAM"]- this tag tell parser to load file and use it as value|display for <input type=radio> tags, example:
+     <~./fradio.sel radio="fradio" name="item[fradio]" delim="custom-control-inline">
 selvalue="var" - display value (fetched from the .sel file) for the var (example: to display 'select' and 'radio' values in List view)
      ex: <~../fcombo.sel selvalue="fcombo">
 nolang - for subtemplates - use default language instead of current (usually english)
@@ -384,6 +387,8 @@ function hfvalue($tag, &$hf){
        $k=preg_replace("/\].*?/",'',$arr[$i]);  #remove last ]
        if ( is_array($ptr) && array_key_exists($k, $ptr) ){
           $ptr=&$ptr[ $k ];
+       }elseif ( is_object($ptr) && property_exists($ptr, $k)){
+          $ptr=$ptr->$k;
        }else{
           $ptr=&$empty_val; #looks like there are just no such key in array OR $ptr is not an array at all - so return empty value
           break;
@@ -620,9 +625,12 @@ function parse_radio_tag($basedir, $tpl_path, $hf, $attrs){
     $str_checked='';
     if ($value==$sel_value) $str_checked=" checked='checked' ";
 
-    $result.="<label class='radio $delim'><input type='radio' name=\"$name\" value=\"$value\" $str_checked>$desc</label>";
+    #$result.="<label class='radio $delim'><input type='radio' name=\"$name\" value=\"$value\" $str_checked>$desc</label>"; #bootstrap3
+    #$result.="<div class='form-check $delim'><label class='form-check-label'><input class='form-check-input' type='radio' name=\"$name\" value=\"$value\" $str_checked> $desc</label></div>"; #bootstrap4 normal control
+    $result.="<div class='custom-control custom-radio $delim'><input class='custom-control-input' type='radio' id=\"$name\$$i\" name=\"$name\" value=\"$value\" $str_checked><label class='custom-control-label' for=\"$name\$$i\">$desc</label></div>"; #bootstrap4 custom control
+
  }
- return $result;
+ return $result; #bootstrap4
 }
 
 ############
@@ -748,7 +756,6 @@ function parse_cache_template($page,$hf,$out_filename=''){
 
 #############
 function htmlescape($str){
-
  $str=preg_replace("/&/",'&amp;', $str);
  $str=preg_replace('/"/','&quot;', $str);
  $str=preg_replace("/'/",'&#039;', $str);

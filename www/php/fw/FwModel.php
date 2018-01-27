@@ -14,6 +14,12 @@ abstract class FwModel {
 
     protected $db;
 
+    #alternative of fw::model(Model)->method() is Model::i()->method()
+    #7 chars shorter :]
+    static function i(){
+        return fw::model(get_called_class());
+    }
+
     public function __construct($param_fw=null) {
         if ( is_null($param_fw) ){
             $this->fw = fw::i();
@@ -131,7 +137,7 @@ abstract class FwModel {
     }
 
     public function isExists($uniq_key, $not_id=NULL) {
-        $this->isExistsByField($uniq_key, 'iname', $not_id);
+        return $this->isExistsByField($uniq_key, 'iname', $not_id);
     }
 
     #return standard list of id,iname where status=0 order by iname

@@ -17,7 +17,8 @@ class HomeController extends FwController {
         if (is_null($ps)){
             #cache miss
             $ps = array();
-            #create home page with heavy queries
+            #create home page with heavy queries, for example from Spages
+            ps['page'] = $this->oneByFullUrl('');
 
             FwCache::setValue('home_page', $ps);
         }
@@ -29,6 +30,7 @@ class HomeController extends FwController {
         return $ps;
     }
 
+    #show home subpage page from hardcoded template
     public function ShowAction($id='') {
         $ps = array(
             'hide_sidebar'  => true,
@@ -37,5 +39,11 @@ class HomeController extends FwController {
         $this->fw->parser('/home/'.Dispatcher::RouteFixChars(strtolower($id)), $ps);
         return false;
     }
+
+    #called if fw dispatcher can't find controller
+    public function NotFoundAction(){
+        $this->fw->model('Spages')->showPageByFullUrl($this->fw->request_url);
+    }
+
 }
 ?>

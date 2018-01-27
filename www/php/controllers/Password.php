@@ -29,7 +29,7 @@ class PasswordController extends FwController {
             $this->Validate($id, $item);
             $user = $this->model->oneByEmail($item['login']);
 
-            $this->fw->sendEmailTpl( $user['login'], 'email_pwd.txt', $user);
+            $this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
 
             fw::redirect($this->base_url.'/(Sent)');
 

@@ -43,6 +43,8 @@
 class AuthException extends Exception {}
 class NoClassException extends Exception {}
 class NoClassMethodException extends Exception {}
+class NoControllerException extends Exception {}
+class NoModelException extends Exception {}
 
 class Dispatcher {
     const def_controller  = 'Home';
@@ -77,6 +79,7 @@ class Dispatcher {
     public $ROUTES = array();
     public $ROOT_URL;
     public $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
+    public $request_url; #last url processed by uriToRoute
 
     # leave just allowed chars in string - for routers: controller, action
     # IN: raw name of the controller or action
@@ -105,7 +108,7 @@ class Dispatcher {
 
 
     public function runController($controller, $action, $aparams=array()){
-        if (!$controller) throw new NoClassException();
+        if (!$controller) throw new NoControllerException();
         if (!$action) throw new NoClassMethodException();
         return $this->callClassMethod($controller.'Controller', $action.'Action', $aparams);
     }
@@ -113,12 +116,12 @@ class Dispatcher {
     # call functions and methods
     # for classes - creates object instance first
     # IN: class name, method, params
-    # OUT: throws NoClassException/NoClassMethodException if no class/method exists
+    # OUT: throws NoControllerException/NoClassMethodException if no class/method exists
     public function callClassMethod($class_name, $method, $aparams=array()){
         logger('TRACE', "calling $class_name->$method", $aparams);
         try {
             if ($class_name){
-              if ( !class_exists($class_name) ) throw new NoClassException();
+              if ( !class_exists($class_name) ) throw new NoControllerException();
 
               $obj=new $class_name;
               $func=array($obj,$method);
@@ -128,7 +131,7 @@ class Dispatcher {
             if ( !is_callable( $func ) ) throw new NoClassMethodException();
             return call_user_func_array( $func, $aparams);
 
-        } catch (NoClassException $ex) {
+        } catch (NoControllerException $ex) {
            throw $ex;
         } catch (NoClassMethodException $ex) {
            throw $ex;
@@ -137,13 +140,13 @@ class Dispatcher {
 
     public function getRouteDefaultAction($controller){
         $class_name=$controller.'Controller';
-        if ( !class_exists($class_name) ) throw new NoClassException();
+        if ( !class_exists($class_name) ) throw new NoControllerException();
         return $class_name::route_default_action;
     }
 
     public function getRouteAccessLevel($controller){
         $class_name=$controller.'Controller';
-        if ( !class_exists($class_name) ) throw new NoClassException();
+        if ( !class_exists($class_name) ) throw new NoControllerException();
         return $class_name::access_level;
     }
 
@@ -245,6 +248,7 @@ class Dispatcher {
         if ($root_url) $uri=preg_replace("/^".preg_quote($root_url,'/')."/", '', $uri);   #remove root_url if any
         $uri=preg_replace("/\?.*/",'',$uri);  #remove query if any , ex. /add/post/12390/alksjdla
         $uri=preg_replace("!/$!", '', $uri); #remove last /
+        $this->request_url = $uri;
         logger('INFO','*** REQUEST START ['.$uri.']');
 
         #check if method override exits
