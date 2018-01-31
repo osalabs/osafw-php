@@ -2,7 +2,7 @@
  @session_start();
  require_once "php/config.php" ;
 
- if ($_SESSION['user'] && $_SESSION['user']['id'] && $_SESSION['access_level']==100){
+ if ($_SESSION['user_id'] && $_SESSION['access_level']==100){
     $DBDEF=array(
      'user'=>$CONFIG['DB']['USER'],#required
      'pwd'=>$CONFIG['DB']['PWD'], #required
