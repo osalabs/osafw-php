@@ -10,8 +10,8 @@
     <~/common/form/msg>
 
     <div class="form-group row">
-      <label class="col-form-label col-md-3">`Member ID`</label>
-      <div class="col-md-2"><p class="form-text text-muted"><~uexists1 if="id" inline><~id></~uexists1><~unew unless="id" inline>(`new`)</~unew></p>
+      <label class="col-form-label col-auto col-md-3">`Member ID`</label>
+      <div class="col col-md-2 align-self-center"><span class="text-muted"><~uexists1 if="id" inline><~id></~uexists1><~unew unless="id" inline>(`new`)</~unew></span>
       </div>
     </div>
 
@@ -31,7 +31,7 @@
         </~chpwd_block>
       </div>
       <~pwd_block if="i[id]" inline>
-        <div class="col-md-2">
+        <div class="col col-md-2">
             <button type="button" class="btn btn-default on-send-pwd">Remind by email</button>
         </div>
         </~pwd_block>
