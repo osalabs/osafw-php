@@ -108,23 +108,23 @@ abstract class FwController {
         $orderby = trim($this->list_sortmap[ $this->list_filter['sortby'] ]);
         if (!$orderby) throw new Exception('No orderby defined for ['. $this->list_filter['sortby'] .']');
 
-        if ($this->list_filter['sortdir']=='desc'){
-            #if sortdir is desc, i.e. opposite to default - invert order for orderby fields
-            #go thru each order field
-            $aorderby = explode(',', $orderby);
-            foreach ($aorderby as $k => $field_dir) {
-                list($field, $order) = preg_split('/\s+/', trim($field_dir));
-                if ($order=='desc'){
-                    $order='asc';
-                }else{
-                    $order='desc';
-                }
-                $aorderby[$k]="$field $order";
-            }
-            $orderby = implode(', ', $aorderby);
-        }
+        // go through all order columns: backtick column names, handle desc
+        // 'ref1.iname asc, ref2.idesc desc' --> 'ORDER BY `ref1.iname` ASC, `ref2.idesc` DESC'
+        $aorderby = explode(',', $orderby);
+        foreach ($aorderby as $k => $field_dir) {
+            list($field, $order) = preg_split('/\s+/', trim($field_dir));
 
-        $this->list_orderby=$orderby;
+            if ($this->list_filter['sortdir'] === 'desc'){
+                $order_sql = $order === 'desc' ? 'ASC' : 'DESC'; //invert if 'desc'
+            } else {
+                $order_sql = $order === 'desc' ? 'DESC' : 'ASC'; //default is 'asc' if not specified
+            }
+
+            $aorderby[$k] = $this->db->quote_ident($field) .' '. $order_sql;
+        }
+        $orderby = implode(', ', $aorderby);
+
+        $this->list_orderby = $orderby;
     }
 
     /**
@@ -145,9 +145,9 @@ abstract class FwController {
                 foreach ($afieldsand as $key2 => $fand) {
                     if (preg_match("/^\!/", $fand)){
                         $fand=preg_replace("/^\!/", "", $fand);
-                        $afieldsand[$key2]= $fand." = ".$exact_quoted;
+                        $afieldsand[$key2] = $this->db->quote_ident($fand)." = ".$exact_quoted;
                     }else{
-                        $afieldsand[$key2]= $fand." LIKE ".$like_quoted;
+                        $afieldsand[$key2] = $this->db->quote_ident($fand)." LIKE ".$like_quoted;
                     }
                 }
                 $afields[$key] = implode(' and ', $afieldsand);
