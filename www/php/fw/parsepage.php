@@ -49,6 +49,7 @@
  2017-09-24 - parse_radio_tag changed to bootstrap4
  2018-01-18 - support for <~object[property]>
  2018-01-27 - parse_radio_tag changed to bootstrap4 custom radio
+ 2018-05-07 - date standard formats support: short/long/sql
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -139,7 +140,11 @@ support `text` => replaced by multilang from $CONFIG['SITE_TEMPLATES']/lang/$lan
 
 support modifiers:
  htmlescape
- date
+ date          - format as datetime, sample "d M Y H:i", see http://php.net/manual/en/function.date.php
+       <~var date>         output "m/d/Y" - date only (TODO - should be formatted per user settings actually)
+       <~var date="short"> output "m/d/Y H:i" - date and time short (to mins)
+       <~var date="long">  output "m/d/Y H:i:s" - date and time long
+       <~var date="sql">   output "Y-m-d H:i:s" - sql date and time
  truncate
  strip_tags
  trim
@@ -783,8 +788,21 @@ function strip($str){
 
 # convert time in seconds to date
 function sec2date($str, $attrs){
- $format='d M Y H:i';
- if ( $attrs['date'] ) $format=$attrs['date'];
+  $format=$attrs['date'];
+  switch (strtolower($format)) {
+    case '':
+      $format = 'm/d/Y';
+      break;
+    case 'short':
+      $format = 'm/d/Y H:i';
+      break;
+    case 'long':
+      $format = 'm/d/Y H:i:s';
+      break;
+    case 'sql':
+      $format = 'Y-m-d H:i:s';
+      break;
+  }
  if ($str){
     if ($str=='0000-00-00 00:00:00'){
         return '';
