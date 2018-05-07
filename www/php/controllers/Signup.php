@@ -11,6 +11,8 @@ class SignupController extends FwAdminController {
     public function __construct() {
         parent::__construct();
 
+        #override layout
+        $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
         if (!$this->fw->config->IS_SIGNUP) throw new ApplicationException("Sign Up access denied by site config [IS_SIGNUP]");
     }
 

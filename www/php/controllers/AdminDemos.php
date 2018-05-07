@@ -110,8 +110,8 @@ class AdminDemosController extends FwAdminController {
             'related_id'        => $this->related_id,
 
             #read dropdowns lists from db
-            'select_options_parent_id'      => $this->model->getSelectOptionsParent( $item['parent_id'] ),
-            'select_options_demo_dicts_id'  => $this->model_related->getSelectOptions( $item['demo_dicts_id'] ),
+            'select_options_parent_id'      => $this->model->listSelectOptionsParent(),
+            'select_options_demo_dicts_id'  => $this->model_related->listSelectOptions(),
             'dict_link_auto_id_iname'       => $item['dict_link_auto_id'] ? $this->model_related->iname( $item['dict_link_auto_id'] ) : $item['dict_link_auto_id_iname'],
             'multi_datarow'                 => $this->model_related->getMultiList( $dict_link_multi ),
             'att'                           => fw::model('Att')->one($item['att_id']+0),

@@ -87,8 +87,12 @@ $FW_CONFIG = array(
 
     #page layout templates - relative to SITE_TEMPLATES dir
     'PAGE_LAYOUT'              => '/layout.html',       #default layout for all pages
+    'PAGE_LAYOUT_PUBLIC'       => '/layout.html',       #default layout for pub pages
+    'PAGE_LAYOUT_STD'          => '/layout.html',
+    'PAGE_LAYOUT_FLUID'        => '/layout_fluid.html',
     'PAGE_LAYOUT_PJAX'         => '/layout_pjax.html',
-    'PAGE_LAYOUT_ADMIN'        => '/layout_tpl.html',
+    'PAGE_LAYOUT_MIN'          => '/layout_min.html',
+    'PAGE_LAYOUT_PRINT'        => '/layout_print.html',
 
     'MAX_PAGE_ITEMS'        => 25,
 

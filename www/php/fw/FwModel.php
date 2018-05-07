@@ -142,12 +142,15 @@ abstract class FwModel {
 
     #return standard list of id,iname where status=0 order by iname
     public function ilist() {
-        $sql  = 'select id, iname from '.$this->table_name.' where status=0 order by iname';
+        $sql  = 'select * from '.$this->table_name.' where status=0 order by iname';
         return $this->db->arr($sql);
     }
 
+    public function listSelectOptions(){
+        return $this->db->arr('select id, iname from '.$this->table_name.' where status=0 order by iname');
+    }
     public function getSelectOptions($sel_id) {
-        return FormUtils::selectOptions($this->ilist(), $sel_id);
+        return FormUtils::selectOptions($this->listSelectOptions(), $sel_id);
     }
 
     public function getMultiList($hsel_ids){

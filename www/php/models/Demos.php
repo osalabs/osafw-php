@@ -15,9 +15,8 @@ class Demos extends FwModel {
         return parent::isExists($email, 'email', $not_id);
     }
 
-    public function getSelectOptionsParent($sel_id){
-        $rows = $this->db->arr("select id, iname from {$this->table_name} where parent_id=0 and status<>127 order by iname");
-        return FormUtils::selectOptions( $rows, $sel_id );
+    public function listSelectOptionsParent(){
+        return $this->db->arr("select id, iname from {$this->table_name} where parent_id=0 and status<>127 order by iname");
     }
 
 }

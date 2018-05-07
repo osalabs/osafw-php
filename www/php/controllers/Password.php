@@ -5,6 +5,13 @@ class PasswordController extends FwController {
     public $base_url = '/Password';
     public $model_name = 'Users';
 
+    public function __construct() {
+        parent::__construct();
+
+        #override layout
+        $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
+    }
+
     public function IndexAction() {
         if ($this->fw->isGetRequest()){
             #defaults

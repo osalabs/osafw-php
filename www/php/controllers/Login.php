@@ -6,6 +6,9 @@ class LoginController extends FwController {
 
     public function __construct() {
         parent::__construct();
+
+        #override layout
+        $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
     }
 
     public function IndexAction() {

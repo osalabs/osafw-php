@@ -53,7 +53,7 @@ class AdminAttController extends FwAdminController {
             'pager'         => $this->list_pager,
             'f'             => $this->list_filter,
 
-            'select_att_categories_ids' => $AttCat->getSelectOptions($this->list_filter['att_categories_id'])
+            'select_att_categories_ids' => $AttCat->listSelectOptions()
         );
         return $ps;
     }
@@ -86,7 +86,7 @@ class AdminAttController extends FwAdminController {
             'url'               => $this->model->getUrl($id),
             'url_m'             => ($item['is_image'] ? $this->model->getUrl($id, 'm') : ''),
 
-            'select_options_att_categories_id'      => fw::model('AttCategories')->getSelectOptions($item['att_categories_id']),
+            'select_options_att_categories_id'      => fw::model('AttCategories')->listSelectOptions($item['att_categories_id']),
         );
 
         return $ps;
@@ -177,7 +177,7 @@ class AdminAttController extends FwAdminController {
 
         $ps=array(
             'att_dr' => $rows,
-            'select_att_categories_id' => $AttCat->getSelectOptions($att_categories_id),
+            'select_att_categories_id' => $AttCat->listSelectOptions($att_categories_id),
         );
         return $ps;
     }

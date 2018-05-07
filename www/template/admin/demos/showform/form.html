@@ -13,7 +13,7 @@
       <div class="col-md-3">
         <select id="parent_id" name="item[parent_id]" class="form-control">
           <option value="0"></option>
-          <~select_options_parent_id noescape>
+          <~select_options_parent_id select="i[parent_id]">
         </select>
       </div>
     </div>
@@ -22,7 +22,7 @@
       <div class="col-md-3">
         <select id="demo_dicts_id" name="item[demo_dicts_id]" class="form-control">
           <option value="0"></option>
-          <~select_options_demo_dicts_id noescape>
+          <~select_options_demo_dicts_id select="i[demo_dicts_id]">
         </select>
       </div>
     </div>
@@ -155,7 +155,7 @@
       <label class="col-form-label col-md-3" for="fdate_pop">Date popup</label>
       <div class="col-md-3">
         <div class="input-group date">
-          <input id="fdate_pop" name="item[fdate_pop]" maxlength="10" value="<~i[fdate_pop] date="m/d/Y">" type="text" class="form-control">
+          <input id="fdate_pop" name="item[fdate_pop]" maxlength="10" value="<~i[fdate_pop] date>" type="text" class="form-control">
           <div class="input-group-append"><button class="btn btn-outline-secondary" type="button"><i class="glyphicon glyphicon-calendar"></i></button></div>
         </div>
       </div>

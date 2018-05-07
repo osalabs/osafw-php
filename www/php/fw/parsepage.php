@@ -49,7 +49,7 @@
  2017-09-24 - parse_radio_tag changed to bootstrap4
  2018-01-18 - support for <~object[property]>
  2018-01-27 - parse_radio_tag changed to bootstrap4 custom radio
- 2018-05-07 - date standard formats support: short/long/sql
+ 2018-05-07 - date standard formats support: short/long/sql, support select from arrays
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -121,15 +121,17 @@ global - this tag is a global var, not in $hf hash
 session - this tag is a $_SESSION var, not in $hf hash
   session[var] - also possible
 parent - this tag is a $parent_hf var, not in current $hf hash
-select="var" - this tag tell parser to load file and use it as value|display for <select> tag, example:
+select="var" - this tag tell parser to either load file with tag name and use it as value|display for <select> tag
+               or if variable with tag name exists - use it as arraylist of hashtables with id/iname keys
+     , example:
      <select name="item[fcombo]">
      <option value=""> - select -
-     <~./fcombo.sel select="fcombo">
+     <~./fcombo.sel select="fcombo">  or <~fcombo_options select="fcombo">
      </select>
 radio="var" name="YYY" [delim="CLASSNAM"]- this tag tell parser to load file and use it as value|display for <input type=radio> tags, example:
      <~./fradio.sel radio="fradio" name="item[fradio]" delim="custom-control-inline">
 selvalue="var" - display value (fetched from the .sel file) for the var (example: to display 'select' and 'radio' values in List view)
-     ex: <~../fcombo.sel selvalue="fcombo">
+     ex: <~../fcombo.sel selvalue="fcombo">  or <~fcombo_options selvalue="fcombo">
 nolang - for subtemplates - use default language instead of current (usually english)
 htmlescape - replace special symbols by their html equivalents (such as <>,",')
 
@@ -268,7 +270,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
             if ( !is_null($tagvalue) ){
                //rw("$tag EXISTS");
 
-               if ( array_key_exists('repeat', $attrs) ){ //if this is 'repeat' tag parse as datarow
+              if ( array_key_exists('repeat', $attrs) ){ //if this is 'repeat' tag parse as datarow
                   if ( is_array($tagvalue) ){
                     $repeat_array = $tagvalue;
                     $tagvalue='';
@@ -291,14 +293,22 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
                     $tagvalue='';
                   }
 
-               }elseif (array_key_exists('sub', $attrs)){   //if this is 'sub' tag - parse it as independent subtemplate
+              }elseif (array_key_exists('select', $attrs)){
+                #this is special case for '<select>' HTML tag when options passed as array
+                $tagvalue=parse_select_tag($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tag, $hf, $attrs);
+
+              }elseif (array_key_exists('selvalue', $attrs)){
+                $tagvalue=parse_selvalue_tag($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tag, $hf, $attrs);
+                if (!array_key_exists('noescape', $attrs)) $tagvalue=htmlescape($tagvalue);
+
+              }elseif (array_key_exists('sub', $attrs)){   //if this is 'sub' tag - parse it as independent subtemplate
                   $tagvalue=parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tagvalue, 'v', $inline_tpl, $hf);
 
-               }else{ //if usual tag - replace it with tagvalue got above
+              }else{ //if usual tag - replace it with tagvalue got above
                   #CSRF shield +1
                   if ($tagvalue>"" && !array_key_exists('noescape', $attrs)) $tagvalue=htmlescape($tagvalue);
-               }
-               $page=tag_replace($page,$tag_full,$tagvalue, $attrs);
+              }
+              $page=tag_replace($page,$tag_full,$tagvalue, $attrs);
 
             }elseif ( array_key_exists('repeat', $attrs) ){
               //if it's repeat tag, but tag value empty - just replace with empty string
@@ -311,7 +321,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
             }elseif ( array_key_exists('select', $attrs) ){
                //this is special case for '<select>' HTML tag
-               $v=parse_select_tag($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hf, $attrs);
+               $v=parse_select_tag($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tag, $hf, $attrs);
                $page=tag_replace($page,$tag_full, $v, $attrs);
 
             }elseif ( array_key_exists('radio', $attrs) ){
@@ -321,7 +331,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
             }elseif ( array_key_exists('selvalue', $attrs) ){
                //this is special case for displaying just one selected value (for '<select>' or '<index type=radio>' HTML tags
-               $v=parse_selvalue_tag($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hf, $attrs);
+               $v=parse_selvalue_tag($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tag, $hf, $attrs);
                if (!array_key_exists('noescape', $attrs)) $v=htmlescape($v);
                $page=tag_replace($page,$tag_full, $v, $attrs);
 
@@ -569,36 +579,66 @@ function tag_replace_raw($page, $tag_full, $value, $is_inline){
 ############### parse select tag
 # output <option value="XX">YY
 # $attrs['select'] could be an array! for <select multiple>
-function parse_select_tag($basedir, $tpl_path, $hf, $attrs){
+function parse_select_tag($basedir, $tpl_path, $tag, $hf, $attrs){
  global $CONFIG;
 
  $sel_value=hfvalue($attrs['select'], $hf);
  if (is_array($sel_value)) $sel_value=array_flip($sel_value);
- if (!preg_match("/^\//",$tpl_path)) $tpl_path="$basedir/$tpl_path";
-
- $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
  $result;
- for($i=0;$i<count($lines);$i++){
-    list ($value,$desc)=preg_split("/\|/",$lines[$i]);
-    if (!strlen($value) && !strlen($desc)) continue;
-
-    parse_lang($value);
-    parse_lang($desc);
-    $desc=parse_cache_template($desc, $hf);
-
-    if (!array_key_exists('noescape', $attrs)) {
-      $value=htmlescape($value);
-      $desc=htmlescape($desc);
+ $is_noescape = array_key_exists('noescape', $attrs);
+ if (array_key_exists($tag, $hf)){
+    # hf(tag) is Array of Assoc Arrays with "id" and "iname" keys, for example rows returned from db.array('select id, iname from ...')
+    # "id" key is optional, if not present - iname will be used for values too
+    if (!is_array($hf[$tag])){
+      logger('DEBUG', 'ParsePage warning - not an array passed to select tag = '.$tag);
+      return '';
     }
 
-    if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value==$sel_value){
-       $result.="<option value=\"$value\" selected>$desc</option>\n";
+    foreach ($hf[$tag] as $key => $item) {
+      $desc=$item['iname'];
+      if (array_key_exists('id', $item)){
+        $value = trim($item['id']);
+      }else{
+        $value = trim($item['iname']);
+      }
+      parse_lang($value);
+      parse_lang($desc);
+
+      $selected='';
+      if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value==$sel_value) $selected=' selected';
+
+      if (!$is_noescape) {
+        $value=htmlescape($value);
+        $desc=htmlescape($desc);
+      }
+      $result.="<option value=\"$value\"$selected>$desc</option>\n";
     }
-    else{
-       $result.="<option value=\"$value\">$desc</option>\n";
+
+ }else{
+    # just read from the plain text file
+    if (!preg_match("/^\//",$tpl_path)) $tpl_path="$basedir/$tpl_path";
+    $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
+
+    for($i=0;$i<count($lines);$i++){
+      list ($value,$desc)=preg_split("/\|/",$lines[$i]);
+      if (!strlen($value) && !strlen($desc)) continue;
+
+      parse_lang($value);
+      parse_lang($desc);
+      $desc=parse_cache_template($desc, $hf);
+
+      $selected='';
+      if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value==$sel_value) $selected=' selected';
+
+      if (!$is_noescape) {
+        $value=htmlescape($value);
+        $desc=htmlescape($desc);
+      }
+      $result.="<option value=\"$value\"$selected>$desc</option>\n";
     }
  }
+
  return $result;
 }
 
@@ -640,7 +680,7 @@ function parse_radio_tag($basedir, $tpl_path, $hf, $attrs){
 
 ############
 # output - just string
-function parse_selvalue_tag($basedir, $tpl_path, $hf, $attrs){
+function parse_selvalue_tag($basedir, $tpl_path, $tag, $hf, $attrs){
  global $CONFIG;
 
  $sel_value=hfvalue($attrs['selvalue'], $hf);
@@ -649,18 +689,46 @@ function parse_selvalue_tag($basedir, $tpl_path, $hf, $attrs){
  $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
  $result;
- for($i=0;$i<count($lines);$i++){
-    list ($value,$desc)=preg_split("/\|/",$lines[$i]);
-    if (!strlen($value) && !strlen($desc)) continue;
+ if ($tag>'' && array_key_exists($tag, $hf)){
+    # hf(tag) is Array of Assoc Arrays with "id" and "iname" keys, for example rows returned from db.array('select id, iname from ...')
+    # "id" key is optional, if not present - iname will be used for values too
+    if (!is_array($hf[$tag])){
+      logger('DEBUG', 'ParsePage warning - not an array passed to select tag = '.$tag);
+      return '';
+    }
 
-    if ($value==$sel_value){
-       parse_lang($desc);
-       $desc=parse_cache_template($desc, $hf);
+    foreach ($hf[$tag] as $key => $item) {
+      $desc=$item['iname'];
+      if (array_key_exists('id', $item)){
+        $value = trim($item['id']);
+      }else{
+        $value = trim($item['iname']);
+      }
+      parse_lang($value);
+      parse_lang($desc);
 
-       $result=$desc;
-       last;
+      if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value==$sel_value) {
+        $result=$desc;
+        break;
+      }
+    }
+
+ }else{
+    # from file
+    for($i=0;$i<count($lines);$i++){
+      list ($value,$desc)=preg_split("/\|/",$lines[$i]);
+      if (!strlen($value) && !strlen($desc)) continue;
+
+      if ($value==$sel_value){
+         parse_lang($desc);
+         $desc=parse_cache_template($desc, $hf);
+
+         $result=$desc;
+         last;
+      }
     }
  }
+
  return $result;
 }
 
@@ -668,7 +736,7 @@ function parse_selvalue_tag($basedir, $tpl_path, $hf, $attrs){
 //example:
 //  get_selvalue('/common/sel/yn.sel', 1);
 function get_selvalue($tpl, $value) {
-  return parse_selvalue_tag('',$tpl, array('v' => $value), array('selvalue' => 'v') );
+  return parse_selvalue_tag('',$tpl, '', array('v' => $value), array('selvalue' => 'v') );
 }
 
 # sort tags so 'inline' and 'sub' tags will be parsed first)
