@@ -32,7 +32,7 @@ class AdminSettingsController extends FwAdminController {
         //other filters add to $this->list_where here
         //if search - no category
         if ($f['s']==''){
-            $this->list_where .= ' and icat='.$this->fw->db->quote($f['icat']);
+            $this->list_where .= ' and icat='.$this->db->quote($f['icat']);
         }
 
         $this->getListRows();

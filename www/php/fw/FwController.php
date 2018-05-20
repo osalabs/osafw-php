@@ -175,7 +175,7 @@ abstract class FwController {
             $limit  = $this->list_filter['pagesize'];
 
             $sql = "SELECT * FROM {$this->list_view} WHERE {$this->list_where} ORDER BY {$this->list_orderby} LIMIT {$offset}, {$limit}";
-            $this->list_rows = $this->fw->db->arr($sql);
+            $this->list_rows = $this->db->arr($sql);
             $this->list_pager = FormUtils::getPager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
         }else{
             $this->list_rows = array();

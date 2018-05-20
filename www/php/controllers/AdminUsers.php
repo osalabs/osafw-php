@@ -25,7 +25,7 @@ class AdminUsersController extends FwAdminController {
         parent::setListSearch();
 
         if ($this->list_filter['status']>''){
-            $this->list_where .= ' and status='.$this->fw->db->quote($this->list_filter['status']);
+            $this->list_where .= ' and status='.$this->db->quote($this->list_filter['status']);
         }else{
             $this->list_where .= ' and status<>127';
         }
