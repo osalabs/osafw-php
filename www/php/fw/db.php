@@ -644,7 +644,7 @@ class DB {
      */
     public function delete($table, $value, $column = 'id', $more_where=''){
         $sql = 'DELETE FROM '.$this->quote_ident($table).' WHERE '.$this->quote_ident($column).'='.$this->quote($value).' '.$this->build_where_str($more_where);
-        db_exec($sql);
+        $this->exec($sql);
     }
 
 
