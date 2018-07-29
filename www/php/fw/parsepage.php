@@ -50,6 +50,7 @@
  2018-01-18 - support for <~object[property]>
  2018-01-27 - parse_radio_tag changed to bootstrap4 custom radio
  2018-05-07 - date standard formats support: short/long/sql, support select from arrays
+ 2018-07-29 - added more secure headers
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -376,6 +377,11 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
 function print_header(){
  print header("Content-Type: text/html; charset=utf-8");
+ #security headers - https://infosec.mozilla.org/guidelines/web_security
+ print header("X-Content-Type-Options: nosniff");
+ print header("Content-Security-Policy: frame-ancestors 'none'");
+ print header("X-Frame-Options: DENY");
+ print header("X-XSS-Protection: 1; mode=block");
 }
 
 ############## return value from hf , support arrays/hashes

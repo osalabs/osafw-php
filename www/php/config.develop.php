@@ -30,6 +30,8 @@ $SITE_CONFIG=array(
     'IS_DEV'            => true, #to enable developer features
     'LOG_LEVEL'         => 'DEBUG', #use ALL|TRACE|DEBUG for development
     'IS_SIGNUP'         => true,
+    'CRYPT_KEY'         => 'DEVKEY',
+    'CRYPT_V'           => 'DEVSALT',
 );
 
 ini_set('display_errors',1);

@@ -12,6 +12,10 @@ abstract class FwModel {
 
     public $CACHE_PREFIX = 'fwmodel.one.'; #TODO - ability to cleanup all, but this model-only cache items
 
+    protected $field_add_users_id='add_users_id';
+    protected $field_upd_users_id='upd_users_id';
+    protected $field_upd_time='upd_time';
+
     protected $db;
 
     #alternative of fw::model(Model)->method() is Model::i()->method()
@@ -48,6 +52,19 @@ abstract class FwModel {
         return $this->db->row("select * from ".$this->table_name." where iname=".$this->db->quote($iname));
     }
 
+    public function listFields(){
+        $result=array();
+
+        $rows = $this->db->arr("explain ".dbq_ident($this->table_name));
+        foreach ($rows as $key => $row) {
+            #add standard id/name fields
+            $rows[$key]['id']=$row['Field'];
+            $rows[$key]['iname']=$row['Field'];
+        }
+
+        return $result;
+    }
+
     public function iname($id) {
         $row = $this->one($id);
         return $row['iname'];
@@ -67,7 +84,7 @@ abstract class FwModel {
 
     //add new record
     public function add($item) {
-        if (!isset($item['add_users_id'])) $item['add_users_id']=Utils::me();
+        if (!empty($this->field_add_users_id) && !isset($item[$this->field_add_users_id])) $item[$this->field_add_users_id]=Utils::me();
         $id=$this->db->insert($this->table_name, $item);
 
         $this->removeCache($id);
@@ -78,8 +95,8 @@ abstract class FwModel {
 
     //update record
     public function update($id, $item) {
-        if (!isset($item['upd_users_id'])) $item['upd_users_id']=Utils::me();
-        $item['upd_time']='~!now()';
+        if (!empty($this->field_upd_users_id) && !isset($item[$this->field_upd_users_id])) $item[$this->field_upd_users_id]=Utils::me();
+        if (!empty($this->field_upd_time) && !isset($item[$this->field_upd_time])) $item[$this->field_upd_time]='~!now()';
         $this->db->update($this->table_name, $item, $id);
 
         $this->removeCache($id);

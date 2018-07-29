@@ -45,6 +45,8 @@ class LoginController extends FwController {
                 $dev = $this->db->row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
                 $login = $dev['email'];
                 $pwd = $dev['pwd'];
+            }else{
+                $pwd = $this->model->encryptPwd($pwd);
             }
 
             if (!strlen($login) || !strlen($pwd) ) {

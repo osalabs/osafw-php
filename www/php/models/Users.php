@@ -50,7 +50,7 @@ class Users extends FwModel {
     public function addOrUpdate($login, $pwd, $item){
         $result=0;
         $itemold=$this->oneByEmail($login);
-        $item['pwd']=$pwd;
+        $item['pwd']=$this->encryptPwd($pwd);
         if ($itemold){
             $this->update($itemold['id'], $item);
             $result=$itemold['id'];
@@ -62,12 +62,21 @@ class Users extends FwModel {
 
     public function add($item) {
         if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::getRandStr(8); #generate password
+        $item['pwd']=$this->encryptPwd($item['pwd']);
         $id=parent::add($item);
         return $id;
     }
 
     public function isExists($email, $not_id=NULL) {
         return $this->isExistsByField($email, 'email', $not_id);
+    }
+
+    #encrypt/decrypt pwd based on config keys
+    public static function encryptPwd($value){
+        return Utils::crypt('encrypt', $value, $this->fw->config->CRYPT_V, $this->fw->config->CRYPT_KEY);
+    }
+    public static function decryptPwd($value){
+        return Utils::crypt('decrypt', $value, $this->fw->config->CRYPT_V, $this->fw->config->CRYPT_KEY);
     }
 
     public function doLogin($id) {

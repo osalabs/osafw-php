@@ -213,6 +213,35 @@ class Utils {
     }
 
     /**
+     * simple encrypt or decrypt a string with vector/key
+     * @param  string $action 'encrypt' or 'decrypt'
+     * @param  string $string string to encrypt or decrypt (base64 encoded)
+     * @param  string $v      vector string
+     * @param  string $k      key string
+     * @return string         encrypted (base64 encoded) or decrypted string or FALSE if wrong action
+     * TODO: use https://github.com/defuse/php-encryption instead
+     */
+    public static function crypt($action, $string, $v, $k) {
+        $output = FALSE;
+        $encrypt_method = "AES-256-CBC";
+
+        // hash
+        $key = hash('sha256', $k);
+
+        // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
+        $iv = substr(hash('sha256', $v), 0, 16);
+
+        if( $action == 'encrypt' ) {
+            $output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
+            $output = base64_encode($output);
+        }elseif( $action == 'decrypt' ){
+            $output = openssl_decrypt(base64_decode($string), $encrypt_method, $key, 0, $iv);
+        }
+
+        return $output;
+    }
+
+    /**
      * load content from url
      * @param string $url url to get info from
      * @param array $params optional, if set - post will be used, instead of get. Can be string or array

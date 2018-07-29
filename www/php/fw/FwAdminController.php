@@ -145,7 +145,7 @@ class FwAdminController extends FwController {
             'i' => $this->model->one($id),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
-            '../url'            => $this->base_url, #override default template url, remove if you created custom /showdelete templates
+            '../url'            => $this->fw->config->ROOT_URL.$this->base_url, #override default template url, remove if you created custom /showdelete templates
         );
 
         $this->fw->parser('/common/form/showdelete', $ps);

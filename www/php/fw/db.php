@@ -374,10 +374,10 @@ class DB {
             throw new Exception($msg);
         }
 
-        $res = $this->dbh->set_charset("utf8");
+        $res = $this->dbh->set_charset("utf8mb4");
         $this->handle_error($res);
 
-        #above is preffered way $this->query("SET NAMES utf8");
+        #above is preffered way $this->query("SET NAMES utf8mb4");
         $this->query("SET SESSION sql_mode = 'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"); #required fw to work on MySQL 5.5+
     }
 
@@ -424,9 +424,11 @@ class DB {
 
         DB::$SQL_QUERY_CTR++;
 
+        $dbhost_info=$this->config['HOST'].':'.$this->config['DBNAME'].' ';
+
         if (is_array($params) && count($params)){
             //use prepared query
-            $this->logger('INFO', $sql);
+            $this->logger('INFO', $dbhost_info.$sql);
             $this->logger('INFO', $params);
 
             $st = $this->dbh->prepare($sql);
@@ -453,7 +455,7 @@ class DB {
             $st->close();
         }else{
             //use direct query
-            $this->logger('INFO', $sql);
+            $this->logger('INFO', $dbhost_info.$sql);
 
             $result = $this->dbh->query($sql);
             #no need to check for metadata here as query returns TRUE for non-select

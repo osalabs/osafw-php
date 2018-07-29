@@ -58,15 +58,37 @@ class FormUtils {
   public static function getPager($count, $pagenum, $pagesize=NULL){
     if (is_null($pagesize)) $pagesize = fw::i()->config->MAX_PAGE_ITEMS;
 
+    $PAD_PAGES = 5; #show up to this number of pages before/after current page
+
     $pager = array();
     if ($count>$pagesize){
       $page_count = ceil($count/$pagesize);
-      for ($i=0; $i < $page_count; $i++) {
-        $pager[]=array(
+
+      $from_page = $pagenum - $PAD_PAGES;
+      if ($from_page < 0) $from_page = 0;
+
+      $to_page = $pagenum + $PAD_PAGES;
+      if ($to_page > $page_count - 1) $to_page = $page_count - 1;
+
+      for ($i=$from_page; $i <= $to_page; $i++) {
+        $pg=array(
           'pagenum'       => $i,
           'pagenum_show'  => $i+1,
-          'is_cur_page'   => ($pagenum==$i) ? 1 : 0,
+          'is_cur_page'   => ($pagenum==$i) ? true : false,
         );
+        if ($i == $from_page){
+          if ($pagenum > $PAD_PAGES) $pg['is_show_first']=true;
+          if ($pagenum > 0) {
+            $pg['is_show_prev'] = true;
+            $pg['pagenum_prev'] = $pagenum - 1;
+          }
+        }elseif ($i == $to_page) {
+          if ($pagenum < $page_count - 1) {
+            $pg['is_show_next'] = true;
+            $pg['pagenum_next'] = $pagenum + 1;
+          }
+        }
+        $pager[]=$pg;
       }
     }
 

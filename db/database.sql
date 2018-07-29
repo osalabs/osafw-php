@@ -1,7 +1,8 @@
 -- (c) 2004-2013 oSa
 -- FOR MySQL >4.x
 
--- CREATE DATABASE xxx;
+-- CREATE DATABASE xxx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE xxx;
 
 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
 -- DROP TABLE IF EXISTS users;
@@ -42,7 +43,7 @@ CREATE TABLE IF NOT EXISTS users (
     upd_users_id         int unsigned default 0,
 
     PRIMARY KEY (id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 insert into users (access_level, email, pwd, fname, lname, add_time)
 VALUES (100, 'admin@admin.com', UUID(), 'Website', 'Admin', now());
 
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS user_cookie (
     add_time            timestamp DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (cookie_id),
     KEY user_cookie_ind1 (users_id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 
 
 /*Site Settings - special table for misc site settings*/
@@ -82,7 +83,7 @@ CREATE TABLE IF NOT EXISTS settings (
     PRIMARY KEY  (id),
     UNIQUE KEY (icode),
     KEY (icat)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO settings (is_user_edit, input, icat, icode, ivalue, iname, idesc) VALUES
 (1, 10, '', 'test', 'novalue', 'test settings', 'description');
 
@@ -102,7 +103,7 @@ CREATE TABLE IF NOT EXISTS att_categories (
     upd_time            timestamp,
     upd_users_id         int unsigned default 0,
     PRIMARY KEY  (id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO att_categories (icode, iname) VALUES
 ('general', 'General images')
 ,('users', 'Member photos')
@@ -132,7 +133,7 @@ CREATE TABLE IF NOT EXISTS att (
     upd_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (att_categories_id) REFERENCES att_categories(id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 CREATE INDEX att_table_name ON att (table_name, item_id);
 
 /* link att files to table items*/
@@ -149,7 +150,7 @@ CREATE TABLE IF NOT EXISTS att_table_link (
     add_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (att_id) REFERENCES att(id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 CREATE UNIQUE INDEX att_table_link_UX ON att_table_link (table_name, item_id, att_id);
 
 /*Static pages*/
@@ -183,7 +184,7 @@ CREATE TABLE IF NOT EXISTS spages (
     upd_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (head_att_id) REFERENCES att(id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 CREATE INDEX spages_parent_id ON spages (parent_id, prio);
 CREATE INDEX spages_url ON spages (url);
 
@@ -215,7 +216,7 @@ CREATE TABLE IF NOT EXISTS categories (
     PRIMARY KEY (id),
     KEY (parent_id),
     KEY (prio, iname)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO categories (iname) VALUES
 ('category1')
 ,('category2')
@@ -239,7 +240,7 @@ CREATE TABLE IF NOT EXISTS fwevents (
 
     PRIMARY KEY (id),
     KEY (icode)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO fwevents (icode, iname) VALUES ('login',    'User login');
 INSERT INTO fwevents (icode, iname) VALUES ('logoff',   'User logoff');
 INSERT INTO fwevents (icode, iname) VALUES ('chpwd',    'User changed login/pwd');
@@ -269,4 +270,4 @@ CREATE TABLE IF NOT EXISTS fwevents_log (
     KEY (events_id),
     KEY (add_users_id),
     KEY (add_time)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;

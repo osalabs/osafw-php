@@ -42,6 +42,7 @@ class MyPasswordController extends FwController {
             $this->Validate($id, $item);
 
             $vars = FormUtils::filter($item, 'email pwd');
+            $vars['pwd'] = $this->model->encryptPwd($vars['pwd']);
             $this->model->update($id, $vars);
 
             $this->fw->model('FwEvents')->log('chpwd', $id);
@@ -59,7 +60,7 @@ class MyPasswordController extends FwController {
 
         if ($result){
             $itemdb=$this->model->one($id);
-            if ( $item['old_pwd']!=$itemdb['pwd'] ){
+            if ( $this->model->encryptPwd($item['old_pwd'])!=$itemdb['pwd'] ){
                 $this->setError('old_pwd', 'WRONG');
             }
 
