@@ -730,7 +730,7 @@ function parse_selvalue_tag($basedir, $tpl_path, $tag, $hf, $attrs){
          $desc=parse_cache_template($desc, $hf);
 
          $result=$desc;
-         last;
+         break;
       }
     }
  }
