@@ -248,7 +248,7 @@ abstract class FwController {
         if ($this->fw->GLOBAL['ERR']['REQUIRED']){
             $result=false;
         }
-        if ( count($this->fw->GLOBAL['ERR']) && !$this->fw->GLOBAL['ERR']['REQUIRED'] ){
+        if ( is_array($this->fw->GLOBAL['ERR']) && !$this->fw->GLOBAL['ERR']['REQUIRED'] ){
             $this->setError('INVALID', true);
             $result=false;
         }
