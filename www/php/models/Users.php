@@ -73,10 +73,10 @@ class Users extends FwModel {
 
     #encrypt/decrypt pwd based on config keys
     public static function encryptPwd($value){
-        return Utils::crypt('encrypt', $value, $this->fw->config->CRYPT_V, $this->fw->config->CRYPT_KEY);
+        return Utils::crypt('encrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
     public static function decryptPwd($value){
-        return Utils::crypt('decrypt', $value, $this->fw->config->CRYPT_V, $this->fw->config->CRYPT_KEY);
+        return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
 
     public function doLogin($id) {
