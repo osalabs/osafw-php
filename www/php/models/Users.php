@@ -47,6 +47,12 @@ class Users extends FwModel {
         return $rows;
     }
 
+    public function add($item) {
+        if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::getRandStr(8); #generate password        
+        $id=parent::add($item);
+        return $id;
+    }
+    
     public function isExists($email, $not_id=NULL) {
         return $this->isExistsByField($email, 'email', $not_id);
     }
