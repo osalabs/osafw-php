@@ -47,26 +47,6 @@ class Users extends FwModel {
         return $rows;
     }
 
-    public function addOrUpdate($login, $pwd, $item){
-        $result=0;
-        $itemold=$this->oneByEmail($login);
-        $item['pwd']=$this->encryptPwd($pwd);
-        if ($itemold){
-            $this->update($itemold['id'], $item);
-            $result=$itemold['id'];
-        }else{
-            $result=$this->add($item);
-        }
-        return $result;
-    }
-
-    public function add($item) {
-        if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::getRandStr(8); #generate password
-        $item['pwd']=$this->encryptPwd($item['pwd']);
-        $id=parent::add($item);
-        return $id;
-    }
-
     public function isExists($email, $not_id=NULL) {
         return $this->isExistsByField($email, 'email', $not_id);
     }
