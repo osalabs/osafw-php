@@ -31,7 +31,7 @@ class AdminSettingsController extends FwAdminController {
 
         //other filters add to $this->list_where here
         //if search - no category
-        if ($f['s']==''){
+        if ($f['s']=='' && isset($f['icat'])){
             $this->list_where .= ' and icat='.$this->db->quote($f['icat']);
         }
 
