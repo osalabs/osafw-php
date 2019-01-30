@@ -19,7 +19,7 @@ $SITE_CONFIG=array(
 
     #db connection settings  - REQUIRED
     'DB'    => array(
-                'DBNAME'    => 'demo2',
+                'DBNAME'    => 'demo',
                 'USER'      => 'dev',
                 'PWD'       => '',
                 'HOST'      => 'localhost',

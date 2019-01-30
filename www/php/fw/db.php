@@ -378,7 +378,7 @@ class DB {
         $this->handle_error($res);
 
         #above is preffered way $this->query("SET NAMES utf8mb4");
-        $this->query("SET SESSION sql_mode = 'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"); #required fw to work on MySQL 5.5+
+#TODO REMOVE        $this->query("SET SESSION sql_mode = 'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"); #required fw to work on MySQL 5.5+
     }
 
     /**

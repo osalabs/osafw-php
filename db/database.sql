@@ -4,88 +4,7 @@
 -- CREATE DATABASE xxx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- USE xxx;
 
-SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
--- DROP TABLE IF EXISTS users;
-CREATE TABLE IF NOT EXISTS users (
-    id                  int unsigned NOT NULL auto_increment,
-    access_level        int default 0,               /*General user access level, 0 - customer, 100-site admin*/
-
-    email               varchar(128) NOT NULL default '',
-    pwd                 varchar(64) NOT NULL default '',
-
-    title               varchar(8) NOT NULL default '',
-    fname               varchar(64) NOT NULL default '',
-    lname               varchar(64) NOT NULL default '',
-    midname             varchar(64) NOT NULL default '',
-    sufname             varchar(64) NOT NULL default '',
-
-    apt                 varchar(8) NOT NULL default '',
-    address1            varchar(64) NOT NULL default '',
-    address2            varchar(64) NOT NULL default '',
-    address3            varchar(64) NOT NULL default '',
-    city                varchar(64) NOT NULL default '',
-    state               varchar(64) NOT NULL default '',
-    zip                 varchar(16) NOT NULL default '',
-    country             varchar(4) NOT NULL default '',
-
-    notes               text,
-    phone               varchar(16) NOT NULL default '',
-    att_id              int unsigned NOT NULL,  /*avatar*/
-
-    login_time          datetime,               /*Last login time */
-    login_ip            char(15),                /*last remote ip*/
-    login_host          varchar(128),          /*last login host*/
-
-    status              tinyint default 0,    /*0-ok, 127-deleted*/
-    add_time            timestamp default CURRENT_TIMESTAMP,
-    add_users_id         int unsigned default 0,
-    upd_time            timestamp,
-    upd_users_id         int unsigned default 0,
-
-    PRIMARY KEY (id)
-) DEFAULT CHARSET=utf8mb4;
-insert into users (access_level, email, pwd, fname, lname, add_time)
-VALUES (100, 'admin@admin.com', UUID(), 'Website', 'Admin', now());
-
-/*user cookies (for permanent sessions)*/
--- DROP TABLE IF EXISTS user_cookie;
-CREATE TABLE IF NOT EXISTS user_cookie (
-    cookie_id           varchar(32) NOT NULL,      /*cookie id: time(secs)+rand(16)*/
-    users_id            int unsigned NOT NULL,
-
-    add_time            timestamp DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (cookie_id),
-    KEY user_cookie_ind1 (users_id)
-) DEFAULT CHARSET=utf8mb4;
-
-
-/*Site Settings - special table for misc site settings*/
--- DROP TABLE IF EXISTS settings;
-CREATE TABLE IF NOT EXISTS settings (
-    id                  int unsigned NOT NULL auto_increment,
-
-    icat                varchar(64) NOT NULL DEFAULT '', /*settings category: ''-system, 'other' -site specific*/
-    icode               varchar(64) NOT NULL DEFAULT '', /*settings internal code*/
-    ivalue              text, /*value*/
-
-    iname               varchar(64) NOT NULL DEFAULT '', /*settings visible name*/
-    idesc               text,                    /*settings visible description*/
-    input               tinyint NOT NULL default 0,       /*form input type: 0-input, 10-textarea, 20-select, 21-select multi, 30-checkbox, 40-radio, 50-date*/
-    allowed_values      text,                    /*space-separated values, use &nbsp; for space, used for: select, select multi, checkbox, radio*/
-
-    is_user_edit        tinyint DEFAULT 0,  /* if 1 - use can edit this value*/
-
-    add_time            timestamp default CURRENT_TIMESTAMP,
-    add_users_id         int unsigned default 0,
-    upd_time            timestamp,
-    upd_users_id         int unsigned default 0,
-
-    PRIMARY KEY  (id),
-    UNIQUE KEY (icode),
-    KEY (icat)
-) DEFAULT CHARSET=utf8mb4;
-INSERT INTO settings (is_user_edit, input, icat, icode, ivalue, iname, idesc) VALUES
-(1, 10, '', 'test', 'novalue', 'test settings', 'description');
+--SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_ENGINE_SUBSTITUTION';
 
 /* upload categories */
 -- DROP TABLE IF EXISTS att_categories;
@@ -153,6 +72,90 @@ CREATE TABLE IF NOT EXISTS att_table_link (
 ) DEFAULT CHARSET=utf8mb4;
 CREATE UNIQUE INDEX att_table_link_UX ON att_table_link (table_name, item_id, att_id);
 
+
+-- DROP TABLE IF EXISTS users;
+CREATE TABLE IF NOT EXISTS users (
+    id                  int unsigned NOT NULL auto_increment,
+    access_level        int default 0,               /*General user access level, 0 - customer, 100-site admin*/
+
+    email               varchar(128) NOT NULL default '',
+    pwd                 varchar(64) NOT NULL default '',
+
+    title               varchar(8) NOT NULL default '',
+    fname               varchar(64) NOT NULL default '',
+    lname               varchar(64) NOT NULL default '',
+    midname             varchar(64) NOT NULL default '',
+    sufname             varchar(64) NOT NULL default '',
+
+    apt                 varchar(8) NOT NULL default '',
+    address1            varchar(64) NOT NULL default '',
+    address2            varchar(64) NOT NULL default '',
+    address3            varchar(64) NOT NULL default '',
+    city                varchar(64) NOT NULL default '',
+    state               varchar(64) NOT NULL default '',
+    zip                 varchar(16) NOT NULL default '',
+    country             varchar(4) NOT NULL default '',
+
+    notes               text,
+    phone               varchar(16) NOT NULL default '',
+    att_id              int unsigned NULL,  /*avatar*/
+
+    login_time          datetime,               /*Last login time */
+    login_ip            char(15),                /*last remote ip*/
+    login_host          varchar(128),          /*last login host*/
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id         int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id         int unsigned default 0,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (att_id) REFERENCES att(id)
+) DEFAULT CHARSET=utf8mb4;
+insert into users (access_level, email, pwd, fname, lname, add_time)
+VALUES (100, 'admin@admin.com', UUID(), 'Website', 'Admin', now());
+
+/*user cookies (for permanent sessions)*/
+-- DROP TABLE IF EXISTS user_cookie;
+CREATE TABLE IF NOT EXISTS user_cookie (
+    cookie_id           varchar(32) NOT NULL,      /*cookie id: time(secs)+rand(16)*/
+    users_id            int unsigned NOT NULL,
+
+    add_time            timestamp DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (cookie_id),
+    KEY user_cookie_ind1 (users_id)
+) DEFAULT CHARSET=utf8mb4;
+
+
+/*Site Settings - special table for misc site settings*/
+-- DROP TABLE IF EXISTS settings;
+CREATE TABLE IF NOT EXISTS settings (
+    id                  int unsigned NOT NULL auto_increment,
+
+    icat                varchar(64) NOT NULL DEFAULT '', /*settings category: ''-system, 'other' -site specific*/
+    icode               varchar(64) NOT NULL DEFAULT '', /*settings internal code*/
+    ivalue              text, /*value*/
+
+    iname               varchar(64) NOT NULL DEFAULT '', /*settings visible name*/
+    idesc               text,                    /*settings visible description*/
+    input               tinyint NOT NULL default 0,       /*form input type: 0-input, 10-textarea, 20-select, 21-select multi, 30-checkbox, 40-radio, 50-date*/
+    allowed_values      text,                    /*space-separated values, use &nbsp; for space, used for: select, select multi, checkbox, radio*/
+
+    is_user_edit        tinyint DEFAULT 0,  /* if 1 - use can edit this value*/
+
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id         int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id         int unsigned default 0,
+
+    PRIMARY KEY  (id),
+    UNIQUE KEY (icode),
+    KEY (icat)
+) DEFAULT CHARSET=utf8mb4;
+INSERT INTO settings (is_user_edit, input, icat, icode, ivalue, iname, idesc) VALUES
+(1, 10, '', 'test', 'novalue', 'test settings', 'description');
+
 /*Static pages*/
 -- DROP TABLE IF EXISTS spages;
 CREATE TABLE IF NOT EXISTS spages (
@@ -181,7 +184,7 @@ CREATE TABLE IF NOT EXISTS spages (
     add_time            timestamp default CURRENT_TIMESTAMP,
     add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_users_id         int unsigned default 0,
+    upd_users_id         int unsigned default 0,    
     PRIMARY KEY (id),
     FOREIGN KEY (head_att_id) REFERENCES att(id)
 ) DEFAULT CHARSET=utf8mb4;
@@ -196,32 +199,6 @@ INSERT INTO spages (parent_id, url, iname) VALUES
 ;
 update spages set is_home=1 where id=1;
 
-
-/*categories*/
--- DROP TABLE IF EXISTS categories;
-CREATE TABLE IF NOT EXISTS categories (
-    id                  int unsigned NOT NULL auto_increment,
-    parent_id           int unsigned NOT NULL default 0,
-
-    iname               varchar(128) NOT NULL default '',
-    idesc               text,
-    prio                tinyint unsigned NOT NULL default 0,/* 0 is normal and lowest priority*/
-
-    status              tinyint default 0,        /*0-ok, 127-deleted*/
-    add_time            timestamp DEFAULT CURRENT_TIMESTAMP,                 /*date record added*/
-    add_users_id         int unsigned default 0,            /*user added record*/
-    upd_time            timestamp,                 /*date record updated*/
-    upd_users_id         int unsigned default 0,            /*user added record*/
-
-    PRIMARY KEY (id),
-    KEY (parent_id),
-    KEY (prio, iname)
-) DEFAULT CHARSET=utf8mb4;
-INSERT INTO categories (iname) VALUES
-('category1')
-,('category2')
-,('category3')
-;
 
 /*event types for log*/
 -- DROP TABLE IF EXISTS fwevents;
