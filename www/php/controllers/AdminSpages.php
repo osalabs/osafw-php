@@ -7,7 +7,7 @@ class AdminSpagesController extends FwAdminController {
     const route_default_action = '';
     public $base_url = '/Admin/Spages';
     public $required_fields = 'iname';
-    public $save_fields = 'iname idesc idesc_right head_att_id template prio custom_css custom_js';
+    public $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_css custom_js';
     public $save_fields_checkboxes = '';
     public $model_name = 'Spages';
     /*REMOVE OR OVERRIDE*/

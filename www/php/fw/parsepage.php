@@ -396,6 +396,7 @@ function print_header(){
  print header("Content-Security-Policy: frame-ancestors 'none'");
  print header("X-Frame-Options: DENY");
  print header("X-XSS-Protection: 1; mode=block");
+ print header("X-Permitted-Cross-Domain-Policies: master-only"); 
 }
 
 ############## return value from hf , support arrays/hashes
@@ -625,7 +626,7 @@ function parse_select_tag($basedir, $tpl_path, $tag, $hf, $attrs){
  $sel_value=hfvalue($attrs['select'], $hf);
  if (is_array($sel_value)) $sel_value=array_flip($sel_value);
 
- $result;
+ $result='';
  $is_noescape = array_key_exists('noescape', $attrs);
  if (array_key_exists($tag, $hf)){
     # hf(tag) is Array of Assoc Arrays with "id" and "iname" keys, for example rows returned from db.array('select id, iname from ...')
@@ -661,7 +662,7 @@ function parse_select_tag($basedir, $tpl_path, $tag, $hf, $attrs){
     $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
     for($i=0;$i<count($lines);$i++){
-      list ($value,$desc)=preg_split("/\|/",$lines[$i]);
+      list($value,$desc)=preg_split("/\|/",$lines[$i]);
       if (!strlen($value) && !strlen($desc)) continue;
 
       parse_lang($value);
@@ -728,7 +729,7 @@ function parse_selvalue_tag($basedir, $tpl_path, $tag, $hf, $attrs){
 
  $lines=preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'].$tpl_path));
 
- $result;
+ $result='';
  if ($tag>'' && array_key_exists($tag, $hf)){
     # hf(tag) is Array of Assoc Arrays with "id" and "iname" keys, for example rows returned from db.array('select id, iname from ...')
     # "id" key is optional, if not present - iname will be used for values too

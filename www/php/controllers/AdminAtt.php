@@ -1,6 +1,7 @@
 <?php
 
 class AdminAttController extends FwAdminController {
+    const access_level = 80;
     const route_default_action = '';
     public $base_url='/Admin/Att';
     public $required_fields = 'iname';
@@ -177,7 +178,8 @@ class AdminAttController extends FwAdminController {
 
         $ps=array(
             'att_dr' => $rows,
-            'select_att_categories_id' => $AttCat->listSelectOptions($att_categories_id),
+            'select_att_categories_id' => $AttCat->listSelectOptions(),
+            'att_categories_id' => $att_categories_id,
         );
         return $ps;
     }

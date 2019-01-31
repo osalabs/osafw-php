@@ -27,6 +27,7 @@ INSERT INTO att_categories (icode, iname) VALUES
 ('general', 'General images')
 ,('users', 'Member photos')
 ,('files', 'Files')
+,('spage_banner', 'Page banners')
 ;
 
 -- DROP TABLE IF EXISTS att;
