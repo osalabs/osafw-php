@@ -51,6 +51,7 @@
  2018-01-27 - parse_radio_tag changed to bootstrap4 custom radio
  2018-05-07 - date standard formats support: short/long/sql, support select from arrays
  2018-07-29 - added more secure headers
+ 2019-01-31 - added json, PARSEPAGE.TOP, PARSEPAGE.PARENT
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -157,7 +158,7 @@ support modifiers:
  upper
  default
  urlencode
- var2js
+ json (was var2js) - produces json-compatible string, example: {success:true, msg:""}
 */
 
 // !!!RECURSIVE
@@ -171,7 +172,30 @@ $PARSE_PAGE_OPENEND_TAG='</~'; #open for end inline tag
 
 $PARSE_PAGE_LANG_PARSE=1; #parse lang strings in `` or not - 1 - parse(default), 0 - no
 
-function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $parent_hf=0){
+$PARSE_PAGE_DATA_TOP=array(); #used fro PARSEPAGE.TOP
+
+function parse_page($basedir, $tpl_name, $hf, $out_filename=''){
+  $GLOBALS['PARSE_PAGE_DATA_TOP'] = &$hf;
+
+  $page = _parse_page($basedir, $tpl_name, $hf);
+
+  if ($out_filename && $out_filename!='v' && $out_filename!='s'){
+    $outdir=dirname($out_filename);  //check dir
+    if (!is_dir($outdir)) mkdir($outdir, 0777);
+    $OUTFILE=fopen($out_filename, "w") or die("Can't open out [$out_filename] file");
+    fputs($OUTFILE, $page);
+    fclose($OUTFILE);
+  }else{
+    if ($out_filename=='v'){  #variable mode
+       return $page;
+    }else{                                #screen mode
+       print_header();
+       print $page;
+    }
+  }
+}
+
+function _parse_page($basedir, $tpl_name, $hf, $page='', $parent_hf=0){
  global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG;
  global $CONFIG;
 
@@ -195,8 +219,6 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
 
     if (count($tags_full)>0){   //if there are no tags found - dont' parse it
        $hf['ROOT_URL']=$CONFIG['ROOT_URL'];
-       $hf['ROOT_DIR']=$CONFIG['SITE_ROOT'];
-       $hf['LANG']=$GLOBALS['LANG'];
        // rw("hf=".count($hf)." ");
 
        //re-sort $tags_full, so all 'inline' and 'sub' tags will be parsed first
@@ -241,27 +263,34 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
             //check for inline template and prepare it
             $inline_tpl='';
             $is_inline_tpl=false;
-            if ( array_key_exists('inline', $attrs) ){
-               $is_inline_tpl=true;
-               $inline_tpl=get_inline_tpl($page, $tag, $tag_full);
-               #rw("inline = $inline_tpl");
-            }
 
-            //get var from GLOBALS, not from $hf
-            if ( array_key_exists('global', $attrs) ){
-                 $tagvalue=hfvalue($tag, fw::i()->GLOBAL); #was: $GLOBALS
-            }
-            //get var from SESSION, not from $hf
-            elseif ( array_key_exists('session', $attrs) ){
-                 $tagvalue=hfvalue($tag, $_SESSION);
-            }
-            //get var from parent $hf, not from current $hf (for use original $hf in sub and repeat's)
-            elseif ( array_key_exists('parent', $attrs) && is_array($parent_hf) ){
-                 $tagvalue=hfvalue($tag, $parent_hf);
 
-            //get usual var
+            if (count($attrs)>0){
+              //check only if there are some attrs
+              if ( array_key_exists('inline', $attrs) ){
+                 $is_inline_tpl=true;
+                 $inline_tpl=get_inline_tpl($page, $tag, $tag_full);
+                 #rw("inline = $inline_tpl");
+              }
+
+              if ( array_key_exists('global', $attrs) ){
+                   //get var from GLOBALS, not from $hf
+                   $tagvalue=hfvalue($tag, fw::i()->GLOBAL); #was: $GLOBALS
+
+              }elseif ( array_key_exists('session', $attrs) ){
+                  //get var from SESSION, not from $hf
+                   $tagvalue=hfvalue($tag, $_SESSION);
+
+              }elseif ( array_key_exists('parent', $attrs) && is_array($parent_hf) ){
+                   //get var from parent $hf, not from current $hf (for use original $hf in sub and repeat's)
+                   $tagvalue=hfvalue($tag, $parent_hf);
+
+              }else{
+                    //get usual var
+                   $tagvalue=hfvalue($tag, $hf, $parent_hf);
+              }              
             }else{
-                 $tagvalue=hfvalue($tag, $hf);
+              $tagvalue=hfvalue($tag, $hf, $parent_hf);
             }
 
 #            $attr_lang='';
@@ -286,7 +315,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
                        $hfrow['repeat.index']=$k1;
                        $hfrow['repeat.iteration']=$k1+1;
                        $hfrow['repeat.total']=$hfcount;
-                       $tagvalue.=parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hfrow, 'v', $inline_tpl, $hf);
+                       $tagvalue.=_parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hfrow, $inline_tpl, $hf);
                        $k1++;
                     }
                   }else{
@@ -303,11 +332,11 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
                 if (!array_key_exists('noescape', $attrs)) $tagvalue=htmlescape($tagvalue);
 
               }elseif (array_key_exists('sub', $attrs)){   //if this is 'sub' tag - parse it as independent subtemplate
-                  $tagvalue=parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tagvalue, 'v', $inline_tpl, $hf);
+                  $tagvalue=_parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tagvalue, $inline_tpl, $hf);
 
               }else{ //if usual tag - replace it with tagvalue got above
                   #CSRF shield +1
-                  if ($tagvalue>"" && !array_key_exists('noescape', $attrs)) $tagvalue=htmlescape($tagvalue);
+                  if ($tagvalue>"" && !array_key_exists('noescape', $attrs) && !array_key_exists('json', $attrs)) $tagvalue=htmlescape($tagvalue);
               }
               $page=tag_replace($page,$tag_full,$tagvalue, $attrs);
 
@@ -339,7 +368,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
             }else{
                //if tag is not set and not a var - then it's subtemplate in a file - parse it
                //echo "$tag SUBPARSE<br>\n";
-               $v=parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hf, 'v', $inline_tpl, $hf);
+               $v=_parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hf, $inline_tpl, $hf);
                $page=tag_replace($page,$tag_full,$v, $attrs);
             }
          } else {
@@ -357,22 +386,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename='', $page='', $paren
  }
 
  #logger('TRACE', "End of $tpl_name");
-
- if ($out_filename && $out_filename!='v' && $out_filename!='s'){
-    $outdir=dirname($out_filename);  //check dir
-    if (!is_dir($outdir)) mkdir($outdir, 0777);
-    $OUTFILE=fopen($out_filename, "w") or die("Can't open out [$out_filename] file");
-    fputs($OUTFILE, $page);
-    fclose($OUTFILE);
- }
- else{
-    if ($out_filename=='v'){  #variable mode
-       return $page;
-    }else{                                #screen mode
-       print_header();
-       print $page;
-    }
- }
+ return $page;
 }
 
 function print_header(){
@@ -385,20 +399,29 @@ function print_header(){
 }
 
 ############## return value from hf , support arrays/hashes
-function hfvalue($tag, &$hf){
+function hfvalue($tag, &$hf, &$parent_hf=null){
+  global $PARSE_PAGE_DATA_TOP;
+
  $value=NULL;
  if (!isset($tag)) return $value;
 
  $empty_val=NULL;
  if ( preg_match("/\[/", $tag) ){
     $arr=explode('[', $tag);
+    $parts0=strtoupper($arr[0]);
 
-    if ( strtoupper($arr[0])=='GLOBAL' ){
+    if ( $parts0=='GLOBAL' ){
        #was $ptr=&$GLOBALS;
       $ptr=fw::i()->GLOBAL;
        array_shift($arr);
-    }elseif ( strtoupper($arr[0])=='SESSION' ){
+    }elseif ( $parts0=='SESSION' ){
        $ptr=&$_SESSION;
+       array_shift($arr);
+    }elseif ( $parts0=='PARSEPAGE.TOP' ){
+       $ptr=&$PARSE_PAGE_DATA_TOP;
+       array_shift($arr);
+    }elseif ( $parts0=='PARSEPAGE.PARENT' && $parent_hf){
+       $ptr=&$parent_hf;
        array_shift($arr);
     }else{
        $ptr=&$hf;
@@ -530,29 +553,40 @@ function tag_if($attrs, $hf){
 // tag replacer for the parse_page - WITH NECESSARY value VISUAL CHANGES
 // IN: $page, $tag, $value, $attrs  - references
 function tag_replace($page, $tag_full, $value, $attrs){
+ // echo "tag_replace tag=$tag_full<br>";
+ // echo "tag_replace value=$value<br>";
+ // echo "tag_replace page=".strlen($page)."<br>";
+  if (is_null($value)) $value='';
 
-//  echo "tag_replace tag=$tag<br>";
-//  echo "tag_replace value=$value<br>";
-//  echo "tag_replace page=".strlen($page)."<br>";
- if (is_array($value)) return '';
-
- if (array_key_exists('number_format', $attrs)) $value=tpl_number_format($value, $attrs);
- if (array_key_exists('string_format', $attrs)) $value=string_format($value, $attrs['string_format']);#for some compatibility with Smarty
- if (array_key_exists('sprintf', $attrs))    $value=string_format($value, $attrs['sprintf']);
- if (array_key_exists('htmlescape', $attrs)) $value=htmlescape($value);
- if (array_key_exists('date', $attrs))       $value=sec2date($value, $attrs);
- if (array_key_exists('truncate', $attrs))   $value=str2truncate($value, $attrs);
- if (array_key_exists('strip_tags', $attrs)) $value=strip_tags($value);
- if (array_key_exists('trim', $attrs))       $value=trim($value);
- if (array_key_exists('nl2br', $attrs))      $value=nl2br($value);
- if (array_key_exists('count', $attrs))      $value=count($value);
- if (array_key_exists('lower', $attrs))      $value=strtolower($value);
- if (array_key_exists('upper', $attrs))      $value=strtoupper($value);
- if (array_key_exists('default', $attrs))    $value=str2default($value, $attrs);
- if (array_key_exists('urlencode', $attrs))  $value=urlencode($value);
- if (array_key_exists('var2js', $attrs))     $value=var2js($value);
-
- return tag_replace_raw($page, $tag_full, $value, array_key_exists('inline', $attrs));
+  if (!is_scalar($value)) {
+    if (array_key_exists('json', $attrs)){
+      if ($attrs['json']=='pretty'){
+        $value=var2js($value, JSON_NUMERIC_CHECK | JSON_PRETTY_PRINT);
+      }else{
+        $value=var2js($value, JSON_NUMERIC_CHECK);
+      }
+    }else{
+      logger('DEBUG', 'ParsePage warning - not a scalar passed for tag = '.$tag_full.' Passed type = '.gettype($value));
+      $value='';
+    }    
+  } else {
+    if (array_key_exists('number_format', $attrs)) $value=tpl_number_format($value, $attrs);
+    if (array_key_exists('string_format', $attrs)) $value=string_format($value, $attrs['string_format']);#for some compatibility with Smarty
+    if (array_key_exists('sprintf', $attrs))    $value=string_format($value, $attrs['sprintf']);
+    if (array_key_exists('htmlescape', $attrs)) $value=htmlescape($value);
+    if (array_key_exists('date', $attrs))       $value=sec2date($value, $attrs);
+    if (array_key_exists('truncate', $attrs))   $value=str2truncate($value, $attrs);
+    if (array_key_exists('strip_tags', $attrs)) $value=strip_tags($value);
+    if (array_key_exists('trim', $attrs))       $value=trim($value);
+    if (array_key_exists('nl2br', $attrs))      $value=nl2br($value);
+    if (array_key_exists('count', $attrs))      $value=count($value);
+    if (array_key_exists('lower', $attrs))      $value=strtolower($value);
+    if (array_key_exists('upper', $attrs))      $value=strtoupper($value);
+    if (array_key_exists('default', $attrs))    $value=str2default($value, $attrs);
+    if (array_key_exists('urlencode', $attrs))  $value=urlencode($value);
+    if (array_key_exists('var2js', $attrs))     $value=var2js($value);
+  }
+  return tag_replace_raw($page, $tag_full, $value, array_key_exists('inline', $attrs));
 }
 
 //#################################
@@ -955,8 +989,8 @@ function string_format($str, $format){
 }
 
 // Convert PHP scalar, array or hash to JS scalar/array/hash.
-function var2js($a) {
-    if ( function_exists('json_encode')) return json_encode($a);
+function var2js($a, $options=0) {
+    if ( function_exists('json_encode')) return json_encode($a, $options);
 
     if (is_null($a)) return 'null';
     if ($a === false) return 'false';

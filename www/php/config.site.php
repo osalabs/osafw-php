@@ -35,6 +35,6 @@ $SITE_CONFIG=array(
 ini_set('display_errors',0);
 error_reporting(E_ERROR); #report only critical errors
 ini_set("log_errors", 1);
-ini_set("error_log", $SITE_CONFIG['site_error_log']);
+ini_set("error_log", $FW_CONFIG['site_error_log']);
 
 ?>
