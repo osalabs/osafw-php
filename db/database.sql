@@ -4,7 +4,7 @@
 -- CREATE DATABASE xxx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- USE xxx;
 
---SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_ENGINE_SUBSTITUTION';
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='';
 
 /* upload categories */
 -- DROP TABLE IF EXISTS att_categories;
