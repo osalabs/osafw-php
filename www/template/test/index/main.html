@@ -9,6 +9,10 @@
         inline template: <b class="true"><~true_inline inline>TRUE INLINE</~true_inline></b><br>
     </li>
     <li>
+        hashtable: key1=<~hashtable[key1]>, key2=<~hashtable[key2]><br>
+        hashtable just name: #<~hashtable>#><br>
+    </li>
+    <li>
         ifeq="one" value="1": <b class="true"><~true_value ifeq="one" value="1"></b>
     </li>
     <li>
@@ -60,6 +64,8 @@
             .total=<b><~repeat.total></b><br>
             .index=<b><~repeat.index></b><br>
             .iteration=<b><~repeat.iteration></b><br>
+            PARSEPAGE.TOP[one]=<~PARSEPAGE.TOP[one]><br>
+            PARSEPAGE.PARENT[two]=<~PARSEPAGE.PARENT[two]><br>
         </~repeat3_dr>
     </li>
     <li>
@@ -76,5 +82,11 @@
        <~now date="short"> - mm/dd/yyyy hh:mm<br>
        <~now date="long"> - mm/dd/yyyy hh:mm:ss<br>
        <~now date="sql"> - yyyy-mm-dd hh:mm:ss<br>
+    </li>
+    <li>
+       json dump of parse data: 
+       <div>
+       <~myself json>
+       </div>
     </li>
 </ul>
