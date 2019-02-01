@@ -54,6 +54,16 @@ class FormUtils {
       }
   }
 
+  # fore each name in $name - check if value is empty '' and make it null
+  public static function filterNullable(&$itemdb, $names){
+    $anames=Utils::qw($names);
+    foreach ($anames as $key => $fld) {
+        if (array_key_exists($fld, $itemdb) && $itemdb[$fld]===''){
+            $itemdb[$fld] = null;
+        }
+    }
+  }
+
   #RETURN: array of pages for pagination
   public static function getPager($count, $pagenum, $pagesize=NULL){
     if (is_null($pagesize)) $pagesize = fw::i()->config->MAX_PAGE_ITEMS;

@@ -27,18 +27,6 @@ class AdminSpagesController extends FwAdminController {
         //optionally init controller
     }
 
-    //override due to custom search filter on status
-    public function setListSearch() {
-        $this->list_where =' 1=1 ';
-        parent::setListSearch();
-
-        if ($this->list_filter['status']>''){
-            $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
-        }else{
-            $this->list_where .= ' and status<>127 '; #by default - show all non-deleted
-        }
-    }
-
     //override list rows
     public function getListRows(){
         if ($this->list_filter['sortby']=='iname' && $this->list_filter['s']==''){

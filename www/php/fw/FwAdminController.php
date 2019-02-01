@@ -13,6 +13,7 @@ class FwAdminController extends FwController {
     public $required_fields = 'iname';
     public $save_fields = 'iname status';
     public $save_fields_checkboxes = '';
+    public $save_fields_nullable = '';
     #public $model_name = 'DemoDicts'; #set in child class!
     /*REMOVE OR OVERRIDE
     public $search_fields = 'iname idesc';
@@ -37,6 +38,7 @@ class FwAdminController extends FwController {
 
         $this->setListSorting();
         $this->setListSearch();
+        $this->setListSearchStatus();
         //other filters add to $this->list_where here
 
         $this->getListRows();
@@ -97,6 +99,7 @@ class FwAdminController extends FwController {
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
+        if ($this->fw->GLOBAL['ERR']) logger($this->fw->GLOBAL['ERR']);
 
         return $ps;
     }

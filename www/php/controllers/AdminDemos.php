@@ -7,6 +7,7 @@ class AdminDemosController extends FwAdminController {
     public $required_fields = 'iname email';
     public $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
     public $save_fields_checkboxes = 'is_checkbox';
+    public $save_fields_nullable = 'demo_dicts_id att_id';
     public $model_name = 'Demos';
     public $model_related;
 
@@ -31,15 +32,6 @@ class AdminDemosController extends FwAdminController {
         parent::__construct();
 
         $this->model_related = fw::model('DemoDicts');
-    }
-
-    //override due to custom search filter on status
-    public function setListSearch() {
-        parent::setListSearch();
-
-        if ($this->list_filter['status']>''){
-            $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
-        }
     }
 
     // override get list rows as list need to be modified
@@ -117,6 +109,7 @@ class AdminDemosController extends FwAdminController {
             'att'                           => fw::model('Att')->one($item['att_id']+0),
             'att_links'                     => fw::model('Att')->getAttLinks($this->model->table_name, $id),
         );
+        if ($this->fw->GLOBAL['ERR']) logger($this->fw->GLOBAL['ERR']);
         #combo date
         #TODO FormUtils::comboForDate( $item['fdate_combo'], $ps, 'fdate_combo');
 
@@ -153,7 +146,7 @@ class AdminDemosController extends FwAdminController {
 
         //check $result here used only to disable further validation if required fields validation failed
         if ($result){
-            if ($this->model->isExists( $item['email'], $id ) ){
+            if ($this->model->isExistsByField( $item['email'], 'email', $id ) ){
                 $this->setError('email', 'EXISTS');
             }
 

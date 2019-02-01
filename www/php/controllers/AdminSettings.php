@@ -25,8 +25,6 @@ class AdminSettingsController extends FwAdminController {
         $f = $this->initFilter();
 
         $this->setListSorting();
-
-        $this->list_where = ' 1=1 ';
         $this->setListSearch();
 
         //other filters add to $this->list_where here

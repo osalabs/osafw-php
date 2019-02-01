@@ -26,6 +26,7 @@ abstract class FwController {
     public $form_new_defaults=array();      //defaults for the fields in new form
     public $save_fields;                    //fields to save from the form to db, space-separated
     public $save_fields_checkboxes;         //checkboxes fields to save from the form to db, qw string: "field|def_value field2|def_value2" or "field field2" (def_value=1 in this case)
+    public $save_fields_nullable;           //nullable fields that should be set to null in db if form submit as ''
 
     //not overridable
     public $fw;  //current app/framework object
@@ -33,7 +34,7 @@ abstract class FwController {
     public $list_view;                  // table or view name to selecte from for the list screen
     public $list_orderby;               // orderby for the list screen
     public $list_filter;                // filter values for the list screen
-    public $list_where=' status<>127 '; // where sql to use in list sql, by default - return all non-deleted(status=127) records
+    public $list_where=' 1=1 ';         // where to use in list sql, default is non-deleted records (see setListSearch() )
     public $list_count;                 // count of list rows returned from db
     public $list_rows;                  // list rows returned from db (array of hashes)
     public $list_pager;                 // pager for the list from FormUtils::getPager
@@ -130,7 +131,7 @@ abstract class FwController {
     /**
      * add to $this->list_where search conditions from $this->list_filter['s'] and based on fields in $this->search_fields
      */
-    public function setListSearch() {
+    public function     setListSearch() {
         #$this->list_where =' 1=1 '; #override initial in child if necessary
 
         $s = trim($this->list_filter['s']);
@@ -159,6 +160,24 @@ abstract class FwController {
         #if related id and field name set - filter on it
         if ($this->related_id>'' && $this->related_field_name){
             $this->list_where .= ' and '.$this->db->quote_ident($this->related_field_name).'='.$this->db->quote($this->related_id);
+        }
+    }
+
+    /**
+     * set list_where filter based on status filter:
+     * - if status not set - filter our deleted (i.e. show all)
+     * - if status set - filter by status, but if status=127 (deleted) only allow to see deleted by admins
+     */
+    public function setListSearchStatus() {
+        if ($this->model && strlen($this->model->field_status)){
+            if ($this->list_filter['status']>''){
+                $status = $this->list_filter['status']+0;
+                #if want to see trashed and not admin - just show active
+                if ($status==127 && !$this->fw->model('Users')->isAccess('ADMIN')) $status=0;
+                $this->list_where .= " and ".$this->db->quote_ident($this->model->field_status)."=".$this->db->quote($status);
+            }else{
+                $this->list_where .= " and ".$this->db->quote_ident($this->model->field_status)."<>127"; #by default - show all non-deleted
+            }
         }
     }
 
@@ -210,6 +229,7 @@ abstract class FwController {
 
         $itemdb = FormUtils::filter($item, $this->save_fields);
         FormUtils::filterCheckboxes($itemdb, $item, $this->save_fields_checkboxes);
+        FormUtils::filterNullable($itemdb, $this->save_fields_nullable);
 
         return $itemdb;
     }

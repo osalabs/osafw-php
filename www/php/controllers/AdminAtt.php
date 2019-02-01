@@ -29,9 +29,8 @@ class AdminAttController extends FwAdminController {
         $f = $this->initFilter();
 
         $this->setListSorting();
-
-        $this->list_where = ' status=0 ';
         $this->setListSearch();
+        $this->setListSearchStatus();
 
         //other filters add to $this->list_where here
         if ($this->list_filter['att_categories_id']>0){

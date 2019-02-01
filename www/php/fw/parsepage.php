@@ -52,6 +52,7 @@
  2018-05-07 - date standard formats support: short/long/sql, support select from arrays
  2018-07-29 - added more secure headers
  2019-01-31 - added json, PARSEPAGE.TOP, PARSEPAGE.PARENT
+ 2019-02-01 - added sub="var" support
 */
 require_once dirname(__FILE__)."/lock.php";
 
@@ -116,7 +117,9 @@ repeat - this tag is repeat content ($hf hash should contain reference to array 
   repeat.index  (0-based)
   repeat.iteration (1-based)
 
-sub - this tag tell parser to use subhash for parse subtemplate ($hf hash should contain reference to hash)
+sub - this tag tell parser to use subhash for parse subtemplate ($hf hash should contain reference to hash), examples:
+   <~tag sub inline>...</~tag>- use $hf[tag] as hashtable for inline template
+   <~tag sub="var"> - use $hf[var] as hashtable for template in "tag.html"
 inline - this tag tell parser that subtemplate is not in file - it's between <~tag>...</~tag> , useful in combination with 'repeat' and 'if'
 global - this tag is a global var, not in $hf hash
  global[var] - also possible
@@ -288,7 +291,7 @@ function _parse_page($basedir, $tpl_name, $hf, $page='', $parent_hf=0){
               }else{
                     //get usual var
                    $tagvalue=hfvalue($tag, $hf, $parent_hf);
-              }              
+              }
             }else{
               $tagvalue=hfvalue($tag, $hf, $parent_hf);
             }
@@ -332,11 +335,11 @@ function _parse_page($basedir, $tpl_name, $hf, $page='', $parent_hf=0){
                 if (!array_key_exists('noescape', $attrs)) $tagvalue=htmlescape($tagvalue);
 
               }elseif (array_key_exists('sub', $attrs)){   //if this is 'sub' tag - parse it as independent subtemplate
-                  $tagvalue=_parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tagvalue, $inline_tpl, $hf);
+                $tagvalue=_tag_sub($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tag, $hf, $attrs, $inline_tpl, $parent_hf, $tagvalue);
 
               }else{ //if usual tag - replace it with tagvalue got above
                   #CSRF shield +1
-                  if ($tagvalue>"" && !array_key_exists('noescape', $attrs) && !array_key_exists('json', $attrs)) $tagvalue=htmlescape($tagvalue);
+                  if ($tagvalue>"" && !array_key_exists('noescape', $attrs)) $tagvalue=htmlescape($tagvalue);
               }
               $page=tag_replace($page,$tag_full,$tagvalue, $attrs);
 
@@ -366,10 +369,15 @@ function _parse_page($basedir, $tpl_name, $hf, $page='', $parent_hf=0){
                $page=tag_replace($page,$tag_full, $v, $attrs);
 
             }else{
-               //if tag is not set and not a var - then it's subtemplate in a file - parse it
-               //echo "$tag SUBPARSE<br>\n";
-               $v=_parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hf, $inline_tpl, $hf);
-               $page=tag_replace($page,$tag_full,$v, $attrs);
+              #also checking for sub
+              if (array_key_exists('sub', $attrs)){
+                $v = _tag_sub($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $tag, $hf, $attrs, $inline_tpl, $parent_hf, $tagvalue);
+              }else{
+                //if tag is not set and not a var - then it's subtemplate in a file - parse it
+                //echo "$tag SUBPARSE<br>\n";
+                $v=_parse_page($basedir, tag_tplpath($tag,$tpl_name,$is_inline_tpl), $hf, $inline_tpl, $hf);
+              }
+              $page=tag_replace($page,$tag_full,$v, $attrs);
             }
          } else {
            $page=tag_replace_raw($page, $tag_full, '', array_key_exists('inline', $attrs));
@@ -396,7 +404,7 @@ function print_header(){
  print header("Content-Security-Policy: frame-ancestors 'none'");
  print header("X-Frame-Options: DENY");
  print header("X-XSS-Protection: 1; mode=block");
- print header("X-Permitted-Cross-Domain-Policies: master-only"); 
+ print header("X-Permitted-Cross-Domain-Policies: master-only");
 }
 
 ############## return value from hf , support arrays/hashes
@@ -494,6 +502,19 @@ function tag_tplpath($tag,$tpl_name,$is_inline_tpl=false){
  return $result;
 }
 
+function _tag_sub($basedir, $tpl_path, $tag, &$hf, &$attrs, &$inline_tpl, &$parent_hf, &$tagvalue){
+  if ($attrs['sub']>''){
+    #if sub attr contains name - use it to get value from hf (instead using tag_value)
+    $tagvalue=hfvalue($attrs['sub'], $hf, $parent_hf);
+  }
+  if (!is_array($tagvalue)){
+    logger('DEBUG', 'ParsePage warning - not an array passed for a SUB tag = '.$tag.', sub = '.$attrs['sub']);
+    $tagvalue=array();
+  }
+
+  return _parse_page($basedir, $tpl_path, $tagvalue, $inline_tpl, $parent_hf);
+}
+
 //return true when "ifXX/unless" conditions true, otherwise - false
 function tag_if($attrs, $hf){
   global $PARSE_PAGE_OPS;
@@ -566,10 +587,12 @@ function tag_replace($page, $tag_full, $value, $attrs){
       }else{
         $value=var2js($value, JSON_NUMERIC_CHECK);
       }
+      if (!array_key_exists('noescape', $attrs)) $value = htmlescape($value);
+
     }else{
       logger('DEBUG', 'ParsePage warning - not a scalar passed for tag = '.$tag_full.' Passed type = '.gettype($value));
       $value='';
-    }    
+    }
   } else {
     if (array_key_exists('number_format', $attrs)) $value=tpl_number_format($value, $attrs);
     if (array_key_exists('string_format', $attrs)) $value=string_format($value, $attrs['string_format']);#for some compatibility with Smarty
@@ -870,6 +893,8 @@ function parse_cache_template($page,$hf,$out_filename=''){
 
 #############
 function htmlescape($str){
+  if (!is_scalar($str)) return $str;
+
  $str=preg_replace("/&/",'&amp;', $str);
  $str=preg_replace('/"/','&quot;', $str);
  $str=preg_replace("/'/",'&#039;', $str);

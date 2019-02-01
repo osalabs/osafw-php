@@ -3,7 +3,7 @@
  Base Fw Model class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2019 Oleg Savchuk www.osalabs.com
 */
 
 abstract class FwModel {
@@ -12,9 +12,13 @@ abstract class FwModel {
 
     public $CACHE_PREFIX = 'fwmodel.one.'; #TODO - ability to cleanup all, but this model-only cache items
 
-    protected $field_add_users_id='add_users_id';
-    protected $field_upd_users_id='upd_users_id';
-    protected $field_upd_time='upd_time';
+    public $field_id='id';                  #default primary key name
+    public $field_iname='iname';
+    # default field names. If you override it and make empty - automatic processing disabled
+    public $field_status='status';
+    public $field_add_users_id='add_users_id';
+    public $field_upd_users_id='upd_users_id';
+    public $field_upd_time='upd_time';
 
     protected $db;
 
@@ -40,7 +44,7 @@ abstract class FwModel {
             $row = FwCache::getValue($cache_key);
         }
         if ($is_force || is_null($row)){
-            $row = $this->db->row("select * from ".$this->table_name." where id=".$this->db->quote($id));
+            $row = $this->db->row("select * from ".$this->table_name." where ".$this->db->quote_ident($this->field_id)."=".$this->db->quote($id));
             FwCache::setValue($cache_key, $row);
         }else{
             #logger('CACHE HIT!');
@@ -49,7 +53,7 @@ abstract class FwModel {
     }
 
     public function oneByIname($iname) {
-        return $this->db->row("select * from ".$this->table_name." where iname=".$this->db->quote($iname));
+        return $this->db->row("select * from ".$this->table_name." where ".$this->db->quote_ident($this->field_iname)."=".$this->db->quote($iname));
     }
 
     public function listFields(){
@@ -67,7 +71,7 @@ abstract class FwModel {
 
     public function iname($id) {
         $row = $this->one($id);
-        return $row['iname'];
+        return $row[$this->field_iname];
     }
 
     public function getFullName($id) {
@@ -76,7 +80,7 @@ abstract class FwModel {
 
         if ($id){
             $item = $this->one($id);
-            $result = $item['iname'];
+            $result = $item[$this->field_iname];
         }
 
         return $result;
@@ -114,12 +118,12 @@ abstract class FwModel {
         if (!strlen($iname)) return 0;
 
         $item = $this->oneByIname($iname);
-        if ($item['id']){
+        if ($item){
             #exists
-            $result = $item['id'];
+            $result = $item[$this->field_id];
         }else{
             $item=array(
-                'iname' => $iname,
+                $this->field_iname => $iname,
             );
             $result = $this->add($item);
         }
@@ -128,12 +132,12 @@ abstract class FwModel {
 
     //non-permanent or permanent delete
     public function delete($id, $is_perm=NULL) {
-        if ($is_perm){
+        if ($is_perm || !strlen($this->field_status)){
             $this->db->delete($this->table_name, $id);
             $this->fw->model('FwEvents')->log($this->table_name.'_del', $id);
         }else{
             $vars=array(
-                'status'    => 127,
+                $this->field_status => 127,
             );
             $this->update($id, $vars);
         }
@@ -154,27 +158,37 @@ abstract class FwModel {
     }
 
     public function isExists($uniq_key, $not_id=NULL) {
-        return $this->isExistsByField($uniq_key, 'iname', $not_id);
+        return $this->isExistsByField($uniq_key, $this->field_iname, $not_id);
     }
 
     #return standard list of id,iname where status=0 order by iname
     public function ilist() {
-        $sql  = 'select * from '.$this->table_name.' where status=0 order by iname';
-        return $this->db->arr($sql);
+        $where = array();
+        if (strlen($this->field_status)) $where[$this->field_status]=0;
+        return $this->db->arr($this->table_name, $where, $this->db->quote_ident($this->field_iname));
     }
 
     public function listSelectOptions(){
-        return $this->db->arr('select id, iname from '.$this->table_name.' where status=0 order by iname');
+        $where = '';
+        if (strlen($this->field_status)) $where.=" ".$this->db->quote_ident($this->field_status)."=0";
+        return $this->db->arr("select ".$this->db->quote_ident($this->field_id)." as id, ".$this->db->quote_ident($this->field_iname)." as iname from ".$this->db->quote_ident($this->table_name)." where $where order by ".$this->db->quote_ident($this->field_iname));
     }
     public function getSelectOptions($sel_id) {
         return FormUtils::selectOptions($this->listSelectOptions(), $sel_id);
     }
 
+    public function getCount(){
+        $where = '';
+        if (strlen($this->field_status)) $where.=" ".$this->db->quote_ident($this->field_status)."<>127";
+        return $this->db->value("select count(*) from ".$this->db->quote_ident($this->table_name)." where $where");
+    }
+
+
     public function getMultiList($hsel_ids){
         $rows = $this->ilist();
         if (is_array($hsel_ids) && count($hsel_ids)){
             foreach ($rows as $k => $row) {
-                $rows[$k]['is_checked'] = array_key_exists($row['id'], $hsel_ids)!==FALSE;
+                $rows[$k]['is_checked'] = array_key_exists($row[$this->field_id], $hsel_ids)!==FALSE;
             }
         }
 
@@ -182,10 +196,10 @@ abstract class FwModel {
     }
 
     public function getAutocompleteList($q, $limit=5) {
-        $sql = 'select iname from '.$this->table_name.'
-                 where status=0
-                  and iname like '.$this->db->quote('%'.$q.'%').'
-                 limit '.$limit;
+        $where = $this->db->quote_ident($this->field_iname) & " like " & $this->db->quote('%'.$q.'%');
+        if (strlen($this->field_status)) $where .= " and ".$this->db->quote_ident($this->field_status)."<>127 ";
+
+        $sql = "select ".$this->db->quote_ident($this->field_iname)." as iname from ".$this->db->quote_ident($this->table_name)." where ".$where." LIMIT $limit";
         return $this->db->col($sql);
     }
 
