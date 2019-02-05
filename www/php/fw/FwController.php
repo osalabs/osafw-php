@@ -12,7 +12,9 @@ abstract class FwController {
                                         //Default=null - use config. If not set in config - all users can access this controller (even not logged)
     const route_default_action = '';    //empty, "index", "show" - default action for controller, dispatcher will use it if no requested action found
                                         //if no default action set - this is special case action - this mean action should be got form REST's 'id'
-    public $model_name; //default model name for the controller
+
+    public $base_url;                   //base url for the controller
+    public $model_name;                 //default model name for the controller
 
     public $list_sortdef = 'id asc';    //default sorting - req param name, asc|desc direction
     public $list_sortmap = array(       //sorting map: req param name => sql field name(s) asc|desc direction
@@ -20,17 +22,19 @@ abstract class FwController {
                         'iname'         => 'iname',
                         'add_time'      => 'add_time',
                         );
-    public $search_fields = 'iname idesc';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
+    public $search_fields = 'iname idesc';  //space-separated, fields to search via $s$list_filter['s'], ! - means exact match, not "like"
                                             //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
 
-    public $form_new_defaults=array();      //defaults for the fields in new form
+    public $form_new_defaults = array();    //defaults for the fields in new form
+    public $required_fields = '';           //optional, default required fields, space-separated
     public $save_fields;                    //fields to save from the form to db, space-separated
     public $save_fields_checkboxes;         //checkboxes fields to save from the form to db, qw string: "field|def_value field2|def_value2" or "field field2" (def_value=1 in this case)
     public $save_fields_nullable;           //nullable fields that should be set to null in db if form submit as ''
 
     //not overridable
-    public $fw;  //current app/framework object
-    public $model; //default model for the controller
+    public $fw;                         //current app/framework object
+    public $model;                      //default model for the controller
+    protected $config = array();        // controller config, loaded from template dir/config.json
     public $list_view;                  // table or view name to selecte from for the list screen
     public $list_orderby;               // orderby for the list screen
     public $list_filter;                // filter values for the list screen
@@ -41,6 +45,15 @@ abstract class FwController {
     public $return_url;                 // url to return after SaveAction successfully completed, passed via request
     public $related_id;                 // related id, passed via request. Controller should limit view to items related to this id
     public $related_field_name;         // if set and $related_id passed - list will be filtered on this field
+
+    #support of dynamic controller and customizable view list
+    protected $is_dynamic_index     = false;    // true if controller has dynamic IndexAction, then define below:
+    protected $view_list_defaults   = '';       // qw list of default columns
+    protected $view_list_map        = array();  // list of all available columns fieldname|visiblename
+    protected $view_list_custom     = '';       // qw list of custom-formatted fields for the list_table
+
+    protected $is_dynamic_show      = false;    // true if controller has dynamic ShowAction, requires "show_fields" to be defined in config.json
+    protected $is_dynamic_showform  = false;    // true if controller has dynamic ShowFormAction, requires "showform_fields" to be defined in config.json
 
     protected $db;
 
@@ -54,6 +67,66 @@ abstract class FwController {
         if ($this->model_name){
             $this->model = fw::model($this->model_name);
         }
+    }
+
+    public function loadControllerConfig($config_filename='config.json') {
+        $conf_file0 = strtolower($this->base_url).'/'.$config_filename;
+        $conf_file = $this->fw->config->SITE_TEMPLATES.$conf_file0;
+        if (!file_exists($conf_file)) throw new ApplicationException("Controller Config file not found in templates: $conf_file");
+
+        $this->config = json_decode(file_get_contents($conf_file), true);
+        if (is_null($this->config) || !$this->config) throw new ApplicationException("Controller Config is invalid, check json in templates: $conf_file0");
+        logger("loaded config:", $this->config);
+
+        #fill up controller params
+        $this->model = fw::model($this->config["model"]);
+
+        $this->required_fields = $this->config["required_fields"];
+
+        #save_fields could be defined as qw string or array - check and convert
+        if (is_array($this->config["save_fields"])){
+            $this->save_fields = Utils::qwRevert($this->config["save_fields"]); #not optimal, but simplest for now
+        }else{
+            $this->save_fields = $this->config["save_fields"];
+        }
+
+        #save_fields_checkboxes could be defined as qw string - check and convert
+        if (is_array($this->config["save_fields_checkboxes"])){
+            $this->save_fields_checkboxes = Utils::qwRevert($this->config["save_fields_checkboxes"]); #not optimal, but simplest for now
+        }else{
+            $this->save_fields_checkboxes = $this->config["save_fields_checkboxes"];
+        }
+
+        #save_fields_nullable could be defined as qw string - check and convert
+        if (is_array($this->config["save_fields_nullable"])){
+            $this->save_fields_nullable = Utils::qwRevert($this->config["save_fields_nullable"]); #not optimal, but simplest for now
+        }else{
+            $this->save_fields_nullable = $this->config["save_fields_nullable"];
+        }
+
+        $this->search_fields = $this->config["search_fields"];
+        $this->list_sortdef = $this->config["list_sortdef"];
+        $this->list_sortmap = $this->config["list_sortmap"];
+        $this->related_field_name = $this->config["related_field_name"];
+        $this->list_view = $this->config["list_view"];
+        $this->is_dynamic_index = $this->config["is_dynamic_index"];
+        if ($this->is_dynamic_index) {
+            #Whoah! list view is dynamic
+            $this->view_list_defaults = $this->config["view_list_defaults"];
+
+            #save_fields_nullable could be defined as qw string - check and convert
+            if (is_array($this->config["view_list_map"])){
+                $this->view_list_map = $this->config["view_list_map"]; #not optimal, but simplest for now
+            }else{
+                $this->view_list_map = Utils::qh($this->config["view_list_map"]);
+            }
+
+            $this->list_sortmap = $this->getViewListSortmap(); #just add all fields from view_list_map
+            if (!$this->search_fields) $this->search_fields = $this->getViewListUserFields(); #just search in all visible fields if no specific fields defined
+        }
+
+        $this->is_dynamic_show      = $this->config["is_dynamic_show"];
+        $this->is_dynamic_showform  = $this->config["is_dynamic_showform"];
     }
 
     ############### helpers - shortcuts from fw
@@ -355,6 +428,98 @@ abstract class FwController {
             }else{
                 $this->routeRedirect("ShowForm");
             }
+        }
+    }
+
+
+    ######################### dynamic controller support
+    /**
+     * as arraylist of hashtables {field_name=>, field_name_visible=> [, is_checked=>true]} in right order
+     * @param  string  $fields qw-string, if fields defined - show fields only
+     * @param  boolean $is_all if is_all true - then show all fields (not only from fields param)
+     * @return array           array of hashtables
+     */
+    public function getViewListArr($fields='', $is_all=false){
+        $result = array();
+
+        #if fields defined - first show these fields, then the rest
+        $fields_added = array();
+        if ($fields>''){
+            foreach (Utils::qw($fields) as $key => $fieldname) {
+                $result[]=array(
+                    'field_name' => $fieldname,
+                    'field_name_visible' => $this->view_list_map[$fieldname],
+                    'is_checked' => true,
+                );
+                $fields_added[$fieldname] = true;
+            }
+        }
+
+        if ($is_all){
+            #rest/all fields
+            foreach ($this->view_list_map as $key => $value) {
+                if (array_key_exists($key, $fields_added)) continue;
+                $result[]=array(
+                    'field_name' => $key,
+                    'field_name_visible' => $this->view_list_map[$key],
+                );
+            }
+        }
+
+        return $result;
+    }
+
+    public function getViewListSortmap($value=''){
+        $result=array();
+        foreach ($this->view_list_map as $fieldname => $value) {
+            $result[$fieldname] = $fieldname;
+        }
+        return $result;
+    }
+
+    public function getViewListUserFields($value=''){
+        $item = fw::model('UserViews')->oneByScreen($this->base_url); #base_url is screen identifier
+        return $item['fields']>'' ? $item['fields'] : $this->view_list_defaults;
+    }
+
+    /**
+     * add to $ps:
+     * headers
+     * headers_search
+     * depends on $ps["list_rows"]
+     * usage:
+     * $this->setViewList($ps, reqh("search"))
+     *
+     * @param [type] $ps      [description]
+     * @param [type] $hsearch [description]
+     */
+    public function setViewList(&$ps, $hsearch){
+        $fields = $this->getViewListUserFields();
+
+        $headers = $this->getViewListArr($fields);
+        #add search from user's submit
+        foreach ($headers as $key => $header) {
+            $headers[$key]["search_value"] = $hsearch[$header["field_name"]];
+        }
+
+        $ps["headers"] = $headers;
+        $ps["headers_search"] = $headers;
+
+        $hcustom = Utils::qh($this->view_list_custom);
+
+        #dynamic cols
+        $fields_qw = Utils::qw($fields);
+        foreach ($ps["list_rows"] as $key => $row) {
+            $cols = array();
+            foreach ($fields_qw as $fieldname) {
+                $cols[]=array(
+                    'row' => $row,
+                    'field_name' => $fieldname,
+                    'data' => $row[$fieldname],
+                    'is_custom' => array_key_exists($fieldname, $hcustom),
+                );
+            }
+            $ps["list_rows"][$key]['cols']=$cols;
         }
     }
 

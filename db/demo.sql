@@ -14,7 +14,7 @@ CREATE TABLE demo_dicts (
 
     PRIMARY KEY (id),
     UNIQUE KEY (iname)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO demo_dicts (iname, idesc, add_time) VALUES
 ('test1', 'test1 description', now())
 ,('test2', 'test2 description', now())
@@ -61,6 +61,6 @@ CREATE TABLE demos (
     UNIQUE KEY (email),
     FOREIGN KEY (demo_dicts_id) REFERENCES demo_dicts(id),
     FOREIGN KEY (att_id) REFERENCES att(id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 
 

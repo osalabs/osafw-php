@@ -132,7 +132,7 @@ class fw {
         if ( preg_match('/Controller$/', $class_name) ){
             $is_controller=true;
             $dirs[]= $bdir.'../controllers/';
-            if ($class_name!=='FwController' && $class_name!=='FwAdminController') $class_name=preg_replace("/Controller$/", "", $class_name);
+            if ($class_name!=='FwController' && $class_name!=='FwAdminController' && $class_name!=='FwDynamicController') $class_name=preg_replace("/Controller$/", "", $class_name);
         }else{
             $dirs[]= $bdir.'../models/';
             if ($class_name!=='FwModel') $class_name=preg_replace("/Model$/", "", $class_name);

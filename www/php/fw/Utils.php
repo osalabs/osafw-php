@@ -27,6 +27,16 @@ class Utils {
         }
     }
 
+    //convert from array back to qw-string
+    //spaces converted to '&nbsp;'
+    public static function qwRevert($arr) {
+        $result = '';
+        foreach ($arr as $key => $value) {
+            $result.= str_replace(' ', '&nbsp;', $value).' ';
+        }
+        return $result;
+    }
+
     /*
     convert string like "AAA|1 BBB|2 CCC|3 DDD" to hash
     (or just "AAA BBB CCC DDD")

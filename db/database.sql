@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS spages (
     add_time            timestamp default CURRENT_TIMESTAMP,
     add_users_id         int unsigned default 0,
     upd_time            timestamp,
-    upd_users_id         int unsigned default 0,    
+    upd_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (head_att_id) REFERENCES att(id)
 ) DEFAULT CHARSET=utf8mb4;
@@ -248,4 +248,59 @@ CREATE TABLE IF NOT EXISTS fwevents_log (
     KEY (events_id),
     KEY (add_users_id),
     KEY (add_time)
+) DEFAULT CHARSET=utf8mb4;
+
+
+/*user custom views*/
+DROP TABLE IF EXISTS user_views;
+CREATE TABLE user_views (
+    id                  int unsigned NOT NULL auto_increment,
+
+    screen              varchar(128) NOT NULL default '',      -- related screen, ex: "Demos"
+    fields              text,                                  -- comma-separated list of fields to display, order kept
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id        int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id        int unsigned default 0,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY (add_users_id, screen)
+) DEFAULT CHARSET=utf8mb4;
+
+/*user lists*/
+DROP TABLE IF EXISTS user_lists;
+CREATE TABLE user_lists (
+    id                  int unsigned NOT NULL auto_increment,
+    entity              varchar(128) NOT NULL default '',      -- related screen, ex: "Demos"
+
+    iname               varchar(255) NOT NULL default '',      -- name
+    idesc               text,                                  -- description
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id        int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id        int unsigned default 0,
+
+    PRIMARY KEY (id)
+) DEFAULT CHARSET=utf8mb4;
+
+/*items linked to user lists */
+DROP TABLE IF EXISTS user_lists_items;
+CREATE TABLE user_lists_items (
+    id                  int unsigned NOT NULL auto_increment,
+    user_lists_id       int unsigned NULL,                  -- user_list
+    item_id             int unsigned NULL,                  -- related item id, example demos.id
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id        int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id        int unsigned default 0,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (user_lists_id) REFERENCES user_lists(id),
+    UNIQUE KEY (user_lists_id, item_id)
 ) DEFAULT CHARSET=utf8mb4;

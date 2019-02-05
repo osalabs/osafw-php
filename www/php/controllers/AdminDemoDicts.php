@@ -24,7 +24,7 @@ class AdminDemoDictsController extends FwAdminController {
     }
 
     //override if necessary: IndexAction, ShowAction, ShowFormAction, Validate, DeleteAction, Export, SaveMultiAction
-    //or override just: setListSearch, set_list_rows, getSaveFields
+    //or override just: setListSearch, getListRows, getSaveFields
 
 }//end of class
 
