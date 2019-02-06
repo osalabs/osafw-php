@@ -184,9 +184,17 @@ abstract class FwModel {
     }
 
 
-    public function getMultiList($hsel_ids){
+    /**
+     * return array of hashtables for multilist values with is_checked set for selected values
+     * @param  string|array $hsel_ids array of comma-separated string
+     * @param  object $params   optional, to use - override in your model
+     * @return array           array of hashtables for templates
+     */
+    public function getMultiList($hsel_ids, $params=null){
+        if (!is_array($hsel_ids)) $hsel_ids=FormUtils::ids2multi($hsel_ids);
+
         $rows = $this->ilist();
-        if (is_array($hsel_ids) && count($hsel_ids)){
+        if (count($hsel_ids)){
             foreach ($rows as $k => $row) {
                 $rows[$k]['is_checked'] = array_key_exists($row[$this->field_id], $hsel_ids)!==FALSE;
             }
@@ -196,7 +204,7 @@ abstract class FwModel {
     }
 
     public function getAutocompleteList($q, $limit=5) {
-        $where = $this->db->quote_ident($this->field_iname) & " like " & $this->db->quote('%'.$q.'%');
+        $where = $this->db->quote_ident($this->field_iname)." like ".$this->db->quote('%'.$q.'%');
         if (strlen($this->field_status)) $where .= " and ".$this->db->quote_ident($this->field_status)."<>127 ";
 
         $sql = "select ".$this->db->quote_ident($this->field_iname)." as iname from ".$this->db->quote_ident($this->table_name)." where ".$where." LIMIT $limit";

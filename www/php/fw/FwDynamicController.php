@@ -68,11 +68,19 @@ class FwDynamicController extends FwController {
         $ps = array(
             'id'    => $id,
             'i'     => $item,
+            #added/updated should be filled before dynamic fields
             'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
             'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
+
+        #dynamic fields
+        if ($this->is_dynamic_show) $ps["fields"] = $this->prepareShowFields($item, $ps);
+
+        #optional userlists support
+        $ps["list_view"] = $this->list_view ? $this->model->table_name : $this->list_view;
+        $ps["mylists"] = fw::model('UserLists')->listForItem($ps["list_view"], $id);
 
         return $ps;
     }
@@ -179,6 +187,89 @@ class FwDynamicController extends FwController {
 
         $this->fw->flash("multidelete", $ctr);
         fw::redirect($this->getReturnLocation());
+    }
+
+    ###################### support for autocomlete related items
+    public function AutocompleteAction(){
+        if ($this->model_related) throw new ApplicationException('No model_related defined');
+        $items = $this->model_related->getAutocompleteList(reqs("q"));
+
+        return array('_json' => $items);
+    }
+
+    ###################### HELPERS for dynamic fields
+
+    /**
+     * prepare data for fields repeat in ShowAction based on config.json show_fields parameter
+     * @param  array $item one item
+     * @param  array $ps   for parsepage
+     * @return array       array of hashtables to build fields in templates
+     */
+    public function prepareShowFields($item, $ps){
+        $id = $item['id']+0;
+
+        $fields = $this->config["show_fields"];
+        foreach ($fields as &$def) {
+            $def['i'] = $item;
+            $dtype = $def["type"];
+            $field = $def["field"];
+
+            if ($dtype == "row" || $dtype == "row_end" || $dtype == "col" || $dtype == "col_end"){
+                #structural tags
+                $def["is_structure"] = true;
+
+            }elseif ($dtype == "multi"){
+                #complex field
+                $def["multi_datarow"] = fw::model($def["lookup_model"])->getMultiList($item[$field], $def["lookup_params"]);
+
+            }elseif ($dtype == "att"){
+                $def["att"] = fw::model('Att')->one($item[$field]);
+
+            }elseif ($dtype == "att_links"){
+                $def["att_links"] = fw::model('Att')->getAllLinked($this->model->table_name, $id);
+                logger($def["att_links"]);
+
+            }else{
+                #single values
+                #lookups
+                if (array_key_exists('lookup_table', $def)){
+                    #lookup by table
+                    $lookup_key = $def["lookup_key"];
+                    if (!$lookup_key) $lookup_key = "id";
+
+                    $lookup_field = $def["lookup_field"];
+                    if (!$lookup_field) $lookup_field = "iname";
+
+                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]) );
+                    $def["value"] = $def["lookup_row"][$lookup_field];
+
+                }elseif(array_key_exists('lookup_model', $def)){
+                    #lookup by model
+
+                    $def["lookup_row"] = fw::model($def["lookup_model"])->one($item[$field]);
+
+                    $lookup_field = $def["lookup_field"];
+                    if (!$lookup_field) $lookup_field = "iname";
+
+                    $def["value"] = $def["lookup_row"][$lookup_field];
+
+                }elseif(array_key_exists('lookup_tpl', $def)){
+                    $def["value"] = get_selvalue($def["lookup_tpl"], $item[$field]);
+                }else{
+                    $def["value"] = $item[$field];
+                }
+            }
+
+            #convertors
+            if (array_key_exists('conv', $def)){
+                if ($def["conv"] == "time_from_seconds"){
+                    $def["value"] = DateUtils::int2timestr($def["value"]);
+                }
+            }
+        }
+        unset($def);
+
+        return $fields;
     }
 
 }//end of class
