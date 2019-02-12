@@ -267,6 +267,14 @@ class Utils {
         return $output;
     }
 
+    #simple encrypt/decrypt pwd based on config keys
+    public static function encrypt($value){
+        return Utils::crypt('encrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
+    }
+    public static function decrypt($value){
+        return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
+    }
+
     /**
      * load content from url
      * @param string $url url to get info from

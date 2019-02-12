@@ -37,16 +37,15 @@ class LoginController extends FwController {
             $login  = trim($_REQUEST['item']['login']);
             $pwd    = $_REQUEST['item']['pwdh'];
             if ($_REQUEST["item"]["chpwd"] == "1") $pwd = $_REQUEST['item']['pwd'];
-            $pwd = substr(trim($pwd), 0, 64);
-            $gourl = reqs('gourl');
+            $pwd    = trim($pwd);
+            $gourl  = reqs('gourl');
 
             #for dev only - login as first admin
+            $is_dev_login=false;
             if ($this->fw->config->IS_DEV===TRUE && $login=='' && $pwd=='~'){
                 $dev = $this->db->row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
                 $login = $dev['email'];
-                $pwd = $dev['pwd'];
-            }else{
-                $pwd = $this->model->encryptPwd($pwd);
+                $is_dev_login=true;
             }
 
             if (!strlen($login) || !strlen($pwd) ) {
@@ -54,8 +53,10 @@ class LoginController extends FwController {
                 throw new ApplicationException("");
             }
 
-            $hU = $this->db->row("select * from users where email=".$this->db->quote($login)." and pwd=".$this->db->quote($pwd));
-            if ( !isset($hU['access_level']) || $hU['status']!=0 ) throw new ApplicationException(lng("User Authentication Error"));
+            $hU = $this->db->row("select * from users where email=".$this->db->quote($login));
+            if (!$is_dev_login){
+                if (!$hU || $hU['status']!=0 || !$this->model->checkPwd($pwd, $hU['pwd']) ) throw new ApplicationException(lng("User Authentication Error"));
+            }
 
             $this->model->doLogin( $hU['id'] );
 

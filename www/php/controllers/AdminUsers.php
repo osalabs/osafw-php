@@ -36,11 +36,8 @@ class AdminUsersController extends FwAdminController {
             #$item_old = $this->model->one($id);
 
             $itemdb=$this->getSaveFields($id, $item);
-            if (!strlen($itemdb['pwd'])) {
-                unset($itemdb['pwd']);
-            }else{
-                $itemdb['pwd']=$this->model->encryptPwd($itemdb['pwd']);
-            }
+            $itemdb['pwd']=trim($itemdb['pwd']);
+            if (!strlen($itemdb['pwd'])) unset($itemdb['pwd']);
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 

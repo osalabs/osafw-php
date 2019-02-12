@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS users (
     access_level        int default 0,               /*General user access level, 0 - customer, 100-site admin*/
 
     email               varchar(128) NOT NULL default '',
-    pwd                 varchar(64) NOT NULL default '',
+    pwd                 varchar(255) NOT NULL default '', #hashed password by password_hash()
 
     title               varchar(8) NOT NULL default '',
     fname               varchar(64) NOT NULL default '',

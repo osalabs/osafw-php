@@ -54,7 +54,6 @@ class SignupController extends FwAdminController {
             #$item_old = $this->model->one($id);
 
             $itemdb = FormUtils::filter($item, $this->save_fields);
-            $itemdb['pwd']=$this->model->encryptPwd($itemdb['pwd']);
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
