@@ -10,6 +10,31 @@ class FormUtils {
     return preg_match("/[^@]+\@[^@]+/", $email);
   }
 
+  #validate phones in forms:
+  # (xxx) xxx-xxxx
+  # xxx xxx xx xx
+  # xxx-xxx-xx-xx
+  # xxxxxxxxxx
+  public static function isPhone($phone) {
+    return preg_match("/^\(?\d{3}\)?[\- ]?\d{3}[\- ]?\d{2}[\- ]?\d{2}$/", $phone);
+  }
+
+  #very simple date validation
+  public static function isDate($str) {
+    $result=true;
+    try {
+        $date = new DateTime($str);
+    } catch (Exception $e) {
+        $result=false;
+    }
+    return $result;
+  }
+
+  #very simple float number validation
+  public function isFloat($str){
+    return preg_match("'/^-?[0-9]+(\.[0-9]+)?$/'", $str);
+  }
+
   /**
    * filter posted $form extracting only specific field $names
    * usually used before calling get_sqlupdate_set and get_sqlinsert_set
@@ -43,22 +68,23 @@ class FormUtils {
   #RETURN: by ref itemdb - add fields with default_value or form value
   public static function filterCheckboxes(&$itemdb, $form, $names, $default_value="0"){
       if (is_array($form)){
-        $anames=Utils::qw($names);
-        foreach ($anames as $key => $fld) {
+        $anames=Utils::qh($names, '0'); #$dval will be 0 by default
+        foreach ($anames as $fld => $dval) {
             if (array_key_exists($fld, $form)){
                 $itemdb[$fld] = $form[$fld];
             }else{
-                $itemdb[$fld] = $default_value;
+                $itemdb[$fld] = $default_value==='0' ? $dval : $default_value;
             }
         }
       }
   }
 
   # fore each name in $name - check if value is empty '' and make it null
+  # TODO: remove nullable processing and rely on DB lib instead (as DB knows field types)
   public static function filterNullable(&$itemdb, $names){
     $anames=Utils::qw($names);
     foreach ($anames as $key => $fld) {
-        if (array_key_exists($fld, $itemdb) && $itemdb[$fld]===''){
+        if (array_key_exists($fld, $itemdb) && ($itemdb[$fld]==='' || $itemdb[$fld]=='0')){
             $itemdb[$fld] = null;
         }
     }
@@ -136,6 +162,47 @@ class FormUtils {
         $result .=' selected ';
       }
       $result .=">$text</option>\n";
+    }
+
+    return $result;
+  }
+
+  public static function selectTplOptions($tpl_path, $sel_id, $is_multi=false){
+    $result=array();
+    if (!$sel_id) $sel_id='';
+
+    $lines = file(fw::i()->config->SITE_TEMPLATES.$tpl_path);
+    foreach ($lines as $line){
+      if (strlen($line)<2) continue;
+
+      list($value, $desc) = explode('|', $line, 2);
+      #$desc = preg_replace("/`(.+?)`/", "", $desc);
+      parse_lang($desc); #from ParsePage
+
+      $result[]=array(
+        'id' => $value,
+        'iname' => $desc,
+      );
+    }
+
+    return $result;
+  }
+
+  #return date for combo date selection or null if wrong date
+  #sample:
+  # <select name="item[fdate_combo_day]">
+  # <select name="item[fdate_combo_mon]">
+  # <select name="item[fdate_combo_year]">
+  # $itemdb["fdate_combo"] = FormUtils::dateForCombo($item, "fdate_combo")
+  public function dateForCombo($item, $field_prefix){
+    $result = null;
+    $day = intval($item[$field_prefix."_day"]);
+    $mon = intval($item[$field_prefix."_mon"]);
+    $year = intval($item[$field_prefix."_year"]);
+
+    if ($day > 0 && $mon > 0 && $year > 0) {
+      $result=strtotime("$year-$mon-$day");
+      if ($result===FALSE) $result=null;
     }
 
     return $result;

@@ -123,7 +123,7 @@ class AdminDemosController extends FwAdminController {
         #load old record if necessary
         #$item_old = $this->model->one($id);
 
-        $itemdb['dict_link_auto_id'] = $this->model_related->addOrUpdateByIname( $item['dict_link_auto_id_iname'] );
+        $itemdb['dict_link_auto_id'] = $this->model_related->findOrAddByIname( $item['dict_link_auto_id_iname'] );
         $itemdb['dict_link_multi'] = FormUtils::multi2ids( req('dict_link_multi') );
         $itemdb['fdate_pop']= DateUtils::Str2SQL($itemdb['fdate_pop']);
         #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');

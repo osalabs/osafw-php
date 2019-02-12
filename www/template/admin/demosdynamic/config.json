@@ -27,6 +27,7 @@
     "save_fields_checkboxes": {
         "is_checkbox":"0"
     },
+    "save_fields_nullable": "demo_dicts_id att_id fdate_pop",
 
     "search_fields": "iname idesc",
     "list_sortdef": "iname asc",
@@ -226,7 +227,7 @@
             "label": "Parent (TODO)",
             "lookup_model": "DemoDicts",
             "type": "select",
-            "is_option0": true,
+            "is_option_empty": true,
             "option0_title": "- none -",
             "class_contents": "col-md-3",
             "attrs_control": "data-noautosave=true"

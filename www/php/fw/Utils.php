@@ -20,8 +20,14 @@ class Utils {
 
     //split string by "whitespace characters" and return array
     public static function qw($str) {
+        if (is_array($str)) return $str; #if array passed - don't chagne it
+        $str=trim($str);
         if ($str>""){
-            return preg_split("/\s+/", $str);
+            $arr=preg_split("/\s+/", $str);
+            foreach ($arr as $key => $value) {
+                $arr[$key]=str_replace('&nbsp;', ' ', $value);
+            }
+            return $arr;
         }else{
             return array();
         }
@@ -47,16 +53,26 @@ class Utils {
 
     WARN! replaces all "&nbsp;" to spaces (after convert)
     */
-    public static function qh($str) {
+    public static function qh($str, $default_value=1) {
+        if (is_array($str)) return $str; #if array passed - don't chagne it
         $result=array();
         foreach (static::qw($str) as $value) {
+            #$value=str_replace('&nbsp;', ' ', $value);
             $kv = explode('|', $value, 2);
-            $val = 1;
-            if (count($kv)==2) $val = str_replace('&nbsp;', ' ', $kv[1]);
+            $val = $default_value;
+            if (count($kv)==2) $val = $kv[1];
 
             $result[ $kv[0] ] = $val;
         }
         return $result;
+    }
+
+    public static function qhRevert($sh) {
+        $result=array();
+        foreach ($sh as $key => $value) {
+            $result[]=str_replace(' ', '&nbsp;', $key).'|'.$value;
+        }
+        return implode(' ', $result);
     }
 
     //get string with random chars A-Fa-f0-9

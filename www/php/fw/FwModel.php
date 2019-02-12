@@ -112,7 +112,7 @@ abstract class FwModel {
     #quickly add new record just with iname
     #if such iname exists - just id returned
     #RETURN id - for new or existing record
-    public function addOrUpdateByIname($iname){
+    public function findOrAddByIname($iname, &$is_added=false){
         $result=0;
         $iname=trim($iname);
         if (!strlen($iname)) return 0;
@@ -126,6 +126,7 @@ abstract class FwModel {
                 $this->field_iname => $iname,
             );
             $result = $this->add($item);
+            $is_added=true;
         }
         return $result;
     }

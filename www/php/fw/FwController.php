@@ -50,7 +50,7 @@ abstract class FwController {
     protected $is_dynamic_index     = false;    // true if controller has dynamic IndexAction, then define below:
     protected $view_list_defaults   = '';       // qw list of default columns
     protected $view_list_map        = array();  // list of all available columns fieldname|visiblename
-    protected $view_list_custom     = '';       // qw list of custom-formatted fields for the list_table
+    protected $view_list_custom     = '';       // array or qw list of custom-formatted fields for the list_table
 
     protected $is_dynamic_show      = false;    // true if controller has dynamic ShowAction, requires "show_fields" to be defined in config.json
     protected $is_dynamic_showform  = false;    // true if controller has dynamic ShowFormAction, requires "showform_fields" to be defined in config.json
@@ -76,7 +76,7 @@ abstract class FwController {
 
         $this->config = json_decode(file_get_contents($conf_file), true);
         if (is_null($this->config) || !$this->config) throw new ApplicationException("Controller Config is invalid, check json in templates: $conf_file0");
-        logger("loaded config:", $this->config);
+        #logger("loaded config:", $this->config);
 
         #fill up controller params
         $this->model = fw::model($this->config["model"]);
@@ -92,7 +92,7 @@ abstract class FwController {
 
         #save_fields_checkboxes could be defined as qw string - check and convert
         if (is_array($this->config["save_fields_checkboxes"])){
-            $this->save_fields_checkboxes = Utils::qwRevert($this->config["save_fields_checkboxes"]); #not optimal, but simplest for now
+            $this->save_fields_checkboxes = Utils::qhRevert($this->config["save_fields_checkboxes"]); #not optimal, but simplest for now
         }else{
             $this->save_fields_checkboxes = $this->config["save_fields_checkboxes"];
         }
@@ -120,6 +120,8 @@ abstract class FwController {
             }else{
                 $this->view_list_map = Utils::qh($this->config["view_list_map"]);
             }
+
+            $this->view_list_custom = $this->config["view_list_custom"];
 
             $this->list_sortmap = $this->getViewListSortmap(); #just add all fields from view_list_map
             if (!$this->search_fields) $this->search_fields = $this->getViewListUserFields(); #just search in all visible fields if no specific fields defined
@@ -204,7 +206,7 @@ abstract class FwController {
     /**
      * add to $this->list_where search conditions from $this->list_filter['s'] and based on fields in $this->search_fields
      */
-    public function     setListSearch() {
+    public function setListSearch() {
         #$this->list_where =' 1=1 '; #override initial in child if necessary
 
         $s = trim($this->list_filter['s']);
@@ -233,6 +235,20 @@ abstract class FwController {
         #if related id and field name set - filter on it
         if ($this->related_id>'' && $this->related_field_name){
             $this->list_where .= ' and '.$this->db->quote_ident($this->related_field_name).'='.$this->db->quote($this->related_id);
+        }
+
+        $this->setListSearchAdvanced();
+    }
+
+    /**
+     * set list_where based on search[] filter
+     */
+    public function setListSearchAdvanced(){
+        $hsearch = reqh("search");
+        foreach ($hsearch as $fieldname => $value) {
+            if ($value > '' && (!$this->is_dynamic_index || array_key_exists($fieldname, $this->view_list_map) ) ) {
+                $this->list_where .= " and ".dbq_ident($fieldname)." LIKE ".dbq("%".$value."%");
+            }
         }
     }
 

@@ -742,17 +742,22 @@ function logger(){
  if (fw::$LOG_LEVELS[$logtype] > $log_level ) return; #skip logging if requested level more than config's log level
 
  $arr=debug_backtrace();#0-logger(),1-func called logger,...
- $func = (isset($arr[1]) ? $arr[1] : '');
- $function = isset($func['function']) ? $func['function'] : '';
- $line = $arr[1]['line'];
+
+ $funcfile=$arr[0]['file'];
+ $line = $arr[0]['line'];
+ $function = $arr[0]['function'];
+ if (isset($arr[1])){
+    $function = $arr[1]['function'];
+ }
 
  //remove unnecessary site_root_offline path
- $func['file']=str_replace( strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']) );
+ $funcfile=preg_replace("/^".preg_quote($CONFIG['SITE_ROOT'])."/i", "", $funcfile);
+ #$func['file']=str_replace( strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']) );
 
  $ts=microtime(true);
  $secs=intval($ts);
  $msec=intval(($ts-$secs)*1000);
- $strlog=strftime('%Y-%m-%d %H:%M:%S',$secs).'.'.$msec.' '.$logtype.' '.$func['file'].'::'.$function.'('.$line.') ';
+ $strlog=strftime('%Y-%m-%d %H:%M:%S',$secs).'.'.$msec.' '.$logtype.' '.$funcfile.'::'.$function.'('.$line.') ';
  foreach ($args as $str){
      if (is_scalar($str)){
         $strlog.=$str;
