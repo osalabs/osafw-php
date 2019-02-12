@@ -56,6 +56,11 @@ class FwAdminController extends FwController {
             'related_id'    => $this->related_id,
         );
 
+        #optional userlists support
+        $ps["select_userlists"] = fw::model('UserLists')->listSelectByEntity($this->list_view);
+        $ps["mylists"] = fw::model('UserLists')->listForItem($this->list_view, 0);
+        $ps["list_view"] = $this->list_view;
+
         return $ps;
     }
 
@@ -72,6 +77,10 @@ class FwAdminController extends FwController {
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
+
+        #userlists support
+        $ps["list_view"] = $this->list_view ? $this->list_view : $this->model->table_name;
+        $ps["mylists"] = fw::model('UserLists')->listForItem($ps["list_view"], $id);
 
         return $ps;
     }
@@ -167,16 +176,31 @@ class FwAdminController extends FwController {
         $acb = req('cb');
         if (!is_array($acb)) $acb=array();
         $is_delete = reqs('delete')>'';
+        $user_lists_id  = reqi("addtolist");
+        $remove_user_lists_id = reqi("removefromlist");
+
+        if ($user_lists_id) {
+            $user_lists = fw::model('UserLists')->one($user_lists_id);
+            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) throw New ApplicationException("Wrong Request");
+        }
 
         $ctr=0;
         foreach ($acb as $id => $value) {
             if ($is_delete){
                 $this->model->delete($id);
                 $ctr+=1;
+            }elseif ($user_lists_id){
+                fw::model('UserLists')->addItemList($user_lists_id, $id);
+                $ctr += 1;
+            }elseif ($remove_user_lists_id){
+                fw::model('UserLists')->delItemList($remove_user_lists_id, $id);
+                $ctr += 1;
             }
         }
 
-        $this->fw->flash("multidelete", $ctr);
+        if ($is_delete) $this->fw->flash("multidelete", $ctr);
+        if ($user_lists_id) $this->fw->flash("success", "$ctr records added to the list");
+
         fw::redirect($this->getReturnLocation());
     }
 

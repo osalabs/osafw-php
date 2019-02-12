@@ -261,16 +261,16 @@ class FwDynamicController extends FwController {
                 $this->model->delete($id);
                 $ctr+=1;
             }elseif ($user_lists_id){
-                fw::model('UserLists').addItemList($user_lists_id, $id);
+                fw::model('UserLists')->addItemList($user_lists_id, $id);
                 $ctr += 1;
             }elseif ($remove_user_lists_id){
-                fw::model('UserLists').delItemList($remove_user_lists_id, $id);
+                fw::model('UserLists')->delItemList($remove_user_lists_id, $id);
                 $ctr += 1;
             }
         }
 
-        $this->fw->flash("multidelete", $ctr);
-        if ($user_lists_id) fw.FLASH("success", "$ctr records added to the list");
+        if ($is_delete) $this->fw->flash("multidelete", $ctr);
+        if ($user_lists_id) $this->fw->flash("success", "$ctr records added to the list");
 
         fw::redirect($this->getReturnLocation());
     }

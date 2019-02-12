@@ -7,6 +7,8 @@
 */
 
 class UserLists extends FwModel {
+    #TODO add here your entities or just use list_view in controllers
+    #const ENTITY_DEMOS = "demos";
 
     public $table_items = 'user_lists_items';
 
@@ -18,42 +20,89 @@ class UserLists extends FwModel {
 
     #list for select by entity and for only logged user
     public function listSelectByEntity($entity){
-        # code...
+        return $this->db->arr("select id, iname from $this->table_name where status=0 and entity=".dbq($entity)." and add_users_id=".Utils::me()." order by iname");
     }
 
     public function listForItem($entity, $item_id){
-        # code...
+        return $this->db->arr("select t.id, t.iname, ".dbqi($item_id)." as item_id, ti.id as is_checked from $this->table_name t
+                        LEFT OUTER JOIN $this->table_items ti ON (ti.user_lists_id=t.id and ti.item_id=".dbqi($item_id)." )
+                        where t.status=0 and t.entity=".dbq($entity)."
+                        and t.add_users_id=".Utils::me()."
+                        order by t.iname");
     }
 
     public function delete($id, $is_perm = false){
-        # code...
+        if ($is_perm){
+            #delete list items first
+            $this->db->delete($this->table_items, $id, $user_lists_id);
+        }
+
+        return parent::delete($id, $is_perm);
     }
 
     public function oneItemsByUK($user_lists_id, $item_id){
-        # code...
+        return $this->db->row($this->table_items, array("user_lists_id" => $user_lists_id, "item_id" => $item_id));
     }
 
     public function deleteItems($id){
-        # code...
+        $this->db->delete($this->table_items, $id);
+        $this->fw->model('FwEvents')->log($this->table_items.'_del', $id);
     }
 
+    #add new record and return new record id
     public function addItems($user_lists_id, $item_id){
-        # code...
+        $item=array(
+            "user_lists_id" => $user_lists_id,
+            "item_id"   => $item_id,
+            "add_users_id"  => Utils::me()
+        );
+        $id = $this->db->insert($this->table_items, $item);
+        $this->fw->model('FwEvents')->log($this->table_items.'_add', $id);
+        return $id;
     }
 
+    #add or remove item from the list
     public function toggleItemList($user_lists_id, $item_id){
-        # code...
+        $result = false;
+        $litem = $this->oneItemsByUK($user_lists_id, $item_id);
+        if ($litem){
+            #remove
+            $this->deleteItems($litem["id"]);
+        }else{
+            #add new
+            $this->addItems($user_lists_id, $item_id);
+            $result = true;
+        }
+
+        return $result;
     }
 
+    #add item to the list, if item not yet in the list
     public function addItemList($user_lists_id, $item_id){
-        # code...
+        $result = false;
+        $litem = $this->oneItemsByUK($user_lists_id, $item_id);
+        if ($litem){
+            #do nothing
+        }else{
+            #add new
+            $this->addItems($user_lists_id, $item_id);
+            $result = true;
+        }
+
+        return $result;
     }
 
     public function delItemList($user_lists_id, $item_id){
-        # code...
+        $result = false;
+        $litem = $this->oneItemsByUK($user_lists_id, $item_id);
+        if ($litem){
+            $this->deleteItems($litem["id"]);
+            $result = true;
+        }
+
+        return $result;
     }
 
-    #TODO finish class
 }
 
 ?>

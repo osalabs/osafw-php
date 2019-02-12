@@ -46,28 +46,22 @@ class AdminDemosController extends FwAdminController {
 
     //View item screen
     public function ShowAction($form_id) {
-        $id = $form_id+0;
-        $item = $this->model->one($id);
-        if (!$item) throw new ApplicationException("Not Found", 404);
+        $ps = parent::ShowAction($form_id);
+        $item = $ps['i'];
+        $id = $item['id']+0;
 
         $item["ftime_str"] = DateUtils::int2timestr( $item["ftime"] );
         $dict_link_multi = FormUtils::ids2multi($item['dict_link_multi']);
 
-        $ps = array(
-            'id'    => $id,
-            'i'     => $item,
-            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
-            'return_url'        => $this->return_url,
-            'related_id'        => $this->related_id,
-
+        $ps = array_merge($ps, array(
+            'i'                 => $item,
             'parent'            => $this->model->one( $item['parent_id'] ),
             'demo_dicts'        => $this->model_related->one( $item['demo_dicts_id'] ),
             'dict_link_auto'    => $this->model_related->one( $item['dict_link_auto_id'] ),
             'multi_datarow'     => $this->model_related->getMultiList( $dict_link_multi ),
             'att'               => fw::model('Att')->one($item['att_id']+0),
             'att_links'         => fw::model('Att')->getAttLinks($this->model->table_name, $id),
-        );
+        ));
 
         return $ps;
     }

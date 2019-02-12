@@ -232,6 +232,10 @@ abstract class FwController {
             $this->list_where .= ' and ('.implode(' or ', $afields).')';
         }
 
+        if ($this->list_filter["userlist"]){
+            $this->list_where .= " and id IN (select ti.item_id from ".$this->fw->model('UserLists')->table_items." ti where ti.user_lists_id=".dbqi($this->list_filter["userlist"])." and ti.add_users_id=".Utils::me()." ) ";
+        }
+
         #if related id and field name set - filter on it
         if ($this->related_id>'' && $this->related_field_name){
             $this->list_where .= ' and '.$this->db->quote_ident($this->related_field_name).'='.$this->db->quote($this->related_id);
