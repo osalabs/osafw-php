@@ -116,7 +116,7 @@ $FW_CONFIG = array(
                                 '/AdminAtt/Select' => 0,
                                 ),
 
-    #multilanguage support settings    
+    #multilanguage support settings
     'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
     'LANG'                  => 'en',        #to be updated according to user session
     'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
@@ -124,6 +124,7 @@ $FW_CONFIG = array(
     'SITE_VERSION'          => '0.18.0127', #also used to re-load css/js to avoid browser cacheing
     'CRYPT_KEY'             => '', #define in site/dev specific config
     'CRYPT_V'               => '', #define in site/dev specific config
+    'PDF_CONVERTER'         => '"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"', #(optional) path to html to pdf converter for reports, if empty - try to use Dompdf
 
     ########### place site specific configuration variables here:
     'SITE_VAR'              => false,

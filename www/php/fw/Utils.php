@@ -142,7 +142,7 @@ class Utils {
             $str = $row[$fld];
             if ( preg_match('/[",]/', $str) ){
                 //quote string
-                $str='"'.str_replace('"','""',n2br($str)).'"';
+                $str='"'.str_replace('"','""',nl2br($str)).'"';
             }
             $result.=(($result)?",":"").$str;
         }
@@ -236,6 +236,15 @@ class Utils {
         $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
 
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+
+    /**
+     * return path to tmp filename WITHOUT extension
+     * @param  string $prefix optional, default 'osafw_'
+     * @return string         path
+     */
+    public static function getTmpFilename($prefix='osafw_'){
+        return sys_get_temp_dir().DIRECTORY_SEPARATOR.$prefix.self::uuid();
     }
 
     /**
