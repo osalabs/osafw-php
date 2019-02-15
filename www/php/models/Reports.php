@@ -208,7 +208,7 @@ class Reports extends FwModel {
             $total_ctr += $row[$ctr_field];
         }
         if ($total_ctr>0){
-            foreach ($rows as $row) {
+            foreach ($rows as &$row) {
                 $row[$perc_field] += $row[$ctr_field] / $total_ctr * 100;
             }
             unset($row);

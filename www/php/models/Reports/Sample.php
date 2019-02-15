@@ -43,7 +43,7 @@ class ReportSample extends Reports {
 
         #perform calculations and add additional info for each result row
 /*
-        foreach ($ps['rows'] as $row) {
+        foreach ($ps['rows'] as &$row) {
             $row['event'] = $evmodel->one($row['events_id']);
         }
         unset($row);

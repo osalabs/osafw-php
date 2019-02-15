@@ -2,7 +2,8 @@
 /*
  Fw Cache class
  Application-level cache
- Caches only for current request lifetine in memory
+ Caches only for current request lifetime in memory
+ TODO - long-term cache
 
  You may overload it with somehitng more specific.
  For example, good caching class - http://www.phpfastcache.com/

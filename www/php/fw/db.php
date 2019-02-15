@@ -888,6 +888,73 @@ class DB {
     }
 
     /**
+     * return list of tables in db
+     * @return array plain array of table names
+     */
+    public function tables(){
+        return $this->col("show tables");
+    }
+
+    public function table_schema($table_name){
+        $rows = $this->arr("SELECT
+             c.column_name as `name`,
+             c.data_type as `type`,
+             CASE c.is_nullable WHEN 'YES' THEN 1 ELSE 0 END AS `is_nullable`,
+             c.column_default as `default`,
+             c.character_maximum_length as `maxlen`,
+             c.numeric_precision as numeric_precision,
+             c.numeric_scale as numeric_scale,
+             c.character_set_name as `charset`,
+             c.collation_name as `collation`,
+             c.ORDINAL_POSITION as `pos`,
+             CASE c.EXTRA WHEN 'auto_increment' THEN 1 ELSE 0 END as is_identity
+            from information_schema.COLUMNS c
+            where c.TABLE_SCHEMA=".dbq($table_name)."
+              and c.TABLE_NAME=".dbq($this->config['DBNAME'])."
+            ");
+        foreach ($rows as $key => &$row) {
+            $row["internal_type"] = $this->map_sqltype2internal($row["type"]);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function map_sqltype2internal($type){
+        switch (strtolower($type)) {
+            #TODO - unsupported: image, varbinary
+            case "tinyint":
+            case "smallint":
+            case "int":
+            case "bigint":
+            case "bit":
+                $result = "int";
+                break;
+
+            case "real":
+            case "numeric":
+            case "decimal":
+            case "money":
+            case "smallmoney":
+            case "float":
+                $result = "float";
+                break;
+
+            case "datetime":
+            case "datetime2":
+            case "date":
+            case "smalldatetime":
+                $result = "datetime";
+                break;
+
+            default: #"text", "ntext", "varchar", "nvarchar", "char", "nchar"
+                $result = "varchar";
+                break;
+        }
+        return $result;
+    }
+
+    /**
      * [logger description]
      * @param  str $log_type 'ERROR'|'DEBUG'|'INFO'
      * @param  str $value    value to log

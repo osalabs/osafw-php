@@ -284,6 +284,13 @@ class Utils {
         return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
 
+    public static function jsonEncode($data){
+        return json_encode($data);
+    }
+    public static function jsonDecode($str){
+        return json_decode($str, true);
+    }
+
     /**
      * load content from url
      * @param string $url url to get info from
