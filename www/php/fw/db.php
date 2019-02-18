@@ -909,8 +909,8 @@ class DB {
              c.ORDINAL_POSITION as `pos`,
              CASE c.EXTRA WHEN 'auto_increment' THEN 1 ELSE 0 END as is_identity
             from information_schema.COLUMNS c
-            where c.TABLE_SCHEMA=".dbq($table_name)."
-              and c.TABLE_NAME=".dbq($this->config['DBNAME'])."
+            where c.TABLE_SCHEMA=".dbq($this->config['DBNAME'])."
+              and c.TABLE_NAME=".dbq($table_name)."
             ");
         foreach ($rows as $key => &$row) {
             $row["internal_type"] = $this->map_sqltype2internal($row["type"]);

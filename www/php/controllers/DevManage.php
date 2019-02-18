@@ -74,14 +74,13 @@ class DevManageController extends FwController {
 
         #copy DemoDicts.vb to model_name.vb
         $path = $this->fw->config->SITE_ROOT."/php/models";
-        $mdemo = file_get_contents($path."/DemoDicts.php");
-        if (!$mdemo) throw new ApplicationException("Can't open DemoDicts.php");
 
         #replace: DemoDicts => ModelName, demo_dicts => table_name
-        $mdemo = str_replace("DemoDicts", $model_name, $mdemo);
-        $mdemo = str_replace("demo_dicts", $table_name, $mdemo);
-
-        file_put_contents($path.'/'.$model_name.".php", $mdemo);
+        $replacements=array(
+            "DemoDicts" => $model_name,
+            "demo_dicts" => $table_name,
+        );
+        if (!$this->_replaceInFile($path."/DemoDicts.php", $replacements, $path.'/'.$model_name.'.php')) throw new ApplicationException("Can't open DemoDicts.php");
 
         $this->fw->flash("success", $model_name.".php model created");
         fw::redirect($this->base_url);
@@ -95,25 +94,24 @@ class DevManageController extends FwController {
         $controller_title = Trim($item["controller_title"]);
 
         if (!$model_name || !$controller_url || !$controller_title) throw new ApplicationException("No model or no controller name or no title");
-        if (in_array($controller_name,$this->_controllers)) throw new ApplicationException("Such controller already exists");
+        if (in_array($controller_name,$this->_controllers())) throw new ApplicationException("Such controller already exists");
 
         #copy DemoDicts.php to $model_name.php
         $path = $this->fw->config->SITE_ROOT."/php/controllers";
-        $mdemo = file_get_contents($path."/AdminDemosDynamic.php");
-        if (!$mdemo) throw new ApplicationException("Can't open AdminDemosDynamic.php");
 
         #replace: DemoDicts => ModelName, demo_dicts => table_name
-        $mdemo = $mdemo.Replace("AdminDemosDynamic", $controller_name);
-        $mdemo = $mdemo.Replace("/Admin/DemosDynamic", $controller_url);
-        $mdemo = $mdemo.Replace("DemoDicts", $model_name);
-        $mdemo = $mdemo.Replace("Demos", $model_name);
-
-        file_put_contents($path."/".$controller_name.".php", $mdemo);
+        $replacements=array(
+            "AdminDemosDynamic" => $controller_name,
+            "/Admin/DemosDynamic" => $controller_url,
+            "DemoDicts" => $model_name,
+            "Demos" => $model_name,
+        );
+        if (!$this->_replaceInFile($path."/AdminDemosDynamic.php", $replacements, $path."/".$controller_name.".php", $mdemo)) throw new ApplicationException("Can't open AdminDemosDynamic.php");
 
         #copy templates from /admin/demosdynamic to /controller/url
         $tpl_from = $this->fw->config->SITE_TEMPLATES."/admin/demosdynamic";
         $tpl_to = $this->fw->config->SITE_TEMPLATES.strtolower($controller_url);
-        $this->_CopyDirectory($tpl_from, $tpl_to);
+        $this->_copyDirectory($tpl_from, $tpl_to);
 
         #replace in templates: DemoDynamic to Title
         #replace in url.html /Admin/DemosDynamic to $controller_url
@@ -121,7 +119,7 @@ class DevManageController extends FwController {
             "/Admin/DemosDynamic"   =>   $controller_url,
             "DemoDynamic"           =>   $controller_title,
         );
-        $this->replaceInFiles($tpl_to, $replacements);
+        $this->_replaceInFiles($tpl_to, $replacements);
 
         #update config.json:
         # save_fields - all fields from model table (except id and sytem add_time/user fields)
@@ -137,10 +135,11 @@ class DevManageController extends FwController {
         $config_file = $tpl_to."/config.json";
         $config = Utils::jsonDecode(file_get_contents($config_file));
         if (!$config) $config=array();
+        logger("LOADED:", $config);
 
         $model = fw::model($model_name);
-        $this->db->connect();
         $fields = $this->db->table_schema($model->table_name);
+        logger("DB $fields", $fields);
         $hfields = array();
         $sys_fields = Utils::qh("add_time add_users_id upd_time upd_users_id");
 
@@ -149,6 +148,7 @@ class DevManageController extends FwController {
         $showFields = array();
         $showFormFields = array();
         foreach ($fields as &$fld) {
+            #logger("check field=", $fld["name"]);
             $hfields[$fld["name"]] = $fld;
             $hFieldsMap[$fld["name"]] = $fld["name"];
 
@@ -166,7 +166,7 @@ class DevManageController extends FwController {
 
             if ($fld["maxlen"]>0) $sff["maxlength"] = intval($fld["maxlen"]);
             if ($fld["internal_type"] == "varchar") {
-                if ($fld["maxlen"]==-1) { #large text
+                if ($fld["maxlen"]==-1 || $fld["type"]=='text') { #large text
                     $sf["type"] = "markdown";
                     $sff["type"] = "textarea";
                     $sff["rows"] = 5;
@@ -286,15 +286,17 @@ class DevManageController extends FwController {
             $saveFields[]=$fld["name"];
         }
         unset($fld);
+        logger('$hfields:', $hfields);
 
+        $config["model"] = $model_name;
         $config["save_fields"] = $saveFields; #save all non-system
         $config["save_fields_checkboxes"] = "";
+        $config["save_fields_nullable"] = $saveFieldsNullable;
         $config["search_fields"] = "id".(array_key_exists('iname', $hfields) ? ' iname' : ''); #id iname
         $config["list_sortdef"] = (array_key_exists('iname', $hfields) ? 'iname asc' : 'id desc'); #either sort by iname or id
         unset($config["list_sortmap"]); #N/A in dynamic controller
         unset($config["required_fields"]); #not necessary in dynamic controller as controlled by showform_fields required attribute
         $config["related_field_name"] = ""; #TODO?
-        $config["is_dynamic"] = true;
         $config["list_view"] = $model->table_name;
         $config["view_list_defaults"] = "id".(array_key_exists('iname', $hfields) ? ' iname' : '').(array_key_exists('add_time', $hfields) ? ' add_time' : '').(array_key_exists('status', $hfields) ? ' status' : '');
         $config["view_list_map"] = $hFieldsMap; #fields to names
@@ -306,6 +308,7 @@ class DevManageController extends FwController {
         foreach (array_keys($config) as $key) {
             if (substr($key, 0, 1)=='#') unset($config[$key]);
         }
+        logger("BEFORE SAVE:", $config);
 
         #Utils.jsonEncode(config) - can't use as it produces unformatted json string
         $config_str = json_encode($config, JSON_PRETTY_PRINT);
@@ -339,6 +342,73 @@ class DevManageController extends FwController {
         foreach ($files as $value) {
             if (!preg_match('/^(.+)\.php$/', $value, $m)) continue;
             $result[]=$m[1];
+        }
+        return $result;
+    }
+
+    #replaces strings in all files under defined dir
+    #RECURSIVE!
+    private function _replaceInFiles($dir, $strings){
+        $subdirs=array();
+        foreach (scandir($dir) as $filename) {
+            if (preg_match('/^\.\.?$/', $filename, $m)) continue;
+            if (is_dir($dir.'/'.$filename)) {
+                $subdirs[]=$filename;
+            }else{
+                $this->_replaceInFile($dir.'/'.$filename, $strings);
+            }
+        }
+
+        #dive into dirs
+        foreach ($subdirs as $foldername) {
+            $this->_replaceInFiles($dir.'/'.$foldername, $strings);
+        }
+    }
+
+    private function _replaceInFile($filepath, $strings, $saveas=''){
+        #logger("REPLACE: $filepath => $saveas");
+        $content = file_get_contents($filepath);
+        if ($content===FALSE || !strlen($content)) return FALSE;
+
+        $content = $this->_replaceStrings($content, $strings);
+
+        if ($saveas) $filepath=$saveas;
+        file_put_contents($filepath, $content);
+
+        return TRUE;
+    }
+
+    private function _replaceStrings($content, $strings){
+        foreach ($strings as $str => $value) {
+            $content = str_replace($str,$value,$content);
+        }
+        return $content;
+    }
+
+    #copy all directory content to other path
+    #RECURSIVE
+    private function _copyDirectory($src,$dst){
+        #logger("COPY DIR $src => $dst");
+        $dir = opendir($src);
+        @mkdir($dst);
+        while(false !== ( $file=readdir($dir)) ) {
+            if (( $file!='.' ) && ( $file!='..' )) {
+                if ( is_dir($src.'/'.$file) ) {
+                    $this->_copyDirectory($src.'/'.$file,$dst.'/'.$file);
+                }else{
+                    copy($src.'/'.$file,$dst.'/'.$file);
+                }
+            }
+        }
+        closedir($dir);
+    }
+
+    #'demo_dicts => DemoDicts
+    private function _tablename2model($table_name){
+        $result = '';
+        $pieces = explode('_', $table_name);
+        foreach ($pieces as $value) {
+            $result .= ucfirst($value);
         }
         return $result;
     }

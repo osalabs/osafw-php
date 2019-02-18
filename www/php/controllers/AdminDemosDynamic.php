@@ -1,6 +1,6 @@
 <?php
 /*
- DemosDynamic Admin Controller class
+ AdminDemosDynamic Controller class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
  (c) 2009-2019 Oleg Savchuk www.osalabs.com
