@@ -13,28 +13,28 @@ class MainController extends FwController {
         $one["title"] = "Pages";
         $one["url"] = "/Admin/Spages";
         $one["value"] = $this->fw->model('Spages')->getCount();
-        $panes['pages'] = $one;
+        $panes['plate1'] = $one;
 
         $one = array();
         $one["type"] = "bignum";
         $one["title"] = "Uploads";
         $one["url"] = "/Admin/Att";
         $one["value"] = $this->fw->model('Att')->getCount();
-        $panes['uploads'] = $one;
+        $panes['plate2'] = $one;
 
         $one = array();
         $one["type"] = "bignum";
         $one["title"] = "Users";
         $one["url"] = "/Admin/Users";
         $one["value"] = $this->fw->model('Users')->getCount();
-        $panes['users'] = $one;
+        $panes['plate3'] = $one;
 
         $one = array();
         $one["type"] = "bignum";
         $one["title"] = "Demo items";
         $one["url"] = "/Admin/DemosDynamic";
         $one["value"] = $this->fw->model('Demos')->getCount();
-        $panes['demos'] = $one;
+        $panes['plate4'] = $one;
 
         $one = array();
         $one["type"] = "barchart";
@@ -47,7 +47,7 @@ class MainController extends FwController {
             group by CAST(el.add_time as date), CONCAT(MONTH(el.add_time),'/',DAY(el.add_time))
             order by CAST(el.add_time as date) desc
             LIMIT 14");
-        $panes['logins'] = $one;
+        $panes['barchart'] = $one;
 
         $one = array();
         $one["type"] = "piechart";
@@ -58,7 +58,7 @@ class MainController extends FwController {
         foreach ($one["rows"] as $key => $row) {
             $one["rows"][$key]['ilabel'] = get_selvalue('/common/sel/access_level.sel', $row['access_level']);
         }
-        $panes['usertypes'] = $one;
+        $panes['piechart'] = $one;
 
         $one = array();
         $one["type"] = "table";
@@ -85,7 +85,7 @@ class MainController extends FwController {
                 $one["rows"][$key]['cols'] = $cols;
             }
         }
-        $panes['lastevents'] = $one;
+        $panes['tabledata'] = $one;
 
         $one = array();
         $one["type"] = "linechart";
@@ -98,7 +98,7 @@ class MainController extends FwController {
             group by CAST(el.add_time as date), CONCAT(MONTH(el.add_time),'/',DAY(el.add_time))
             order by CAST(el.add_time as date) desc
             LIMIT 14");
-        $panes['eventsctr'] = $one;
+        $panes['linechart'] = $one;
 
         $ps['panes'] = $panes;
         return $ps;
