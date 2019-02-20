@@ -453,7 +453,7 @@ class FwDynamicController extends FwController {
                     if (array_key_exists('lookup_field', $def)){
                         #lookup value
                         $def["lookup_row"] = fw::model($def["lookup_model"])->one($item[$field]);
-                        $def["value"] = $def["lookup_row"][$lookup_field];
+                        $def["value"] = $def["lookup_row"][$def["lookup_field"]];
                     }else{
                         #lookup select
                         $def["select_options"] = fw::model($def["lookup_model"])->listSelectOptions($def['lookup_params']);
