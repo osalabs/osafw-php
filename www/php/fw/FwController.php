@@ -221,9 +221,9 @@ abstract class FwController {
                 foreach ($afieldsand as $key2 => $fand) {
                     if (preg_match("/^\!/", $fand)){
                         $fand=preg_replace("/^\!/", "", $fand);
-                        $afieldsand[$key2]= $fand." = ".$exact_quoted;
+                        $afieldsand[$key2]= $this->db->quote_ident($fand)." = ".$exact_quoted;
                     }else{
-                        $afieldsand[$key2]= $fand." LIKE ".$like_quoted;
+                        $afieldsand[$key2]= $this->db->quote_ident($fand)." LIKE ".$like_quoted;
                     }
                 }
                 $afields[$key] = implode(' and ', $afieldsand);
