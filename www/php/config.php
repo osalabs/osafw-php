@@ -11,17 +11,19 @@ $conf_server_name='site';
 
 ########### detect test/development servers and load appropriate config
 #!!! add server configs here:
-$DEV_SERVERS=array(
-  #format - [0]filepath to check for existence (must be unique and not in SVN), [1]-config name to load
-  array('/var',         'site'),  #prod
-  array('c:/docs_proj', 'develop'),
-  array('d:/myfile.my', 'my'),
+$CFG_SERVERS=array(
+  #format - [0]domain to check, [1]-config name to load
+  'domain.com'          => 'site',   #production server
+  'staging.domain.com'  => 'staging', #staging server (sample)
+  'localhost'           => 'develop', #first developer
 );
 
 #detect
-foreach($DEV_SERVERS as $k => $arr){
- if ( @file_exists($arr[0]) ){
-    $conf_server_name=$arr[1];
+$root_domain0=preg_replace('/:\d+$/','',$_SERVER['HTTP_HOST']);
+
+foreach($CFG_SERVERS as $k => $conf){
+ if ( $root_domain0==$k ){
+    $conf_server_name=$conf;
     break;
  }
 }
@@ -31,9 +33,8 @@ foreach($DEV_SERVERS as $k => $arr){
    $site_root_offline = preg_replace("![\\\/]\w+$!i", "", $site_root);
 
    #!note, these will be empty if script run from command line
-   $proto = preg_match("/https/i", $_SERVER["SERVER_PROTOCOL"]) ? 'https' : 'http';
+   $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 ? 'https' : 'http';
 
-   $root_domain0=preg_replace('/:\d+$/','',$_SERVER['HTTP_HOST']);
    $root_domain=$proto."://".$_SERVER['HTTP_HOST'];
    $root_url="";
 
@@ -59,7 +60,7 @@ $FW_CONFIG = array(
                 'PWD'           => '', #SMTP auth pwd
                 ),
 
-    #db connection settings
+    #db connection settings  - REQUIRED
     'DB'    => array(
                 'DBNAME'    => '',      #database name
                 'USER'      => '',      #db user name
@@ -86,9 +87,13 @@ $FW_CONFIG = array(
     'ASSETS_URL'            => $root_url.'/assets',
 
     #page layout templates - relative to SITE_TEMPLATES dir
-    'PAGE_LAYOUT'              => '/layout.html',       #default layout for all pages
+    'PAGE_LAYOUT'              => '/layout_fluid.html',       #default layout for all pages
+    'PAGE_LAYOUT_PUBLIC'       => '/layout.html',       #default layout for pub pages
+    'PAGE_LAYOUT_STD'          => '/layout.html',
+    'PAGE_LAYOUT_FLUID'        => '/layout_fluid.html',
     'PAGE_LAYOUT_PJAX'         => '/layout_pjax.html',
-    'PAGE_LAYOUT_ADMIN'        => '/layout_tpl.html',
+    'PAGE_LAYOUT_MIN'          => '/layout_min.html',
+    'PAGE_LAYOUT_PRINT'        => '/layout_print.html',
 
     'MAX_PAGE_ITEMS'        => 25,
 
@@ -113,9 +118,13 @@ $FW_CONFIG = array(
 
     #multilanguage support settings
     'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
+    'LANG'                  => 'en',        #to be updated according to user session
     'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
 
     'SITE_VERSION'          => '0.18.0127', #also used to re-load css/js to avoid browser cacheing
+    'CRYPT_KEY'             => '', #define in site/dev specific config
+    'CRYPT_V'               => '', #define in site/dev specific config
+    'PDF_CONVERTER'         => '"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"', #(optional) path to html to pdf converter for reports, if empty - try to use Dompdf
 
     ########### place site specific configuration variables here:
     'SITE_VAR'              => false,

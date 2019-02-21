@@ -5,6 +5,14 @@ class PasswordController extends FwController {
     public $base_url = '/Password';
     public $model_name = 'Users';
 
+    public function __construct() {
+        parent::__construct();
+
+        #override layout
+        $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
+        throw new ApplicationException('Access Denied - TODO');
+    }
+
     public function IndexAction() {
         if ($this->fw->isGetRequest()){
             #defaults
@@ -29,7 +37,7 @@ class PasswordController extends FwController {
             $this->Validate($id, $item);
             $user = $this->model->oneByEmail($item['login']);
 
-            $this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
+            #$this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
 
             fw::redirect($this->base_url.'/(Sent)');
 

@@ -63,10 +63,25 @@ class Spages extends FwModel {
             if ($item["head_att_id"] > ''){
                 $item["head_att_id_url"] = $this->fw->model('Att')->getUrlDirect($item["head_att_id"]);
             }
+        }
 
-            #page[top_url] used in templates navigation
-            if (count($url_parts)>=2){
-                $item["top_url"] = strtolower($url_parts[1]);
+        #page[top_url] used in templates navigation
+        if (count($url_parts)>=2){
+            $item["top_url"] = strtolower($url_parts[1]);
+        }
+
+        #columns
+        if ($item["idesc_left"] > ""){
+            if ($item["idesc_right"] > ""){
+                $item["is_col3"] = true;
+            }else{
+                $item["is_col2_left"] = true;
+            }
+        }else{
+            if ($item["idesc_right"] > ""){
+                $item["is_col2_right"] = true;
+            }else{
+                $item["is_col1"] = true;
             }
         }
 

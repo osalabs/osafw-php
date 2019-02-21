@@ -1,16 +1,86 @@
 -- (c) 2004-2013 oSa
 -- FOR MySQL >4.x
 
--- CREATE DATABASE xxx;
+-- CREATE DATABASE xxx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- USE xxx;
 
-SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='';
+
+/* upload categories */
+-- DROP TABLE IF EXISTS att_categories;
+CREATE TABLE IF NOT EXISTS att_categories (
+    id                  int unsigned NOT NULL auto_increment,
+
+    icode               varchar(64) NOT NULL DEFAULT '', /*to use from code*/
+    iname               varchar(64) NOT NULL DEFAULT '',
+    idesc               text,
+    prio                int NOT NULL DEFAULT 0,     /* 0 is normal and lowest priority*/
+
+    status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id         int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id         int unsigned default 0,
+    PRIMARY KEY  (id)
+) DEFAULT CHARSET=utf8mb4;
+INSERT INTO att_categories (icode, iname) VALUES
+('general', 'General images')
+,('users', 'Member photos')
+,('files', 'Files')
+,('spage_banner', 'Page banners')
+;
+
+-- DROP TABLE IF EXISTS att;
+CREATE TABLE IF NOT EXISTS att (
+    id                  int unsigned NOT NULL auto_increment, /* files stored on disk under 0/0/0/id.dat */
+    att_categories_id   int unsigned NULL,
+
+    table_name          varchar(128) NOT NULL DEFAULT '',
+    item_id             int NOT NULL DEFAULT 0,
+
+    is_inline           tinyint DEFAULT 0, /* if uploaded with wysiwyg */
+    is_image            tinyint DEFAULT 0, /* 1 if this is supported image */
+
+    fname               varchar(255) NOT NULL DEFAULT '',              /*original file name*/
+    fsize               int DEFAULT 0,                   /*file size*/
+    ext                 varchar(16) NOT NULL DEFAULT '',                 /*extension*/
+    iname               varchar(255) NOT NULL DEFAULT '',   /*attachment name*/
+
+    status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id         int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id         int unsigned default 0,
+    PRIMARY KEY (id),
+    FOREIGN KEY (att_categories_id) REFERENCES att_categories(id)
+) DEFAULT CHARSET=utf8mb4;
+CREATE INDEX att_table_name ON att (table_name, item_id);
+
+/* link att files to table items*/
+-- DROP TABLE IF EXISTS att_table_link;
+CREATE TABLE IF NOT EXISTS att_table_link (
+    id                  int unsigned NOT NULL auto_increment,
+    att_id              int unsigned NOT NULL,
+
+    table_name          varchar(128) NOT NULL DEFAULT '',
+    item_id             int NOT NULL,
+
+    status              tinyint default 0,    /*0-ok, 1-under update*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id         int unsigned default 0,
+    PRIMARY KEY (id),
+    FOREIGN KEY (att_id) REFERENCES att(id)
+) DEFAULT CHARSET=utf8mb4;
+CREATE UNIQUE INDEX att_table_link_UX ON att_table_link (table_name, item_id, att_id);
+
+
 -- DROP TABLE IF EXISTS users;
 CREATE TABLE IF NOT EXISTS users (
     id                  int unsigned NOT NULL auto_increment,
     access_level        int default 0,               /*General user access level, 0 - customer, 100-site admin*/
 
     email               varchar(128) NOT NULL default '',
-    pwd                 varchar(64) NOT NULL default '',
+    pwd                 varchar(255) NOT NULL default '', #hashed password by password_hash()
 
     title               varchar(8) NOT NULL default '',
     fname               varchar(64) NOT NULL default '',
@@ -29,7 +99,7 @@ CREATE TABLE IF NOT EXISTS users (
 
     notes               text,
     phone               varchar(16) NOT NULL default '',
-    att_id              int unsigned NOT NULL,  /*avatar*/
+    att_id              int unsigned NULL,  /*avatar*/
 
     login_time          datetime,               /*Last login time */
     login_ip            char(15),                /*last remote ip*/
@@ -41,8 +111,9 @@ CREATE TABLE IF NOT EXISTS users (
     upd_time            timestamp,
     upd_users_id         int unsigned default 0,
 
-    PRIMARY KEY (id)
-) DEFAULT CHARSET=utf8;
+    PRIMARY KEY (id),
+    FOREIGN KEY (att_id) REFERENCES att(id)
+) DEFAULT CHARSET=utf8mb4;
 insert into users (access_level, email, pwd, fname, lname, add_time)
 VALUES (100, 'admin@admin.com', UUID(), 'Website', 'Admin', now());
 
@@ -55,7 +126,7 @@ CREATE TABLE IF NOT EXISTS user_cookie (
     add_time            timestamp DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (cookie_id),
     KEY user_cookie_ind1 (users_id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 
 
 /*Site Settings - special table for misc site settings*/
@@ -82,75 +153,9 @@ CREATE TABLE IF NOT EXISTS settings (
     PRIMARY KEY  (id),
     UNIQUE KEY (icode),
     KEY (icat)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO settings (is_user_edit, input, icat, icode, ivalue, iname, idesc) VALUES
 (1, 10, '', 'test', 'novalue', 'test settings', 'description');
-
-/* upload categories */
--- DROP TABLE IF EXISTS att_categories;
-CREATE TABLE IF NOT EXISTS att_categories (
-    id                  int unsigned NOT NULL auto_increment,
-
-    icode               varchar(64) NOT NULL DEFAULT '', /*to use from code*/
-    iname               varchar(64) NOT NULL DEFAULT '',
-    idesc               text,
-    prio                int NOT NULL DEFAULT 0,     /* 0 is normal and lowest priority*/
-
-    status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
-    add_time            timestamp default CURRENT_TIMESTAMP,
-    add_users_id         int unsigned default 0,
-    upd_time            timestamp,
-    upd_users_id         int unsigned default 0,
-    PRIMARY KEY  (id)
-) DEFAULT CHARSET=utf8;
-INSERT INTO att_categories (icode, iname) VALUES
-('general', 'General images')
-,('users', 'Member photos')
-,('files', 'Files')
-;
-
--- DROP TABLE IF EXISTS att;
-CREATE TABLE IF NOT EXISTS att (
-    id                  int unsigned NOT NULL auto_increment, /* files stored on disk under 0/0/0/id.dat */
-    att_categories_id   int unsigned NULL,
-
-    table_name          varchar(128) NOT NULL DEFAULT '',
-    item_id             int NOT NULL DEFAULT 0,
-
-    is_inline           tinyint DEFAULT 0, /* if uploaded with wysiwyg */
-    is_image            tinyint DEFAULT 0, /* 1 if this is supported image */
-
-    fname               varchar(255) NOT NULL DEFAULT '',              /*original file name*/
-    fsize               int DEFAULT 0,                   /*file size*/
-    ext                 varchar(16) NOT NULL DEFAULT '',                 /*extension*/
-    iname               varchar(255) NOT NULL DEFAULT '',   /*attachment name*/
-
-    status              tinyint default 0,    /*0-ok, 1,2,3, - can be used for record status, 127-deleted*/
-    add_time            timestamp default CURRENT_TIMESTAMP,
-    add_users_id         int unsigned default 0,
-    upd_time            timestamp,
-    upd_users_id         int unsigned default 0,
-    PRIMARY KEY (id),
-    FOREIGN KEY (att_categories_id) REFERENCES att_categories(id)
-) DEFAULT CHARSET=utf8;
-CREATE INDEX att_table_name ON att (table_name, item_id);
-
-/* link att files to table items*/
--- DROP TABLE IF EXISTS att_table_link;
-CREATE TABLE IF NOT EXISTS att_table_link (
-    id                  int unsigned NOT NULL auto_increment,
-    att_id              int unsigned NOT NULL,
-
-    table_name          varchar(128) NOT NULL DEFAULT '',
-    item_id             int NOT NULL,
-
-    status              tinyint default 0,    /*0-ok, 1-under update*/
-    add_time            timestamp default CURRENT_TIMESTAMP,
-    add_users_id         int unsigned default 0,
-    PRIMARY KEY (id),
-    FOREIGN KEY (att_id) REFERENCES att(id)
-) DEFAULT CHARSET=utf8;
-CREATE UNIQUE INDEX att_table_link_UX ON att_table_link (table_name, item_id, att_id);
 
 /*Static pages*/
 -- DROP TABLE IF EXISTS spages;
@@ -183,7 +188,7 @@ CREATE TABLE IF NOT EXISTS spages (
     upd_users_id         int unsigned default 0,
     PRIMARY KEY (id),
     FOREIGN KEY (head_att_id) REFERENCES att(id)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 CREATE INDEX spages_parent_id ON spages (parent_id, prio);
 CREATE INDEX spages_url ON spages (url);
 
@@ -195,32 +200,6 @@ INSERT INTO spages (parent_id, url, iname) VALUES
 ;
 update spages set is_home=1 where id=1;
 
-
-/*categories*/
--- DROP TABLE IF EXISTS categories;
-CREATE TABLE IF NOT EXISTS categories (
-    id                  int unsigned NOT NULL auto_increment,
-    parent_id           int unsigned NOT NULL default 0,
-
-    iname               varchar(128) NOT NULL default '',
-    idesc               text,
-    prio                tinyint unsigned NOT NULL default 0,/* 0 is normal and lowest priority*/
-
-    status              tinyint default 0,        /*0-ok, 127-deleted*/
-    add_time            timestamp DEFAULT CURRENT_TIMESTAMP,                 /*date record added*/
-    add_users_id         int unsigned default 0,            /*user added record*/
-    upd_time            timestamp,                 /*date record updated*/
-    upd_users_id         int unsigned default 0,            /*user added record*/
-
-    PRIMARY KEY (id),
-    KEY (parent_id),
-    KEY (prio, iname)
-) DEFAULT CHARSET=utf8;
-INSERT INTO categories (iname) VALUES
-('category1')
-,('category2')
-,('category3')
-;
 
 /*event types for log*/
 -- DROP TABLE IF EXISTS fwevents;
@@ -239,7 +218,7 @@ CREATE TABLE IF NOT EXISTS fwevents (
 
     PRIMARY KEY (id),
     KEY (icode)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 INSERT INTO fwevents (icode, iname) VALUES ('login',    'User login');
 INSERT INTO fwevents (icode, iname) VALUES ('logoff',   'User logoff');
 INSERT INTO fwevents (icode, iname) VALUES ('chpwd',    'User changed login/pwd');
@@ -269,4 +248,59 @@ CREATE TABLE IF NOT EXISTS fwevents_log (
     KEY (events_id),
     KEY (add_users_id),
     KEY (add_time)
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
+
+
+/*user custom views*/
+DROP TABLE IF EXISTS user_views;
+CREATE TABLE user_views (
+    id                  int unsigned NOT NULL auto_increment,
+
+    screen              varchar(128) NOT NULL default '',      -- related screen, ex: "Demos"
+    fields              text,                                  -- comma-separated list of fields to display, order kept
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id        int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id        int unsigned default 0,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY (add_users_id, screen)
+) DEFAULT CHARSET=utf8mb4;
+
+/*user lists*/
+DROP TABLE IF EXISTS user_lists;
+CREATE TABLE user_lists (
+    id                  int unsigned NOT NULL auto_increment,
+    entity              varchar(128) NOT NULL default '',      -- related screen, ex: "Demos"
+
+    iname               varchar(255) NOT NULL default '',      -- name
+    idesc               text,                                  -- description
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id        int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id        int unsigned default 0,
+
+    PRIMARY KEY (id)
+) DEFAULT CHARSET=utf8mb4;
+
+/*items linked to user lists */
+DROP TABLE IF EXISTS user_lists_items;
+CREATE TABLE user_lists_items (
+    id                  int unsigned NOT NULL auto_increment,
+    user_lists_id       int unsigned NULL,                  -- user_list
+    item_id             int unsigned NULL,                  -- related item id, example demos.id
+
+    status              tinyint default 0,    /*0-ok, 127-deleted*/
+    add_time            timestamp default CURRENT_TIMESTAMP,
+    add_users_id        int unsigned default 0,
+    upd_time            timestamp,
+    upd_users_id        int unsigned default 0,
+
+    PRIMARY KEY (id),
+    FOREIGN KEY (user_lists_id) REFERENCES user_lists(id),
+    UNIQUE KEY (user_lists_id, item_id)
+) DEFAULT CHARSET=utf8mb4;

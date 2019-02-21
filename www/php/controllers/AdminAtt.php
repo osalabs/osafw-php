@@ -1,6 +1,7 @@
 <?php
 
 class AdminAttController extends FwAdminController {
+    const access_level = 80;
     const route_default_action = '';
     public $base_url='/Admin/Att';
     public $required_fields = 'iname';
@@ -28,9 +29,8 @@ class AdminAttController extends FwAdminController {
         $f = $this->initFilter();
 
         $this->setListSorting();
-
-        $this->list_where = ' status=0 ';
         $this->setListSearch();
+        $this->setListSearchStatus();
 
         //other filters add to $this->list_where here
         if ($this->list_filter['att_categories_id']>0){
@@ -53,7 +53,7 @@ class AdminAttController extends FwAdminController {
             'pager'         => $this->list_pager,
             'f'             => $this->list_filter,
 
-            'select_att_categories_ids' => $AttCat->getSelectOptions($this->list_filter['att_categories_id'])
+            'select_att_categories_ids' => $AttCat->listSelectOptions()
         );
         return $ps;
     }
@@ -86,7 +86,7 @@ class AdminAttController extends FwAdminController {
             'url'               => $this->model->getUrl($id),
             'url_m'             => ($item['is_image'] ? $this->model->getUrl($id, 'm') : ''),
 
-            'select_options_att_categories_id'      => fw::model('AttCategories')->getSelectOptions($item['att_categories_id']),
+            'select_options_att_categories_id'      => fw::model('AttCategories')->listSelectOptions($item['att_categories_id']),
         );
 
         return $ps;
@@ -177,7 +177,8 @@ class AdminAttController extends FwAdminController {
 
         $ps=array(
             'att_dr' => $rows,
-            'select_att_categories_id' => $AttCat->getSelectOptions($att_categories_id),
+            'select_att_categories_id' => $AttCat->listSelectOptions(),
+            'att_categories_id' => $att_categories_id,
         );
         return $ps;
     }

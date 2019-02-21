@@ -220,6 +220,27 @@ class Att extends FwModel {
         fpassthru($fp);
     }
 
+    /**
+     * return all att files linked via att_table_link
+     * @param  string  $table_name table name
+     * @param  integer $id         id in table
+     * @param  integer $is_image   -1 (all - files and images), 0 (files only), 1 (images only)
+     * @return array              array of hashtables
+     */
+    public function getAllLinked($table_name, $id, $is_image=-1){
+        $where = '';
+        if ($is_image > -1){
+            $where .= " and a.is_image=".dbqi(is_image);
+        }
+        return $this->db->arr("select a.* ".
+                    "  from ". $this->att_table_link. " atl, att a ".
+                    " where atl.table_name=". dbq($table_name).
+                    "   and atl.item_id=". dbqi($id).
+                    "   and a.id=atl.att_id".
+                    $where.
+                    " order by a.id ");
+    }
+
 }
 
 ?>

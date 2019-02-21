@@ -20,11 +20,27 @@ class Utils {
 
     //split string by "whitespace characters" and return array
     public static function qw($str) {
+        if (is_array($str)) return $str; #if array passed - don't chagne it
+        $str=trim($str);
         if ($str>""){
-            return preg_split("/\s+/", $str);
+            $arr=preg_split("/\s+/", $str);
+            foreach ($arr as $key => $value) {
+                $arr[$key]=str_replace('&nbsp;', ' ', $value);
+            }
+            return $arr;
         }else{
             return array();
         }
+    }
+
+    //convert from array back to qw-string
+    //spaces converted to '&nbsp;'
+    public static function qwRevert($arr) {
+        $result = '';
+        foreach ($arr as $key => $value) {
+            $result.= str_replace(' ', '&nbsp;', $value).' ';
+        }
+        return $result;
     }
 
     /*
@@ -37,16 +53,26 @@ class Utils {
 
     WARN! replaces all "&nbsp;" to spaces (after convert)
     */
-    public static function qh($str) {
+    public static function qh($str, $default_value=1) {
+        if (is_array($str)) return $str; #if array passed - don't chagne it
         $result=array();
         foreach (static::qw($str) as $value) {
+            #$value=str_replace('&nbsp;', ' ', $value);
             $kv = explode('|', $value, 2);
-            $val = 1;
-            if (count($kv)==2) $val = str_replace('&nbsp;', ' ', $kv[1]);
+            $val = $default_value;
+            if (count($kv)==2) $val = $kv[1];
 
             $result[ $kv[0] ] = $val;
         }
         return $result;
+    }
+
+    public static function qhRevert($sh) {
+        $result=array();
+        foreach ($sh as $key => $value) {
+            $result[]=str_replace(' ', '&nbsp;', $key).'|'.$value;
+        }
+        return implode(' ', $result);
     }
 
     //get string with random chars A-Fa-f0-9
@@ -116,7 +142,7 @@ class Utils {
             $str = $row[$fld];
             if ( preg_match('/[",]/', $str) ){
                 //quote string
-                $str='"'.str_replace('"','""',n2br($str)).'"';
+                $str='"'.str_replace('"','""',nl2br($str)).'"';
             }
             $result.=(($result)?",":"").$str;
         }
@@ -210,6 +236,59 @@ class Utils {
         $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
 
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+
+    /**
+     * return path to tmp filename WITHOUT extension
+     * @param  string $prefix optional, default 'osafw_'
+     * @return string         path
+     */
+    public static function getTmpFilename($prefix='osafw_'){
+        return sys_get_temp_dir().DIRECTORY_SEPARATOR.$prefix.self::uuid();
+    }
+
+    /**
+     * simple encrypt or decrypt a string with vector/key
+     * @param  string $action 'encrypt' or 'decrypt'
+     * @param  string $string string to encrypt or decrypt (base64 encoded)
+     * @param  string $v      vector string
+     * @param  string $k      key string
+     * @return string         encrypted (base64 encoded) or decrypted string or FALSE if wrong action
+     * TODO: use https://github.com/defuse/php-encryption instead
+     */
+    public static function crypt($action, $string, $v, $k) {
+        $output = FALSE;
+        $encrypt_method = "AES-256-CBC";
+
+        // hash
+        $key = hash('sha256', $k);
+
+        // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
+        $iv = substr(hash('sha256', $v), 0, 16);
+
+        if( $action == 'encrypt' ) {
+            $output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
+            $output = base64_encode($output);
+        }elseif( $action == 'decrypt' ){
+            $output = openssl_decrypt(base64_decode($string), $encrypt_method, $key, 0, $iv);
+        }
+
+        return $output;
+    }
+
+    #simple encrypt/decrypt pwd based on config keys
+    public static function encrypt($value){
+        return Utils::crypt('encrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
+    }
+    public static function decrypt($value){
+        return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
+    }
+
+    public static function jsonEncode($data){
+        return json_encode($data);
+    }
+    public static function jsonDecode($str){
+        return json_decode($str, true);
     }
 
     /**

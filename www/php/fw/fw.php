@@ -132,7 +132,7 @@ class fw {
         if ( preg_match('/Controller$/', $class_name) ){
             $is_controller=true;
             $dirs[]= $bdir.'../controllers/';
-            if ($class_name!=='FwController' && $class_name!=='FwAdminController') $class_name=preg_replace("/Controller$/", "", $class_name);
+            if ($class_name!=='FwController' && $class_name!=='FwAdminController' && $class_name!=='FwDynamicController') $class_name=preg_replace("/Controller$/", "", $class_name);
         }else{
             $dirs[]= $bdir.'../models/';
             if ($class_name!=='FwModel') $class_name=preg_replace("/Model$/", "", $class_name);
@@ -419,7 +419,7 @@ class fw {
     # parser('/controller/action', $ps)   - show page from template  /controller/action = parser('/controller/action/', $PAGE_LAYOUT, $ps)
     # parser('/controller/action', $layout, $ps)   - show page from template  /controller/action = parser('/controller/action/', $layout, $ps)
     # full params:
-    # $basedir, $layout, $ps, $out_filename=''|'v'|'filename'
+    # [$basedir, [$layout,]] $ps
     #
     # output format based on requested format: json, pjax or (default) full page html
     # JSON: for automatic json response support - set ps("_json") = true
@@ -440,7 +440,6 @@ class fw {
         $basedir=strtolower($basedir);
         $layout=$this->page_layout;
         $ps=array();
-        $out_filename='';
 
         if ( !count($args) ){
             $ps = array();
@@ -449,11 +448,10 @@ class fw {
         }elseif ( count($args)==2 && is_string($args[0]) && is_array($args[1]) ){
             $basedir = &$args[0];
             $ps = &$args[1];
-        }elseif ( count($args)>=3 && is_string($args[0]) && is_string($args[1]) && is_array($args[2]) ){
+        }elseif ( count($args)==3 && is_string($args[0]) && is_string($args[1]) && is_array($args[2]) ){
             $basedir = &$args[0];
             $layout = &$args[1];
             $ps = &$args[2];
-            if (count($args)==4) $out_filename = &$args[3];
         }else{
             throw new Exception("parser - wrong call");
         }
@@ -490,8 +488,8 @@ class fw {
                 $ps["ERR"] = @$this->GLOBAL['ERR']; #add errors if any
             }
 
-            logger('DEBUG', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
-            return parse_page($basedir, $layout, $ps, $out_filename);
+            logger('DEBUG', "basedir=[$basedir], layout=[$layout]");
+            parse_page($basedir, $layout, $ps);
 
         }else{
             #any other formats - call controller's Export($out_format)
@@ -744,17 +742,22 @@ function logger(){
  if (fw::$LOG_LEVELS[$logtype] > $log_level ) return; #skip logging if requested level more than config's log level
 
  $arr=debug_backtrace();#0-logger(),1-func called logger,...
- $func = (isset($arr[1]) ? $arr[1] : '');
- $function = isset($func['function']) ? $func['function'] : '';
- $line = $arr[1]['line'];
+
+ $funcfile=$arr[0]['file'];
+ $line = $arr[0]['line'];
+ $function = $arr[0]['function'];
+ if (isset($arr[1])){
+    $function = $arr[1]['function'];
+ }
 
  //remove unnecessary site_root_offline path
- $func['file']=str_replace( strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']) );
+ $funcfile=preg_replace("/^".preg_quote($CONFIG['SITE_ROOT'])."/i", "", $funcfile);
+ #$func['file']=str_replace( strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']) );
 
  $ts=microtime(true);
  $secs=intval($ts);
  $msec=intval(($ts-$secs)*1000);
- $strlog=strftime('%Y-%m-%d %H:%M:%S',$secs).'.'.$msec.' '.$logtype.' '.$func['file'].'::'.$function.'('.$line.') ';
+ $strlog=strftime('%Y-%m-%d %H:%M:%S',$secs).'.'.$msec.' '.$logtype.' '.$funcfile.'::'.$function.'('.$line.') ';
  foreach ($args as $str){
      if (is_scalar($str)){
         $strlog.=$str;

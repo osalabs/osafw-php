@@ -374,11 +374,11 @@ class DB {
             throw new Exception($msg);
         }
 
-        $res = $this->dbh->set_charset("utf8");
+        $res = $this->dbh->set_charset("utf8mb4");
         $this->handle_error($res);
 
-        #above is preffered way $this->query("SET NAMES utf8");
-        $this->query("SET SESSION sql_mode = 'NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"); #required fw to work on MySQL 5.5+
+        #above is preffered way $this->query("SET NAMES utf8mb4");
+        $this->query("SET SESSION sql_mode = ''"); #required fw to work on MySQL 5.5+
     }
 
     /**
@@ -424,9 +424,11 @@ class DB {
 
         DB::$SQL_QUERY_CTR++;
 
+        $dbhost_info=$this->config['HOST'].':'.$this->config['DBNAME'].' ';
+
         if (is_array($params) && count($params)){
             //use prepared query
-            $this->logger('INFO', $sql);
+            $this->logger('INFO', $dbhost_info.$sql);
             $this->logger('INFO', $params);
 
             $st = $this->dbh->prepare($sql);
@@ -453,7 +455,7 @@ class DB {
             $st->close();
         }else{
             //use direct query
-            $this->logger('INFO', $sql);
+            $this->logger('INFO', $dbhost_info.$sql);
 
             $result = $this->dbh->query($sql);
             #no need to check for metadata here as query returns TRUE for non-select
@@ -644,7 +646,7 @@ class DB {
      */
     public function delete($table, $value, $column = 'id', $more_where=''){
         $sql = 'DELETE FROM '.$this->quote_ident($table).' WHERE '.$this->quote_ident($column).'='.$this->quote($value).' '.$this->build_where_str($more_where);
-        db_exec($sql);
+        $this->exec($sql);
     }
 
 
@@ -883,6 +885,73 @@ class DB {
      */
     public function get_identity(){
         return $this->dbh->insert_id;
+    }
+
+    /**
+     * return list of tables in db
+     * @return array plain array of table names
+     */
+    public function tables(){
+        return $this->col("show tables");
+    }
+
+    public function table_schema($table_name){
+        $rows = $this->arr("SELECT
+             c.column_name as `name`,
+             c.data_type as `type`,
+             CASE c.is_nullable WHEN 'YES' THEN 1 ELSE 0 END AS `is_nullable`,
+             c.column_default as `default`,
+             c.character_maximum_length as `maxlen`,
+             c.numeric_precision as numeric_precision,
+             c.numeric_scale as numeric_scale,
+             c.character_set_name as `charset`,
+             c.collation_name as `collation`,
+             c.ORDINAL_POSITION as `pos`,
+             CASE c.EXTRA WHEN 'auto_increment' THEN 1 ELSE 0 END as is_identity
+            from information_schema.COLUMNS c
+            where c.TABLE_SCHEMA=".dbq($this->config['DBNAME'])."
+              and c.TABLE_NAME=".dbq($table_name)."
+            ");
+        foreach ($rows as $key => &$row) {
+            $row["internal_type"] = $this->map_sqltype2internal($row["type"]);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function map_sqltype2internal($type){
+        switch (strtolower($type)) {
+            #TODO - unsupported: image, varbinary
+            case "tinyint":
+            case "smallint":
+            case "int":
+            case "bigint":
+            case "bit":
+                $result = "int";
+                break;
+
+            case "real":
+            case "numeric":
+            case "decimal":
+            case "money":
+            case "smallmoney":
+            case "float":
+                $result = "float";
+                break;
+
+            case "datetime":
+            case "datetime2":
+            case "date":
+            case "smalldatetime":
+                $result = "datetime";
+                break;
+
+            default: #"text", "ntext", "varchar", "nvarchar", "char", "nchar"
+                $result = "varchar";
+                break;
+        }
+        return $result;
     }
 
     /**

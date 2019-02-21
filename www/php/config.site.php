@@ -28,11 +28,13 @@ $SITE_CONFIG=array(
                 'IS_LOG'    => true,
                 ),
     'LOG_LEVEL'          => 'INFO', #use WARN|ERROR|FATAL|OFF for production, use INFO temporary to see SQL queries in production
+    'CRYPT_KEY'             => '', #TODO define your key for crypting
+    'CRYPT_V'               => '', #TODO define your "salt" for crypting
 );
 
 ini_set('display_errors',0);
 error_reporting(E_ERROR); #report only critical errors
 ini_set("log_errors", 1);
-ini_set("error_log", $SITE_CONFIG['site_error_log']);
+ini_set("error_log", $FW_CONFIG['site_error_log']);
 
 ?>

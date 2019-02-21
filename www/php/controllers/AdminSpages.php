@@ -7,7 +7,7 @@ class AdminSpagesController extends FwAdminController {
     const route_default_action = '';
     public $base_url = '/Admin/Spages';
     public $required_fields = 'iname';
-    public $save_fields = 'iname idesc idesc_right head_att_id template prio custom_css custom_js';
+    public $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_css custom_js';
     public $save_fields_checkboxes = '';
     public $model_name = 'Spages';
     /*REMOVE OR OVERRIDE*/
@@ -25,18 +25,6 @@ class AdminSpagesController extends FwAdminController {
         parent::__construct();
 
         //optionally init controller
-    }
-
-    //override due to custom search filter on status
-    public function setListSearch() {
-        $this->list_where =' 1=1 ';
-        parent::setListSearch();
-
-        if ($this->list_filter['status']>''){
-            $this->list_where .= ' and status='.dbqi($this->list_filter['status']);
-        }else{
-            $this->list_where .= ' and status<>127 '; #by default - show all non-deleted
-        }
     }
 
     //override list rows

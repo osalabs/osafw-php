@@ -1,0 +1,15 @@
+<div class="card">
+    <div class="card-body">
+        <~blink if="url" inline>
+            <a href="<~url>" class="card-link float-right" title="Details..."><i class="glyphicon glyphicon-share-alt"></i></a>
+        </~blink>
+        <~btype1 ifeq="type" value="bignum" inline>
+            <~bsubtitle if="title" inline><h6 class="card-subtitle mb-2 text-muted"><~title var></h6></~bsubtitle>
+            <h5><~value var></h5>
+        </~btype1>
+        <~type_barchart ifeq="type" value="barchart">
+        <~type_piechart ifeq="type" value="piechart">
+        <~type_table ifeq="type" value="table">
+        <~type_linechart ifeq="type" value="linechart">
+    </div>
+</div>

@@ -44,18 +44,19 @@ a.thumbnail:hover {
         <input type="hidden" name="XSS" value="<~session[XSS]>">
         <input type="hidden" name="mode" value="select">
 
-        <span class="btn btn-success btn-fileinput mr-3"><i class="glyphicon glyphicon-upload"></i><span> `Upload new file`...</span>
+        <span class="btn btn-success btn-fileinput mr-3">
+            <span class="msg-button"><i class="glyphicon glyphicon-upload"></i><span> Upload new file...</span></span>
+            <span class="msg-uploading d-none"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> uploading...</span>
             <input name="file1" type="file">
         </span>
         <div class="form-group">
             <label class="mr-3">`or choose from existing uploads, category`:</label>
             <select name="item[att_categories_id]" class="form-control">
                 <option value="">- `show all` -</option>
-                <~select_att_categories_id noescape>
+                <~select_att_categories_id select="att_categories_id">
             </select>
         </div>
     </form>
-    <div class="form-control-plaintext msg-uploading mb-3 d-none"><i class="ico-wait"></i> `uploading`...</div>
 
     <div class="thumbs clearfix">
         <~att_dr repeat inline>

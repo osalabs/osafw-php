@@ -19,7 +19,7 @@ $SITE_CONFIG=array(
 
     #db connection settings  - REQUIRED
     'DB'    => array(
-                'DBNAME'    => 'demo2',
+                'DBNAME'    => 'demo',
                 'USER'      => 'dev',
                 'PWD'       => '',
                 'HOST'      => 'localhost',
@@ -30,12 +30,14 @@ $SITE_CONFIG=array(
     'IS_DEV'            => true, #to enable developer features
     'LOG_LEVEL'         => 'DEBUG', #use ALL|TRACE|DEBUG for development
     'IS_SIGNUP'         => true,
+    'CRYPT_KEY'         => 'DEVKEY',
+    'CRYPT_V'           => 'DEVSALT',
 );
 
-ini_set('display_errors',1);
+ini_set('display_errors',0);
 error_reporting(E_ALL & ~E_NOTICE);
 #error_reporting(E_ALL);
 ini_set("log_errors", 1);
-ini_set("error_log", $SITE_CONFIG['site_error_log']);
+ini_set("error_log", $FW_CONFIG['site_error_log']);
 
 ?>

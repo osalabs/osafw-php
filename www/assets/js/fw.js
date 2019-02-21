@@ -1,11 +1,11 @@
 /*
   misc client utils for the osafw framework
   www.osalabs.com/osafw
-  (c) 2009-2017 Oleg Savchuk www.osalabs.com
+  (c) 2009-2018 Oleg Savchuk www.osalabs.com
 */
 
 window.fw={
-  HTML_LOADING : '<i class="ico-wait"></i> Loading...',
+  HTML_LOADING : '<span class="spinner-border spinner-border" role="status" aria-hidden="true"></span> Loading...',
 
   ok: function (str){
     $.jGrowl(str, {theme: 'hint_green'});
@@ -24,6 +24,9 @@ window.fw={
       $modal=$('#fw-modal-alert');
     }
     $modal.modal('show').find('.modal-title').html(title).end().find('.modal-body p').html(content);
+    $modal.off('shown.bs.modal').on('shown.bs.modal', function (e) {
+      $modal.find('.btn-primary').focus();
+    });
   },
 
   /*
@@ -45,6 +48,9 @@ window.fw={
       $modal=$('#fw-modal-confirm');
     }
     $modal.modal('show').find('.modal-title').html(title).end().find('.modal-body p').html(content);
+    $modal.off('shown.bs.modal').on('shown.bs.modal', function (e) {
+      $modal.find('.btn-primary').focus();
+    });
     $modal.find('.btn-primary').one('click', function (e) {
       callback();
     });
@@ -55,8 +61,48 @@ window.fw={
     //list screen init
     fw.make_table_list(".list");
 
-    //autosubmit filter on change TODO test
-    $(document).on('change', 'form[data-list-filter][data-autosubmit] :input:visible:not([data-nosubmit])', function(){
+    //list screen init
+    var $ffilter = $('form[data-list-filter]:first');
+
+    //advanced search filter
+    $(document).on('click', '.on-toggle-search', function (e) {
+      var $fis = $ffilter.find('input[name="f[is_search]"]');
+      var $el = $('table.list .search');
+      if ($el.is(':visible')){
+          $el.hide();
+          $fis.val('');
+      } else {
+          $el.show();
+          $fis.val('1');
+      }
+    });
+
+    $('table.list').on('keypress','.search input', function(e) {
+      if (e.which == 13) {// on Enter press
+          e.preventDefault();
+          //on explicit search - could reset pagenum to 0
+          //$ffilter.find('input[name="f[pagenum]"]').val(0);
+          $ffilter.trigger('submit');
+          return false;
+      }
+    });
+
+    //on filter form submit - add advanced search fields into form
+    $ffilter.on('submit', function (e) {
+        var $f = $ffilter;
+        var $fis = $f.find('input[name="f[is_search]"]');
+        if ($fis.val()=='1'){
+            //if search ON - add search fields to the form
+            var html=[];
+            $('table.list .search input').each(function (i, el) {
+                html.push( '<input type="hidden" name="'+el.name+'" value="'+el.value+'">');
+            });
+            $f.append(html.join(''));
+        }
+    });
+
+    //autosubmit filter on change filter fields
+    $(document).on('change', 'form[data-list-filter][data-autosubmit] [name^="f["]:input:visible:not([data-nosubmit])', function(){
         this.form.submit();
     });
 
@@ -73,6 +119,21 @@ window.fw={
     //list check all/none handler
     $(document).on('click', '.on-list-chkall', function (e){
       $(".multicb", this.form).prop('checked', this.checked);
+    });
+
+    //make list multi buttons floating if at least one row checked
+    $(document).on('click', '.on-list-chkall, .multicb', function (e) {
+      var $bm = $('#list-btn-multi');
+      var len = $('.multicb:checked').length;
+      if (len>0){
+        //float
+        $bm.addClass('floating');
+        $bm.find('.rows-num').text(len);
+      }else{
+        //de-float
+        $bm.removeClass('floating');
+        $bm.find('.rows-num').text('');
+      }
     });
 
     $(document).on('click', '.on-delete-list-row', function (e){
@@ -94,6 +155,7 @@ window.fw={
     //form screen init
     fw.setup_cancel_form_handlers();
     fw.setup_autosave_form_handlers();
+    fw.process_form_errors();
   },
 
   //for all forms with data-check-changes on a page - setup changes tracker, call in $(document).ready()
@@ -190,7 +252,7 @@ window.fw={
       set_status($f, 1);
     });
 
-    $('body').on('keyup', 'form[data-autosave] :input', function(e){
+    $('body').on('keyup', 'form[data-autosave] :input:not([data-noautosave])', function(e){
       var $inp = $(this);
       //console.log('on keyup');
       if ($inp.data('oldval')!==$inp.val()) {
@@ -200,13 +262,13 @@ window.fw={
       }
     });
 
-    $('body').on('focus', 'form[data-autosave] :input', function(e){
+    $('body').on('focus', 'form[data-autosave] :input:not([data-noautosave])', function(e){
       var $inp = $(this);
       //console.log('on focus');
       $inp.data('oldval', $inp.val());
     });
 
-    $('body').on('blur', 'form[data-autosave] :input', function(e){
+    $('body').on('blur', 'form[data-autosave] :input:not([data-noautosave])', function(e){
       var $f = $(this.form);
       //console.log('on blur', $f);
       if ($f.data('is-changed')===true){
@@ -230,6 +292,8 @@ window.fw={
           dataType: 'json',
           success: function function_name (data) {
               //console.log('ajaxSubmit success', data);
+              $('#fw-form-msg').hide();
+              fw.clean_form_errors($f);
               if (data.success){
                   $f.data('is-changed', false);
                   set_status($f, 2);
@@ -240,6 +304,8 @@ window.fw={
                   }
               }else{
                   $f.data('is-ajaxsubmit',false);
+                  //auto-save error - highlight errors
+                  if (data.ERR) fw.process_form_errors($f, data.ERR);
                   //hint_error(data.err_msg ? data.err_msg : 'Auto-save error. Press Save manually.');
               }
               $f.trigger('autosave-success',[data]);
@@ -267,6 +333,40 @@ window.fw={
     }
   },
 
+  //cleanup any exisitng form errors
+  clean_form_errors: function ($form) {
+    $form=$($form);
+    $form.find('.has-danger').removeClass('has-danger');
+    $form.find('.is-invalid').removeClass('is-invalid');
+    $form.find('[class^="err-"]').removeClass('invalid-feedback');
+  },
+
+  //form - optional, if set - just this form processed
+  //err_json - optional, if set - this error json used instead of form's data-errors
+  process_form_errors: function (form, err_json) {
+    //console.log(form, err_json);
+    var selector= 'form[data-errors]';
+    if (form) selector=$(form);
+    $(selector).each(function (i, el) {
+      var $f = $(el);
+      var errors = err_json ? err_json : $f.data('errors');
+      console.log(errors);
+      if ($.isPlainObject(errors)){
+        //highlight error fields
+        $.each(errors,function(key, errcode) {
+          var $input = $f.find('[name="item['+key+']"],[name="'+key+'"]');
+          if ($input.length){
+            $input.closest('.form-group').not('.noerr').addClass('has-danger'); //highlight whole row (unless .noerr exists)
+            $input.addClass('is-invalid'); //mark input itself
+            if (errcode!==true && errcode.length){
+              $input.parent().find('.err-'+errcode).addClass('invalid-feedback'); //find/show specific error message
+            }
+          }
+        });
+      }
+    });
+  },
+
   delete_btn: function (ael){
     fw.confirm('<strong>ARE YOU SURE</strong> to delete this item?', function(){
       var XSS=$(ael).parents('form:first').find("input[name=XSS]").val();
@@ -279,7 +379,7 @@ window.fw={
   // if no data-filter defined, tries to find first form with data-list-filter
   // <table class="list" data-rowtitle="Double click to Edit" [data-rowtitle-type="explicit"] [data-filter="#FFilter"]>
   //  <thead>
-  //    <tr class="list-header sort-header" data-sortby="" data-sortdir="asc|desc"
+  //    <tr data-sortby="" data-sortdir="asc|desc"
   //  ... <tr data-url="url to go on double click">
   //       <td data-rowtitle="override title on particular cell if 'explicit' set above">
   make_table_list: function(tbl){
@@ -299,16 +399,16 @@ window.fw={
     if ($tbl.data('rowtitle-type')=='explicit') title_selector="tbody tr td.rowtitle";
     $tbl.find(title_selector).attr('title', rowtitle);
 
-    var $sh=$tbl.find('.sort-header');
+    var $sh=$tbl.find('tr[data-sortby]');
     var sortby=$sh.data('sortby');
     var sortdir=$sh.data('sortdir');
 
     var sort_img= (sortdir=='desc') ? 'glyphicon-arrow-up' : 'glyphicon-arrow-down';
-    $tbl.find('.sortable[data-sort="'+sortby+'"]').addClass('active-sort').prepend('<span class="glyphicon '+sort_img+' float-right"></span>');
+    $sh.find('th[data-sort="'+sortby+'"]').addClass('active-sort').prepend('<span class="glyphicon '+sort_img+' float-right"></span>');
 
-    $tbl.on('click', '.sortable', function() {
+    $sh.on('click', 'th[data-sort]', function() {
       var $td=$(this);
-      var sortdir=$tbl.find('.sort-header').data('sortdir');
+      var sortdir=$sh.data('sortdir');
       //console.log(sortdir, $td.is('.active'));
 
       if ( $td.is('.active-sort') ){
@@ -363,10 +463,10 @@ window.fw={
           $dh.remove();
 
           //create fixed header for the table
-          var $th_orig = $table.find('thead');
+          var $th_orig = $table.find('thead:first');
           $th_orig.find('tr:first').css({visibility: 'hidden'});
 
-          var $th = $table.find('thead').clone(true);
+          var $th = $table.find('thead:first').clone(true);
           $th.find('tr').not(':eq(0)').remove(); //leave just first tr
           $th.find('tr:first').css({visibility: ''});
 
@@ -374,8 +474,8 @@ window.fw={
           $htable[0].className = $table[0].className; //apply all classes
           $htable.removeClass('data-table');
 
-          var $th0 = $table.find('thead > tr:first > th');
-          var $thh = $htable.find('thead > tr:first > th');
+          var $th0 = $table.find('thead:first > tr:first > th');
+          var $thh = $htable.find('thead:first > tr:first > th');
           $th0.each(function(i,el) {
               $thh.eq(i).outerWidth( $(this).outerWidth() );
           });

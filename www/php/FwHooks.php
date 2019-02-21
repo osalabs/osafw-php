@@ -17,7 +17,6 @@ class FwHooks {
            $me_id=Utils::me();
         }
 
-        #if (!isset($_SESSION['categories'])) $_SESSION['categories']=fw::model('Categories')->ilist();
         #'also force set XSS code
         if (!isset($_SESSION['XSS'])) $_SESSION['XSS']=Utils::getRandStr(16);
     }

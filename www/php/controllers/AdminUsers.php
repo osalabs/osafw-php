@@ -5,6 +5,7 @@ class AdminUsersController extends FwAdminController {
     public $base_url = '/Admin/Users';
     public $required_fields = 'email access_level';
     public $save_fields = 'email pwd access_level fname lname title address1 address2 city state zip phone status att_id';
+    public $save_fields_nullable = 'att_id';
     public $model_name = 'Users';
 
     public $list_sortdef = 'iname asc';    //default sorting - req param name, asc|desc direction
@@ -18,18 +19,6 @@ class AdminUsersController extends FwAdminController {
                         );
     public $search_fields = 'email fname lname';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
                                             //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
-
-    public function setListSearch() {
-        $this->list_where=' 1=1 ';
-
-        parent::setListSearch();
-
-        if ($this->list_filter['status']>''){
-            $this->list_where .= ' and status='.$this->fw->db->quote($this->list_filter['status']);
-        }else{
-            $this->list_where .= ' and status<>127';
-        }
-    }
 
     public function ShowFormAction($form_id){
         $ps = parent::ShowFormAction($form_id);
@@ -46,7 +35,8 @@ class AdminUsersController extends FwAdminController {
             #load old record if necessary
             #$item_old = $this->model->one($id);
 
-            $itemdb = FormUtils::filter($item, $this->save_fields);
+            $itemdb=$this->getSaveFields($id, $item);
+            $itemdb['pwd']=trim($itemdb['pwd']);
             if (!strlen($itemdb['pwd'])) unset($itemdb['pwd']);
 
             $id = $this->modelAddOrUpdate($id, $itemdb);

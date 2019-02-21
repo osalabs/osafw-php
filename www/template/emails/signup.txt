@@ -5,6 +5,6 @@ you successfully signed up at <~GLOBAL[ROOT_DOMAIN]><~GLOBAL[ROOT_URL]>.
 
 Your login credentials to access the service:
 login: <~user[email]>
-password: <~user[pwd]>
+password: as you provided
 
 <~/emails/sign_en.txt>

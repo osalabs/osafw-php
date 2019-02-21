@@ -25,14 +25,12 @@ class AdminSettingsController extends FwAdminController {
         $f = $this->initFilter();
 
         $this->setListSorting();
-
-        $this->list_where = ' 1=1 ';
         $this->setListSearch();
 
         //other filters add to $this->list_where here
         //if search - no category
-        if ($f['s']==''){
-            $this->list_where .= ' and icat='.$this->fw->db->quote($f['icat']);
+        if ($f['s']=='' && isset($f['icat'])){
+            $this->list_where .= ' and icat='.$this->db->quote($f['icat']);
         }
 
         $this->getListRows();

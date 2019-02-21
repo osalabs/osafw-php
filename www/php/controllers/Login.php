@@ -6,6 +6,9 @@ class LoginController extends FwController {
 
     public function __construct() {
         parent::__construct();
+
+        #override layout
+        $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
     }
 
     public function IndexAction() {
@@ -34,14 +37,15 @@ class LoginController extends FwController {
             $login  = trim($_REQUEST['item']['login']);
             $pwd    = $_REQUEST['item']['pwdh'];
             if ($_REQUEST["item"]["chpwd"] == "1") $pwd = $_REQUEST['item']['pwd'];
-            $pwd = substr(trim($pwd), 0, 64);
-            $gourl = reqs('gourl');
+            $pwd    = trim($pwd);
+            $gourl  = reqs('gourl');
 
             #for dev only - login as first admin
+            $is_dev_login=false;
             if ($this->fw->config->IS_DEV===TRUE && $login=='' && $pwd=='~'){
-                $dev = $this->fw->db->row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
+                $dev = $this->db->row("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
                 $login = $dev['email'];
-                $pwd = $dev['pwd'];
+                $is_dev_login=true;
             }
 
             if (!strlen($login) || !strlen($pwd) ) {
@@ -49,8 +53,10 @@ class LoginController extends FwController {
                 throw new ApplicationException("");
             }
 
-            $hU = $this->fw->db->row("select * from users where email=".$this->fw->db->quote($login)." and pwd=".$this->fw->db->quote($pwd));
-            if ( !isset($hU['access_level']) || $hU['status']!=0 ) throw new ApplicationException(lng("User Authentication Error"));
+            $hU = $this->db->row("select * from users where email=".$this->db->quote($login));
+            if (!$is_dev_login){
+                if (!$hU || $hU['status']!=0 || !$this->model->checkPwd($pwd, $hU['pwd']) ) throw new ApplicationException(lng("User Authentication Error"));
+            }
 
             $this->model->doLogin( $hU['id'] );
 
@@ -93,13 +99,13 @@ class LoginController extends FwController {
 
         if (!$users_id){
             #now check by facebook email
-            $hU=$this->fw->db->row("select * from users where fb_email=".$this->fw->db->quote($item['email']) );
+            $hU=$this->db->row("select * from users where fb_email=".$this->db->quote($item['email']) );
             if ($hU['id']) $users_id=$hU['id'];
         }
 
         if (!$users_id){
             #now check by facebook id
-            $hU=$this->fw->db->row("select * from users where fb_id=".$this->fw->db->quote($item['id']) );
+            $hU=$this->db->row("select * from users where fb_id=".$this->db->quote($item['id']) );
             if ($hU['id']) $users_id=$hU['id'];
         }
 
@@ -123,7 +129,7 @@ class LoginController extends FwController {
             if (!$hU['fb_verified'])    $vars['fb_verified']    =$item['verified']=='true' ? 1 : 0;
             if (!$hU['fb_picture_url']) $vars['fb_picture_url'] ='http://graph.facebook.com/'.$item['username'].'/picture';
 
-            $this->fw->db->update('users', $vars, $users_id);
+            $this->db->update('users', $vars, $users_id);
 
         }else{
             #register user first if new
