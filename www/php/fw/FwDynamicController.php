@@ -277,7 +277,7 @@ class FwDynamicController extends FwController {
 
     ###################### support for autocomlete related items
     public function AutocompleteAction(){
-        if ($this->model_related) throw new ApplicationException('No model_related defined');
+        if (!$this->model_related) throw new ApplicationException('No model_related defined');
         $items = $this->model_related->getAutocompleteList(reqs("q"));
 
         return array('_json' => $items);
