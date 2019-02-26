@@ -938,7 +938,7 @@ function sec2date($str, $attrs){
       break;
   }
  if ($str){
-    if ($str=='0000-00-00 00:00:00'){
+    if ($str=='0000-00-00 00:00:00' || $str=='0000-00-00'){
         return '';
     }
     if ( !preg_match("/^\d+$/", $str) ){
