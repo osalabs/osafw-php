@@ -24,10 +24,10 @@ class ReportSample extends Reports {
         #apply filters from Me.f
         $where = ' ';
         if ($this->f['from_date']){
-            $where .= ' and el.add_time>='.dbq($f['from_date']);
+            $where .= ' and el.add_time>='.dbq(DateUtils::Str2SQL($this->f['from_date']));
         }
         if ($this->f['to_date']){
-            $where .= ' and el.add_time<DATE_ADD('.dbq($f['to_date']).', INTERVAL 1 DAY)'; #+1 because less than equal
+            $where .= ' and el.add_time<DATE_ADD('.dbq(DateUtils::Str2SQL($this->f['to_date'])).', INTERVAL 1 DAY)'; #+1 because less than equal
         }
 
         #define query
