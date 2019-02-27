@@ -13,6 +13,7 @@ class ReportSample extends Reports {
         $this->f=array_merge($this->f,array(
             #add there data for custom filters
             #'select_users' => fw::model('Users')->listSelectOptions(),
+            'is_dates' => $this->f['from_date'] || $this->f['to_date'] ? 1 : 0
         ));
         return $this->f;
     }
