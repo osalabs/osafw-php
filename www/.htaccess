@@ -8,7 +8,7 @@ RewriteBase /
 RewriteRule ^template/ - [F,L,NC]
 
 #ignore assets dirs by fw engine
-RewriteRule ^(?:css|fonts|img|js|upload)/ - [L]
+RewriteRule ^(?:assets|upload)/ - [L]
 
 #fw engine
 RewriteCond %{REQUEST_FILENAME} !-l
