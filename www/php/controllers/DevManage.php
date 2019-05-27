@@ -10,7 +10,6 @@ class DevManageController extends FwController {
     public $base_url = '/Dev/Manage';
 
     public function IndexAction() {
-        global $conf_server_name;
         $ps = array(
         );
 

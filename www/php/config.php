@@ -3,30 +3,9 @@
  Configuration variables for the site
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2019 Oleg Savchuk www.osalabs.com
 
 */
-
-$conf_server_name='site';
-
-########### detect test/development servers and load appropriate config
-#!!! add server configs here:
-$CFG_SERVERS=array(
-  #format - [0]domain to check, [1]-config name to load
-  'domain.com'          => 'site',   #production server
-  'staging.domain.com'  => 'staging', #staging server (sample)
-  'localhost'           => 'develop', #first developer
-);
-
-#detect
-$root_domain0=preg_replace('/:\d+$/','',$_SERVER['HTTP_HOST']);
-
-foreach($CFG_SERVERS as $k => $conf){
- if ( $root_domain0==$k ){
-    $conf_server_name=$conf;
-    break;
- }
-}
 
 ######### set all variables to defaults with detection of base dirs
    $site_root         = preg_replace("![\\\/]\w+$!i", "", dirname(__FILE__));
@@ -130,8 +109,13 @@ $FW_CONFIG = array(
     'SITE_VAR'              => false,
 );
 
-#load config which may override any variables
-include_once('config.'.$conf_server_name.'.php');
+#load config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
+$conf_server_name = str_replace(':', '_', strtolower($_SERVER['HTTP_HOST']));
+if (!include_once('config.'.$conf_server_name.'.php')){
+    #if no config exists for the domain - use site config
+    $conf_server_name='site';
+    include_once('config.'.$conf_server_name.'.php');
+}
 $CONFIG = array_merge($FW_CONFIG, $SITE_CONFIG);
 
 /*
