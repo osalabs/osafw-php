@@ -16,7 +16,7 @@ class Users extends FwModel {
     }
 
     public function oneByEmail($email) {
-        return $this->db->row("select * from ".$this->table_name." where email=".$this->db->quote($email));
+        return $this->db->row("SELECT * FROM ".$this->table_name." WHERE email=".$this->db->quote($email));
     }
 
     public function getFullName($id) {
@@ -32,7 +32,7 @@ class Users extends FwModel {
     public function ilist($min_acl=null) {
         $where='';
         if (!is_null($min_acl)) $where=' and access_level>='.dbqi($min_acl);
-        $sql  = "select *, (fname+' '+lname) as iname from $this->table_name where status=0 $where order by fname,lname";
+        $sql  = "SELECT *, (fname+' '+lname) as iname FROM $this->table_name WHERE status=0 $where ORDER BY fname,lname";
         return $this->db->arr($sql);
     }
 
@@ -172,9 +172,9 @@ class Users extends FwModel {
         #exit;
 
         if ($cookie_id) {
-            $u_id=$this->db->value("select users_id
-                  from user_cookie
-                 where cookie_id=".$this->db->quote($cookie_id)."
+            $u_id=$this->db->value("SELECT users_id
+                  FROM user_cookie
+                 WHERE cookie_id=".$this->db->quote($cookie_id)."
                    and add_time>=FROM_DAYS(TO_DAYS(now())-".self::$PERM_COOKIE_DAYS.")
             ");
 
@@ -196,8 +196,8 @@ class Users extends FwModel {
         setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
 
         #cleanup in DB (user's cookie and ALL old cookies)
-        $this->db->query("delete from user_cookie
-            where cookie_id=".$this->db->quote($cookie_id)."
+        $this->db->query("DELETE FROM user_cookie
+            WHERE cookie_id=".$this->db->quote($cookie_id)."
                or add_time<FROM_DAYS(TO_DAYS(now())-".self::$PERM_COOKIE_DAYS.")
         ");
 

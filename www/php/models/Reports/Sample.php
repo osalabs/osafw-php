@@ -32,12 +32,12 @@ class ReportSample extends Reports {
 
         #define query
         $evmodel=fw::model('FwEvents');
-        $sql = "select el.*, e.iname as event_name, u.fname, u.lname, 1 as ctr
-                  from $evmodel->table_name e, $evmodel->log_table_name el
+        $sql = "SELECT el.*, e.iname as event_name, u.fname, u.lname, 1 as ctr
+                  FROM $evmodel->table_name e, $evmodel->log_table_name el
                        LEFT OUTER JOIN users u ON (u.id=el.add_users_id)
-                 where el.events_id=e.id
+                 WHERE el.events_id=e.id
                    $where
-                order by el.id desc
+                ORDER by el.id desc
                 LIMIT 50 ";
         $ps['rows'] = $this->db->arr($sql);
         $ps['count'] = count($ps['rows']);

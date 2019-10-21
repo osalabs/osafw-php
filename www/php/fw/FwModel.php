@@ -44,7 +44,7 @@ abstract class FwModel {
             $row = FwCache::getValue($cache_key);
         }
         if ($is_force || is_null($row)){
-            $row = $this->db->row("select * from ".$this->table_name." where ".$this->db->quote_ident($this->field_id)."=".$this->db->quote($id));
+            $row = $this->db->row("SELECT * FROM ".$this->table_name." WHERE ".$this->db->quote_ident($this->field_id)."=".$this->db->quote($id));
             FwCache::setValue($cache_key, $row);
         }else{
             #logger('CACHE HIT!');
@@ -53,7 +53,7 @@ abstract class FwModel {
     }
 
     public function oneByIname($iname) {
-        return $this->db->row("select * from ".$this->table_name." where ".$this->db->quote_ident($this->field_iname)."=".$this->db->quote($iname));
+        return $this->db->row("SELECT * FROM ".$this->table_name." WHERE ".$this->db->quote_ident($this->field_iname)."=".$this->db->quote($iname));
     }
 
     public function listFields(){
@@ -172,7 +172,7 @@ abstract class FwModel {
     public function listSelectOptions(){
         $where = '';
         if (strlen($this->field_status)) $where.=" ".$this->db->quote_ident($this->field_status)."=0";
-        return $this->db->arr("select ".$this->db->quote_ident($this->field_id)." as id, ".$this->db->quote_ident($this->field_iname)." as iname from ".$this->db->quote_ident($this->table_name)." where $where order by ".$this->db->quote_ident($this->field_iname));
+        return $this->db->arr("SELECT ".$this->db->quote_ident($this->field_id)." as id, ".$this->db->quote_ident($this->field_iname)." as iname FROM ".$this->db->quote_ident($this->table_name)." WHERE $where ORDER BY ".$this->db->quote_ident($this->field_iname));
     }
     public function getSelectOptions($sel_id) {
         return FormUtils::selectOptions($this->listSelectOptions(), $sel_id);
@@ -181,7 +181,7 @@ abstract class FwModel {
     public function getCount(){
         $where = '';
         if (strlen($this->field_status)) $where.=" ".$this->db->quote_ident($this->field_status)."<>127";
-        return $this->db->value("select count(*) from ".$this->db->quote_ident($this->table_name)." where $where");
+        return $this->db->value("SELECT count(*) FROM ".$this->db->quote_ident($this->table_name)." WHERE $where");
     }
 
 
@@ -208,7 +208,7 @@ abstract class FwModel {
         $where = $this->db->quote_ident($this->field_iname)." like ".$this->db->quote('%'.$q.'%');
         if (strlen($this->field_status)) $where .= " and ".$this->db->quote_ident($this->field_status)."<>127 ";
 
-        $sql = "select ".$this->db->quote_ident($this->field_iname)." as iname from ".$this->db->quote_ident($this->table_name)." where ".$where." LIMIT $limit";
+        $sql = "SELECT ".$this->db->quote_ident($this->field_iname)." as iname FROM ".$this->db->quote_ident($this->table_name)." WHERE ".$where." LIMIT $limit";
         return $this->db->col($sql);
     }
 

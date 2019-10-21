@@ -233,7 +233,7 @@ abstract class FwController {
         }
 
         if ($this->list_filter["userlist"]){
-            $this->list_where .= " and id IN (select ti.item_id from ".$this->fw->model('UserLists')->table_items." ti where ti.user_lists_id=".dbqi($this->list_filter["userlist"])." and ti.add_users_id=".Utils::me()." ) ";
+            $this->list_where .= " and id IN (SELECT ti.item_id FROM ".$this->fw->model('UserLists')->table_items." ti WHERE ti.user_lists_id=".dbqi($this->list_filter["userlist"])." and ti.add_users_id=".Utils::me()." ) ";
         }
 
         #if related id and field name set - filter on it
@@ -281,7 +281,7 @@ abstract class FwController {
      * @return string $this->list_pager pager from FormUtils::getPager
      */
     public function getListRows() {
-        $this->list_count = $this->db->value("select count(*) from {$this->list_view} where " . $this->list_where);
+        $this->list_count = $this->db->value("SELECT count(*) FROM {$this->list_view} WHERE " . $this->list_where);
         if ($this->list_count){
             $offset = $this->list_filter['pagenum']*$this->list_filter['pagesize'];
             $limit  = $this->list_filter['pagesize'];

@@ -99,7 +99,7 @@ class Att extends FwModel {
 
     public function getAttLinks($table_name, $id){
         if (!$id || !$table_name) return array();
-        return $this->db->arr('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name='.$this->db->quote($table_name).' and atl.item_id='.dbqi($id));
+        return $this->db->arr('SELECT att.* FROM att, att_table_link atl WHERE att.id = atl.att_id and atl.table_name='.$this->db->quote($table_name).' and atl.item_id='.dbqi($id));
     }
 
     //add/update att_table_links
@@ -232,13 +232,13 @@ class Att extends FwModel {
         if ($is_image > -1){
             $where .= " and a.is_image=".dbqi(is_image);
         }
-        return $this->db->arr("select a.* ".
-                    "  from ". $this->att_table_link. " atl, att a ".
-                    " where atl.table_name=". dbq($table_name).
+        return $this->db->arr("SELECT a.* ".
+                    "  FROM ". $this->att_table_link. " atl, att a ".
+                    " WHERE atl.table_name=". dbq($table_name).
                     "   and atl.item_id=". dbqi($id).
                     "   and a.id=atl.att_id".
                     $where.
-                    " order by a.id ");
+                    " ORDER BY a.id ");
     }
 
 }

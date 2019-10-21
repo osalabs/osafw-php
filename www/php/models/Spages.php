@@ -94,7 +94,7 @@ class Spages extends FwModel {
      * @return db array
      */
     public function listChildren($parent_id) {
-        return $this->db->arr("select * from $this->table_name where status<>127 and parent_id=".dbqi($parent_id)." order by iname");
+        return $this->db->arr("SELECT * FROM $this->table_name WHERE status<>127 and parent_id=".dbqi($parent_id)." ORDER BY iname");
     }
 
     /**
@@ -104,7 +104,7 @@ class Spages extends FwModel {
      * @return array            parsepage array with hierarcy (via "children" key)
      */
     public function tree($where, $orderby){
-        $rows = $this->db->arr("select * from $this->table_name where $where order by $orderby");
+        $rows = $this->db->arr("SELECT * FROM $this->table_name WHERE $where ORDER BY $orderby");
         $pages_tree = $this->getPagesTree($rows, 0);
         return $pages_tree;
     }
