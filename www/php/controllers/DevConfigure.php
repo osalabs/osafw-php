@@ -48,6 +48,9 @@ class DevConfigureController extends FwController {
         $ps['is_write_dirs']=false;
         if (is_writable($this->fw->config->PUBLIC_UPLOAD_DIR)) $ps['is_write_dirs']=true;
 
+        $ps['is_write_langok']=true;
+        if (is_writable($this->fw->config->SITE_TEMPLATES.'/lang') && !$this->fw->config->IS_DEV) $ps['is_write_langok']=false;
+
         $ps['is_error_log']=false;
         if (is_writable($this->fw->config->site_error_log)) $ps['is_error_log']=true;
         $ps['error_log_size']=Utils::bytes2str(filesize($this->fw->config->site_error_log));
