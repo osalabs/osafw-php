@@ -1067,6 +1067,7 @@ function lng($str){
 
  $result='';
  $lang_file=$CONFIG['SITE_TEMPLATES']."/lang/$l.txt";
+ $str = trim($str);
 
 # logger("$str => $lang_file");
 
