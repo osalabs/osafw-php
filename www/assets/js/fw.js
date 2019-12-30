@@ -7,12 +7,16 @@
 window.fw={
   HTML_LOADING : '<span class="spinner-border spinner-border" role="status" aria-hidden="true"></span> Loading...',
 
-  ok: function (str){
-    $.jGrowl(str, {theme: 'hint_green'});
+  ok: function (str, options){
+    options = $.extend({}, {theme: 'hint_green'}, options);
+    // if (typeof(options)=='undefined') options={theme: 'hint_green'};
+    $.jGrowl(str, options);
   },
 
-  error: function (str){
-    $.jGrowl(str, {theme: 'hint_error'});
+  error: function (str, options){
+    options = $.extend({}, {theme: 'hint_error'}, options);
+    // if (typeof(options)=='undefined') options={theme: 'hint_error'};
+    $.jGrowl(str, options);
   },
 
   // usage: fw.alert('Process completed','Worker');
@@ -94,8 +98,10 @@ window.fw={
         if ($fis.val()=='1'){
             //if search ON - add search fields to the form
             var html=[];
-            $('table.list .search input').each(function (i, el) {
-                html.push( '<input type="hidden" name="'+el.name+'" value="'+el.value+'">');
+            $('table.list:first .search input').each(function (i, el) {
+              if (el.value>''){
+                html.push( '<input type="hidden" name="'+el.name.replace(/"/g,'&quot;')+'" value="'+el.value.replace(/"/g,'&quot;')+'">');
+              }
             });
             $f.append(html.join(''));
         }
@@ -106,8 +112,21 @@ window.fw={
         this.form.submit();
     });
 
-    //pagesize change TODO
+    //pager click via form filter submit so all filters applied
+    $(document).on('click', '.pagination .page-link[data-pagenum]', function (e){
+      var $this = $(this);
+      var pagenum = $this.data('pagenum');
+      var $f = $this.data('filter') ? $($this.data('filter')) : $('form[data-list-filter]:first');
+      if ($f){
+        e.preventDefault();
+        $('<input type="hidden" name="f[pagenum]">').val(pagenum).appendTo($f);
+        $f.submit();
+      }
+    });
+
+    //pagesize change
     $(document).on('change', '.on-pagesize-change', function (e){
+      e.preventDefault();
       var $this = $(this);
       var $f = $this.data('filter') ? $($this.data('filter')) : $('form[data-list-filter]:first');
       if ($f){
@@ -286,6 +305,10 @@ window.fw={
       }
       //console.log('on autosave', $f);
       $f.data('is-ajaxsubmit',true);
+      var hint_options={};
+      if ($f.data('autosave-sticky')){
+        hint_options={sticky: true};
+      }
 
       //console.log('before ajaxSubmit', $f);
       $f.ajaxSubmit({
@@ -306,8 +329,9 @@ window.fw={
                   $f.data('is-ajaxsubmit',false);
                   //auto-save error - highlight errors
                   if (data.ERR) fw.process_form_errors($f, data.ERR);
-                  //hint_error(data.err_msg ? data.err_msg : 'Auto-save error. Press Save manually.');
+                  fw.error(data.err_msg ? data.err_msg : 'Auto-save error. Press Save manually.', hint_options);
               }
+              if (data.msg) fw.ok(data.msg, hint_options);
               $f.trigger('autosave-success',[data]);
           },
           error: function function_name (argument) {
@@ -323,13 +347,15 @@ window.fw={
       if (status==0){
           //nothing
       }else if (status==1){ //not saved
-          cls='text-danger';
+          cls='badge-danger';
           txt='not saved';
       }else if (status==2){ //saved
-          cls='text-success';
+          cls='badge-success';
           txt='saved';
       }
-      $(f).find('.form-saved-status').html('<span class="'+cls+'">'+txt+'</span>');
+      var html='<span class="badge '+cls+'">'+txt+'</span>';
+      $(f).find('.form-saved-status').html(html);
+      $('.form-saved-status-global').html(html);
     }
   },
 
@@ -350,16 +376,18 @@ window.fw={
     $(selector).each(function (i, el) {
       var $f = $(el);
       var errors = err_json ? err_json : $f.data('errors');
-      console.log(errors);
+      if (errors) console.log(errors);
       if ($.isPlainObject(errors)){
         //highlight error fields
         $.each(errors,function(key, errcode) {
           var $input = $f.find('[name="item['+key+']"],[name="'+key+'"]');
           if ($input.length){
-            $input.closest('.form-group').not('.noerr').addClass('has-danger'); //highlight whole row (unless .noerr exists)
+            $input.closest('.form-group, .form-row').not('.noerr').addClass('has-danger'); //highlight whole row (unless .noerr exists)
             $input.addClass('is-invalid'); //mark input itself
             if (errcode!==true && errcode.length){
-              $input.parent().find('.err-'+errcode).addClass('invalid-feedback'); //find/show specific error message
+              var $p=$input.parent();
+              if ($p.is('.input-group')) $p = $p.parent();
+              $p.find('.err-'+errcode).addClass('invalid-feedback'); //find/show specific error message
             }
           }
         });
@@ -455,7 +483,7 @@ window.fw={
       if (win_scrollY<to.top) {
           //no need to show fixed header
           $dh.remove();
-          $table.find('thead').find('tr:first').css({visibility: ''});
+          $table.find('thead').css({visibility: ''});
           return;
       }
 
@@ -464,18 +492,18 @@ window.fw={
 
           //create fixed header for the table
           var $th_orig = $table.find('thead:first');
-          $th_orig.find('tr:first').css({visibility: 'hidden'});
+          $th_orig.css({visibility: 'hidden'});
 
           var $th = $table.find('thead:first').clone(true);
-          $th.find('tr').not(':eq(0)').remove(); //leave just first tr
-          $th.find('tr:first').css({visibility: ''});
+          //$th.find('tr').not(':eq(0)').remove(); //leave just first tr
+          $th.css({visibility: ''});
 
           var $htable = $('<table></table>').width($table.width()).append( $th );
           $htable[0].className = $table[0].className; //apply all classes
           $htable.removeClass('data-table');
 
-          var $th0 = $table.find('thead:first > tr:first > th');
-          var $thh = $htable.find('thead:first > tr:first > th');
+          var $th0 = $table.find('thead:first > tr > th');
+          var $thh = $htable.find('thead:first > tr > th');
           $th0.each(function(i,el) {
               $thh.eq(i).outerWidth( $(this).outerWidth() );
           });
