@@ -28,6 +28,7 @@ $SITE_CONFIG=array(
                 'IS_LOG'    => true,
                 ),
     'IS_DEV'            => true, #to enable developer features
+    'IS_LANG_UPD'       => true,    #auto-update lang file while in development
     'LOG_LEVEL'         => 'DEBUG', #use ALL|TRACE|DEBUG for development
     'IS_SIGNUP'         => true,
     'CRYPT_KEY'         => 'DEVKEY',

@@ -115,6 +115,8 @@ class Users extends FwModel {
 
         $_SESSION['user_id']=$id;
         $_SESSION['login']=$hU['email'];
+        $_SESSION['lang']=$hU['lang'];
+
         $fname = trim($hU['fname']);
         $lname = trim($hU['lname']);
         $_SESSION['user_name']=$fname.($fname?' ':'').$lname; #will be empty if no user name set

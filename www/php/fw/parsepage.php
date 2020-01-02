@@ -1061,15 +1061,15 @@ function replace_lang($matches){
 
 #########
 function lng($str){
- global $CONFIG;
- $l=$CONFIG['LANG'];
- if (!$l) $l=$CONFIG['LANG_DEF'];
+ $fw = fw::i(); #TODO change ParsePage to use fw->config everywhere instead of global $CONFIG
+ $l=$fw->config->LANG;
+ if (!$l) $l=$fw->config->LANG_DEF;
 
  $result='';
- $lang_file=$CONFIG['SITE_TEMPLATES']."/lang/$l.txt";
+ $lang_file=$fw->config->SITE_TEMPLATES."/lang/$l.txt";
  $str = trim($str);
 
-# logger("$str => $lang_file");
+ #logger("$str => $lang_file");
 
  if ($l){
     $LANG_STR=load_lang($lang_file);
@@ -1082,7 +1082,7 @@ function lng($str){
 
 #    logger("before update $result");
 #    if ($l=='en'){  #update only if we are under English (this keep performance better)
-       if ($CONFIG['IS_LANG_UPD']) update_lang($result, $CONFIG['LANG_DEF']); #if no translation - add string to en.txt file (but only if we allowed to update)
+       if ($fw->config->IS_LANG_UPD) update_lang($result, $fw->config->LANG_DEF); #if no translation - add string to en.txt file (but only if we allowed to update)
 #    }
  }
 
@@ -1128,7 +1128,7 @@ function update_lang($str, $lang){
 
  $lang_file=$CONFIG['SITE_TEMPLATES']."/lang/$lang.txt";
  $LANG_STR=load_lang($lang_file);
- logger('TRACE', "ParsePage notice - updating lang [$lang_file]");
+ logger('DEBUG', "ParsePage notice - updating lang [$lang_file]");
 
  if ( !array_key_exists($str, $LANG_STR) ){
     $LANG_CACHE[$lang_file][$str]="";

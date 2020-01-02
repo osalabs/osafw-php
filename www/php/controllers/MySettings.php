@@ -41,8 +41,10 @@ class MySettingsController extends FwController {
         try{
             $this->Validate($id, $item);
 
-            $vars = FormUtils::filter($item, 'email fname lname address1 address2 city state zip phone');
+            $vars = FormUtils::filter($item, 'email fname lname address1 address2 city state zip phone lang');
             $this->model->update($id, $vars);
+
+            $this->model->reloadSession();
 
             $this->fw->flash("record_updated", true);
             fw::redirect($this->base_url);
