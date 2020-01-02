@@ -7,6 +7,9 @@
 */
 
 abstract class FwModel {
+    public const STATUS_ACTIVE = 0;
+    public const STATUS_DELETED = 127;
+
     public $fw;  //current app/framework object
     public $table_name; //must be defined in inherited classes
 
@@ -19,6 +22,8 @@ abstract class FwModel {
     public $field_add_users_id='add_users_id';
     public $field_upd_users_id='upd_users_id';
     public $field_upd_time='upd_time';
+
+    public $csv_export_fields = ""; #all or Utils.qh format fieldname|HumanName|fieldName
 
     protected $db;
 
@@ -212,6 +217,13 @@ abstract class FwModel {
         return $this->db->col($sql);
     }
 
+    public function getCSVExport() {
+        $where = array();
+        if ($this->field_status > "")  $where[$this->field_status] = self::STATUS_ACTIVE;
+
+        $rows = $this->db->arr($this->table_name, $where);
+        Utils::responseCSV($rows, $this->csv_export_fields);
+    }
 
     //****************** Item Upload Utils
 

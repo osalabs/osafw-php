@@ -68,6 +68,10 @@ class AdminUsersController extends FwAdminController {
         $this->validateCheckResult();
     }
 
+    public function ExportAction(){
+        $this->model->getCSVExport();
+    }
+
     public function Export($ps, $format) {
         if ($format!='csv') throw new ApplicationException("Unsupported format");
 

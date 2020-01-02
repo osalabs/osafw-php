@@ -16,10 +16,11 @@ class Users extends FwModel {
         parent::__construct();
 
         $this->table_name = 'users';
+        $this->csv_export_fields = "id|id fname|First&nbsp;Name lname|Last&nbsp;Name email|Email add_time|Registered";
     }
 
     public function oneByEmail($email) {
-        return $this->db->row("SELECT * FROM ".$this->table_name." WHERE email=".$this->db->quote($email));
+        return $this->db->row($this->table_name, array("email" => $email));
     }
 
     public function getFullName($id) {
