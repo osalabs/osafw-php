@@ -19,6 +19,7 @@ class FwHooks {
 
         #'also force set XSS code
         if (!isset($_SESSION['XSS'])) $_SESSION['XSS']=Utils::getRandStr(16);
+        if ($me_id) Users::i()->loadMenuItems();
     }
 
 }

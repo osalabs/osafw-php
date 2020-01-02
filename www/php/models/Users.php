@@ -9,6 +9,9 @@ class Users extends FwModel {
     public static $PERM_COOKIE_NAME='perm';
     public static $PERM_COOKIE_DAYS=356;
     public static $order_by = 'fname, lname';
+
+    public $table_menu_items = 'menu_items';
+
     public function __construct() {
         parent::__construct();
 
@@ -228,6 +231,12 @@ class Users extends FwModel {
         return $result;
     }
 
+    public function loadMenuItems(){
+        if (!isset($_SESSION['menu_items'])) {
+            $_SESSION['menu_items']=$this->db->arr("select * from $this->table_menu_items where status=0 and access_level<=".dbqi($users_acl)." order by iname");
+        }
+        $this->fw->GLOBAL['menu_items'] = $_SESSION['menu_items'];
+    }
 }
 
 ?>
