@@ -4,6 +4,10 @@ Demos model class
 */
 
 class Demos extends FwModel {
+    /** @return Demos */
+    public static function i() {
+        return parent::i();
+    }
 
     public function __construct() {
         parent::__construct();

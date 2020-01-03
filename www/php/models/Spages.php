@@ -4,6 +4,10 @@ Static Pages model class
 */
 
 class Spages extends FwModel {
+    /** @return Spages */
+    public static function i() {
+        return parent::i();
+    }
 
     public function __construct() {
         parent::__construct();

@@ -29,6 +29,8 @@ abstract class FwModel {
 
     #alternative of fw::model(Model)->method() is Model::i()->method()
     #7 chars shorter :]
+    #this comment below is a helper hint for IDE:
+    /** @return FwModel */
     static function i(){
         return fw::model(get_called_class());
     }

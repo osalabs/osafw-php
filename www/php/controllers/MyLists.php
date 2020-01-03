@@ -26,7 +26,7 @@ class MyListsController extends FwAdminController {
     }
 
     public function initFilter(){
-        $result = parent::initFilter();
+        parent::initFilter();
         if (!array_key_exists('entity', $this->list_filter)){
             $this->list_filter["entity"] = $this->related_id;
         }
@@ -48,7 +48,7 @@ class MyListsController extends FwAdminController {
 
         $id = parent::modelAddOrUpdate($id, $itemdb);
 
-        if ($is_new && array_key_exists('item_id', $item)){
+        if ($is_new && array_key_exists('item_id', $itemdb)){
             #item_id could contain comma-separated ids
             $hids = Utils::commastr2hash(item["item_id"]);
 

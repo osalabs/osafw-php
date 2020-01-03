@@ -4,6 +4,10 @@ Settings model class
 */
 
 class Settings extends FwModel {
+    /** @return Settings */
+    public static function i() {
+        return parent::i();
+    }
 
     /* static convenience functions, for easier use as:
     $var = Settings::read('icode');

@@ -22,15 +22,15 @@ class AdminSettingsController extends FwAdminController {
 
     public function IndexAction() {
         #get filters from the search form
-        $f = $this->initFilter();
+        $this->initFilter();
 
         $this->setListSorting();
         $this->setListSearch();
 
         //other filters add to $this->list_where here
         //if search - no category
-        if ($f['s']=='' && isset($f['icat'])){
-            $this->list_where .= ' and icat='.$this->db->quote($f['icat']);
+        if ($this->list_filter['s']=='' && isset($this->list_filter['icat'])){
+            $this->list_where .= ' and icat='.$this->db->quote($this->list_filter['icat']);
         }
 
         $this->getListRows();

@@ -31,7 +31,7 @@ class AdminDemosController extends FwAdminController {
     public function __construct() {
         parent::__construct();
 
-        $this->model_related = fw::model('DemoDicts');
+        $this->model_related = DemoDicts::i();
     }
 
     // override get list rows as list need to be modified

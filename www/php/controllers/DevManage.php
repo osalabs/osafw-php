@@ -55,14 +55,14 @@ class DevManageController extends FwController {
         $logpath = $this->fw->config->site_error_log;
         rw("Dump of last ".$seek." bytes of the site log");
 
-        $fs = fopen($logpath, "r");
-        fseek($fs, -$seek);
+        $flog = fopen($logpath, "r");
+        fseek($flog, -$seek);
         rw("<pre>");
-        fpassthru($fs);
+        fpassthru($flog);
         rw("</pre>");
 
         rw("end of dump");
-        fclose($fs);
+        fclose($flog);
     }
 
     public function CreateModelAction(){
@@ -105,7 +105,7 @@ class DevManageController extends FwController {
             "DemoDicts" => $model_name,
             "Demos" => $model_name,
         );
-        if (!$this->_replaceInFile($path."/AdminDemosDynamic.php", $replacements, $path."/".$controller_name.".php", $mdemo)) throw new ApplicationException("Can't open AdminDemosDynamic.php");
+        if (!$this->_replaceInFile($path."/AdminDemosDynamic.php", $replacements, $path."/".$controller_name.".php")) throw new ApplicationException("Can't open AdminDemosDynamic.php");
 
         #copy templates from /admin/demosdynamic to /controller/url
         $tpl_from = $this->fw->config->SITE_TEMPLATES."/admin/demosdynamic";
@@ -146,6 +146,8 @@ class DevManageController extends FwController {
         $hFieldsMap = array();
         $showFields = array();
         $showFormFields = array();
+        $saveFieldsNullable = array();
+        $fld = array();
         foreach ($fields as &$fld) {
             #logger("check field=", $fld["name"]);
             $hfields[$fld["name"]] = $fld;
@@ -161,6 +163,7 @@ class DevManageController extends FwController {
             $sff["field"] = $fld["name"];
             $sff["label"] = $fld["name"];
 
+            if ($fld["is_nullable"] = "1") $saveFieldsNullable[]=$fld["name"];
             if ($fld["is_nullable"] = "0" && !$fld["default"]) $sff["required"] = true; #if not nullable and no default - required
 
             if ($fld["maxlen"]>0) $sff["maxlength"] = intval($fld["maxlen"]);

@@ -13,6 +13,11 @@ class Reports extends FwModel {
         'landscape' => true,
     );
 
+    /** @return Reports */
+    public static function i() {
+        return parent::i();
+    }
+
     public function __construct() {
         parent::__construct();
 

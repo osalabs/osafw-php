@@ -125,3 +125,38 @@ Please fill in all required fields ===
 Please correct the errors === 
 Record has been deleted === 
 records has been deleted === 
+Search === 
+Active === 
+Inactive === 
+[Trashed] === 
+My List === 
+DemoDicts === 
+Title === 
+View === 
+with <span class="badge badge-secondary rows-num"></span> checked rows: === 
+First === 
+Filter Columns === 
+Add New Demo item === 
+Edit Demo item === 
+Return back to list === 
+Return back === 
+Parent === 
+Such title already exists in our database === 
+Wysiwyg editor === 
+Wysiwyg editor short === 
+fint === 
+ffloat === 
+Attachment === 
+Select/Upload === 
+Download === 
+Remove === 
+Multiple Attachments === 
+new === 
+Deleted === 
+by === 
+or choose from existing uploads, category === 
+show all === 
+<label> === 
+Your Email === 
+show characters === 
+Sign Up === 

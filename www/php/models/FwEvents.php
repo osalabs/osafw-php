@@ -6,6 +6,11 @@ Events/Event logging model class
 class FwEvents extends FwModel {
     public $log_table_name = 'fwevents_log';
 
+    /** @return FwEvents */
+    public static function i() {
+        return parent::i();
+    }
+
     public function __construct() {
         parent::__construct();
 

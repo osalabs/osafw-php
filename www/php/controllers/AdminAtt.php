@@ -26,7 +26,7 @@ class AdminAttController extends FwAdminController {
 
     public function IndexAction() {
         #get filters from the search form
-        $f = $this->initFilter();
+        $this->initFilter();
 
         $this->setListSorting();
         $this->setListSearch();
@@ -34,7 +34,7 @@ class AdminAttController extends FwAdminController {
 
         //other filters add to $this->list_where here
         if ($this->list_filter['att_categories_id']>0){
-            $this->list_where .= '  and att_categories_id='. dbqi($att_categories_id);
+            $this->list_where .= '  and att_categories_id='. dbqi($this->list_filter['att_categories_id']);
         }
 
         $this->getListRows();
@@ -60,7 +60,6 @@ class AdminAttController extends FwAdminController {
 
     public function ShowFormAction($form_id) {
         $id = $form_id+0;
-        $dict_link_multi=array();
 
         if ($this->fw->isGetRequest()){
             if ($id>0){
@@ -171,7 +170,7 @@ class AdminAttController extends FwAdminController {
         }
 
         $rows = $this->model->ilistByCategory($att_categories_id);
-        foreach ($rows as $key => $row) {
+        foreach ($rows as $row) {
             $row['direct_url'] = $this->model->getUrlDirect($row);
         }
 

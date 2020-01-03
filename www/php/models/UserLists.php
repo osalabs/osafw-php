@@ -12,6 +12,11 @@ class UserLists extends FwModel {
 
     public $table_items = 'user_lists_items';
 
+    /** @return UserLists */
+    public static function i() {
+        return parent::i();
+    }
+
     public function __construct() {
         parent::__construct();
 

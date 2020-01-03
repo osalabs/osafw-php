@@ -38,7 +38,7 @@ class DevConfigureController extends FwController {
         $ps['is_db_tables']=false;
         if ($ps['is_db_conn']){
             try {
-                $value=$db->value("select count(*) from fwevents_log"); #checking last table in a script as first tables might be filled
+                $db->value("select count(*) from fwevents_log"); #checking last table in a script as first tables might be filled
                 $ps['is_db_tables']=true;
             } catch (Exception $e) {
                 $ps['db_tables_err']=$e->getMessage();

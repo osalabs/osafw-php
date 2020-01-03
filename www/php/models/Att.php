@@ -10,6 +10,11 @@ class Att extends FwModel {
     public $MIME_MAP = 'doc|application/msword docx|application/msword xls|application/vnd.ms-excel xlsx|application/vnd.ms-excel ppt|application/vnd.ms-powerpoint pptx|application/vnd.ms-powerpoint pdf|application/pdf html|text/html zip|application/x-zip-compressed jpg|image/jpeg jpeg|image/jpeg gif|image/gif png|image/png wmv|video/x-ms-wmv avi|video/x-msvideo';
     public $att_table_link = 'att_table_link';
 
+    /** @return Att */
+    public static function i() {
+        return parent::i();
+    }
+
     public function __construct() {
         parent::__construct();
 

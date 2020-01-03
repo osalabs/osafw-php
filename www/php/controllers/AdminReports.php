@@ -51,12 +51,12 @@ class AdminReportsController extends FwAdminController {
 
         try {
             if ($report->saveChanges()){
-                fw::redirect($base_url."/".$repcode."?is_run=1");
+                fw::redirect($this->base_url."/".$repcode."?is_run=1");
             }else{
                 $_REQUEST['is_run']=1;
                 $this->fw->routeRedirect("Show");
             }
-        } catch (ApplicationException $e) {
+        } catch (ApplicationException $ex) {
             $this->setFormError($ex->getMessage());
             $this->routeRedirect("ShowForm");
         }

@@ -53,12 +53,12 @@ class LoginController extends FwController {
                 throw new ApplicationException("");
             }
 
-            $hU = $this->db->row("select * from users where email=".$this->db->quote($login));
+            $user = $this->db->row("select * from users where email=".$this->db->quote($login));
             if (!$is_dev_login){
-                if (!$hU || $hU['status']!=0 || !$this->model->checkPwd($pwd, $hU['pwd']) ) throw new ApplicationException(lng("User Authentication Error"));
+                if (!$user || $user['status']!=0 || !$this->model->checkPwd($pwd, $user['pwd']) ) throw new ApplicationException(lng("User Authentication Error"));
             }
 
-            $this->model->doLogin( $hU['id'] );
+            $this->model->doLogin( $user['id'] );
 
             if ($gourl && !preg_match("/^http/i", $gourl)){ #if url set and not external url (hack!) given
                 fw::redirect($gourl);
@@ -92,21 +92,21 @@ class LoginController extends FwController {
         $users_id=0;
 
         #first - check by email
-        $hU=$this->model->oneByEmail($item['email']);
-        if ($hU['id']){
-            $users_id=$hU['id'];
+        $user=$this->model->oneByEmail($item['email']);
+        if ($user['id']){
+            $users_id=$user['id'];
         }
 
         if (!$users_id){
             #now check by facebook email
-            $hU=$this->db->row("select * from users where fb_email=".$this->db->quote($item['email']) );
-            if ($hU['id']) $users_id=$hU['id'];
+            $user=$this->db->row("select * from users where fb_email=".$this->db->quote($item['email']) );
+            if ($user['id']) $users_id=$user['id'];
         }
 
         if (!$users_id){
             #now check by facebook id
-            $hU=$this->db->row("select * from users where fb_id=".$this->db->quote($item['id']) );
-            if ($hU['id']) $users_id=$hU['id'];
+            $user=$this->db->row("select * from users where fb_id=".$this->db->quote($item['id']) );
+            if ($user['id']) $users_id=$user['id'];
         }
 
         if ($users_id){
@@ -115,19 +115,19 @@ class LoginController extends FwController {
                 'fb_access_token'   => $item['access_token'],
             );
 
-            if ($hU['sex']!= ($item['gender']=='male' ? 1 : 0) ) $vars['sex']=$item['gender']=='male' ? 1 : 0;
-            if (!$hU['fname']) $vars['fname']=$item['first_name'];
-            if (!$hU['lname']) $vars['lname']=$item['last_name'];
-            if ($hU['fb_email']!=$item['email'] && $item['email']) $vars['fb_email']=$item['email'];
+            if ($user['sex']!= ($item['gender']=='male' ? 1 : 0) ) $vars['sex']=$item['gender']=='male' ? 1 : 0;
+            if (!$user['fname']) $vars['fname']=$item['first_name'];
+            if (!$user['lname']) $vars['lname']=$item['last_name'];
+            if ($user['fb_email']!=$item['email'] && $item['email']) $vars['fb_email']=$item['email'];
 
-            if (!$hU['fb_id'])          $vars['fb_id']          =$item['id'];
-            if (!$hU['fb_link'])        $vars['fb_link']        =$item['link'];
-            if (!$hU['fb_locale'])      $vars['fb_locale']      =$item['locale'];
-            if (!$hU['fb_name'])        $vars['fb_name']        =$item['name'];
-            if (!$hU['fb_timezone'])    $vars['fb_timezone']    =$item['timezone'];
-            if (!$hU['fb_username'])    $vars['fb_username']    =$item['username'];
-            if (!$hU['fb_verified'])    $vars['fb_verified']    =$item['verified']=='true' ? 1 : 0;
-            if (!$hU['fb_picture_url']) $vars['fb_picture_url'] ='http://graph.facebook.com/'.$item['username'].'/picture';
+            if (!$user['fb_id'])          $vars['fb_id']          =$item['id'];
+            if (!$user['fb_link'])        $vars['fb_link']        =$item['link'];
+            if (!$user['fb_locale'])      $vars['fb_locale']      =$item['locale'];
+            if (!$user['fb_name'])        $vars['fb_name']        =$item['name'];
+            if (!$user['fb_timezone'])    $vars['fb_timezone']    =$item['timezone'];
+            if (!$user['fb_username'])    $vars['fb_username']    =$item['username'];
+            if (!$user['fb_verified'])    $vars['fb_verified']    =$item['verified']=='true' ? 1 : 0;
+            if (!$user['fb_picture_url']) $vars['fb_picture_url'] ='http://graph.facebook.com/'.$item['username'].'/picture';
 
             $this->db->update('users', $vars, $users_id);
 
