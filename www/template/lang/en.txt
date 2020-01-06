@@ -160,3 +160,34 @@ show all ===
 Your Email === 
 show characters === 
 Sign Up === 
+Add New DemoDynamic item === 
+Edit DemoDynamic item === 
+<~label> === 
+Such name already exists in our database === 
+Published on === 
+Add New Page === 
+Edit Page === 
+Back to list === 
+Up === 
+Add Sub-Page === 
+Sub === 
+Preview === 
+Page Title === 
+Page Content === 
+Left column === 
+Right column === 
+Page Image === 
+best === 
+Remove image === 
+Meta Keywords === 
+Meta Description === 
+Custom CSS === 
+Custom JS === 
+On date === 
+Parent&nbsp;Url === 
+Url === 
+Such URL already exists in our database === 
+Parent&nbsp;page === 
+Template === 
+Priority === 
+Sub-Pages === 

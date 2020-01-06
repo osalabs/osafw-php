@@ -167,9 +167,8 @@ class FormUtils {
     return $result;
   }
 
-  public static function selectTplOptions($tpl_path, $sel_id, $is_multi=false){
+  public static function selectTplOptions($tpl_path){
     $result=array();
-    if (!$sel_id) $sel_id='';
 
     $lines = file(fw::i()->config->SITE_TEMPLATES.$tpl_path);
     foreach ($lines as $line){

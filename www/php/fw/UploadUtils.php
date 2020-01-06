@@ -253,7 +253,7 @@ class UploadUtils {
      * @param  string  $size        optional, s,m,l or ''(default) for original upload
      * @return string               direct url to file
      */
-    public static function getUploadUrl($id, $module_basedir, $module_baserul, $ext, $size=''){
+    public static function getUploadUrl($id, $module_baserul, $ext, $size=''){
         if ($size>'') $size='_'.$size;
         $url = $module_baserul.self::id2dir($id).'/'.$id.$size.$ext;
 

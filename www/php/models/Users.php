@@ -129,20 +129,8 @@ class Users extends FwModel {
     }
 
     private function updateAfterLogin($id) {
-        $hU=$this->one($id);
-        #TODO add_notify_log($GLOBAL['NOTIFY_LOG_LOGIN'], $id, 0, $hU);
-
         #update login vars
         $ip=getenv("REMOTE_ADDR");
-
-        /*TODO
-        $vars=array(
-           'users_id'     => $id,
-           'login_ip' => $ip,
-           'add_time' => '~!now()',
-        );
-        $this->db->insert('users_log', $vars);
-        */
 
         $host=gethostbyaddr($ip);
 
@@ -151,7 +139,7 @@ class Users extends FwModel {
             'login_ip'      => $ip,
             'login_host'    => $host,
         );
-        $this->db->update($this->table_name, $vars, $id);
+        $this->update($id, $vars);
     }
 
     public function createPermCookie($id){
@@ -241,7 +229,7 @@ class Users extends FwModel {
 
     public function loadMenuItems(){
         if (!isset($_SESSION['menu_items'])) {
-            $_SESSION['menu_items']=$this->db->arr("select * from $this->table_menu_items where status=0 and access_level<=".dbqi($users_acl)." order by iname");
+            $_SESSION['menu_items']=$this->db->arr("select * from $this->table_menu_items where status=0 and access_level<=".dbqi($_SESSION['access_level'])." order by iname");
         }
         $this->fw->GLOBAL['menu_items'] = $_SESSION['menu_items'];
     }

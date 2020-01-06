@@ -39,7 +39,7 @@ class UserLists extends FwModel {
     public function delete($id, $is_perm = false){
         if ($is_perm){
             #delete list items first
-            $this->db->delete($this->table_items, $id, $user_lists_id);
+            $this->db->delete($this->table_items, $id, "user_lists_id");
         }
 
         return parent::delete($id, $is_perm);

@@ -489,7 +489,7 @@ abstract class FwController {
         return $result;
     }
 
-    public function getViewListSortmap($value=''){
+    public function getViewListSortmap(){
         $result=array();
         foreach ($this->view_list_map as $fieldname => $value) {
             $result[$fieldname] = $fieldname;
@@ -497,7 +497,7 @@ abstract class FwController {
         return $result;
     }
 
-    public function getViewListUserFields($value=''){
+    public function getViewListUserFields(){
         $item = UserViews::i()->oneByScreen($this->base_url); #base_url is screen identifier
         return $item['fields']>'' ? $item['fields'] : $this->view_list_defaults;
     }

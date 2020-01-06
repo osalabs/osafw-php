@@ -322,16 +322,16 @@ class fw {
         $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS, CASE_LOWER);
 
         #XSS check for all requests that modify data
-        if ( (reqs("XSS") || $this->route->method == "POST" || $this->route->method == "PUT" || $this->route->method == "DELETE")
+        if ( (reqs("XSS") || $route->method == "POST" || $route->method == "PUT" || $route->method == "DELETE")
             && $_SESSION["XSS"] > "" && $_SESSION["XSS"] <> reqs("XSS")
-            && !in_array($this->route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
+            && !in_array($route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
            throw new AuthException("XSS Error");
         }
 
         #access level check
-        $path = strtolower('/'.$this->route->controller.'/'.$this->route->action);
-        $path2 = strtolower('/'.$this->route->controller);
+        $path = strtolower('/'.$route->controller.'/'.$route->action);
+        $path2 = strtolower('/'.$route->controller);
 
         $current_level = -1;
         if (isset($_SESSION['access_level'])) $current_level=$_SESSION['access_level'];
@@ -345,7 +345,7 @@ class fw {
 
         if (is_null($rule_level)){
             #rule not found in config - try Controller.access_level
-            $rule_level = $this->dispatcher->getRouteAccessLevel($this->route->controller);
+            $rule_level = $this->dispatcher->getRouteAccessLevel($route->controller);
         }
 
         if (is_null($rule_level)){
@@ -385,7 +385,7 @@ class fw {
         if (!$is_error_processed){
             $uri = $_SERVER['REQUEST_URI'];
             $d = $this->dispatcher;
-            $err_code_desc = $d::$HTTP_CODE[$error_code];
+            $err_code_desc = $d->getHTTPDescription($error_code);
 
             header("HTTP/1.0 $error_code $err_code_desc", true, $error_code);
 

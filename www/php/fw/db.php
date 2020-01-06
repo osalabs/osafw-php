@@ -675,7 +675,7 @@ class DB {
             $anames = $row_values = $avalues = $params = array();
             $is_anames_set=false;
 
-            foreach ($vars as $i => $row) {
+            foreach ($vars as $row) {
                 foreach( $row as $k => $v ){
                     if (!$is_anames_set) {
                         $anames[]=$this->quote_ident($k);
@@ -912,7 +912,7 @@ class DB {
             where c.TABLE_SCHEMA=".dbq($this->config['DBNAME'])."
               and c.TABLE_NAME=".dbq($table_name)."
             ");
-        foreach ($rows as $key => &$row) {
+        foreach ($rows as &$row) {
             $row["internal_type"] = $this->map_sqltype2internal($row["type"]);
         }
         unset($row);

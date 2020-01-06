@@ -76,7 +76,7 @@ class ImageUtils {
                }
             }
 
-            $a=imagecopyresampled($s_img,$img,0,0,0,0,$new_w,$new_h,$old_w,$old_h);
+            imagecopyresampled($s_img,$img,0,0,0,0,$new_w,$new_h,$old_w,$old_h);
 
             self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format) );
 
@@ -360,7 +360,7 @@ class ImageUtils {
       //crop and resize
       //bool imagecopyresampled ( resource $dst_image , resource $src_image , int $dst_x , int $dst_y , int $src_x , int $src_y , int $dst_w , int $dst_h , int $src_w , int $src_h )
       //rw("src xy=$src_x,$src_y wh=$src_w,$src_h, to $w,$h");
-      $a=imagecopyresampled($s_img,$img,0,0, $src_x,$src_y, $w,$h, $src_w,$src_h);
+      imagecopyresampled($s_img,$img,0,0, $src_x,$src_y, $w,$h, $src_w,$src_h);
 
       //save result
       self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format) );

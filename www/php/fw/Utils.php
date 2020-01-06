@@ -37,7 +37,7 @@ class Utils {
     //spaces converted to '&nbsp;'
     public static function qwRevert($arr) {
         $result = '';
-        foreach ($arr as $key => $value) {
+        foreach ($arr as $value) {
             $result.= str_replace(' ', '&nbsp;', $value).' ';
         }
         return $result;
@@ -138,7 +138,7 @@ class Utils {
     public static function toCSVRow($row, $fields){
         $result='';
 
-        foreach ($fields as $key => $fld) {
+        foreach ($fields as $fld) {
             $str = $row[$fld];
             if ( preg_match('/[",]/', $str) ){
                 //quote string
@@ -168,11 +168,9 @@ class Utils {
         $headers_str=implode(',', $fields_header);
 
         echo $headers_str."\n";
-        foreach ($rows as $key => $row) {
+        foreach ($rows as $row) {
             echo static::toCSVRow($row, $fields);
         }
-
-        echo $result;
     }
 
     /**

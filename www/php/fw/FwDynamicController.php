@@ -295,7 +295,7 @@ class FwDynamicController extends FwController {
     }
 
     public function SaveUserViewsAction(){
-        $item = reqh('item');
+        $fld = reqh('fld');
         $success = true;
 
         try {
@@ -304,7 +304,7 @@ class FwDynamicController extends FwController {
             }else{
                 #save fields
                 #order by value
-                $ordered = reqh("fld");
+                $ordered = $fld;
                 asort($ordered);
 
                 #and then get ordered keys
@@ -463,7 +463,7 @@ class FwDynamicController extends FwController {
                     }
 
                 }elseif(array_key_exists('lookup_tpl', $def)){
-                    $def['select_options'] = FormUtils::selectTplOptions($def['lookup_tpl'], $item[$field]);
+                    $def['select_options'] = FormUtils::selectTplOptions($def['lookup_tpl']);
                     $def["value"] = $item[$field];
                     foreach ($def['select_options'] as &$row) { #contains id, iname
                         $row["is_inline"] = $def["is_inline"];

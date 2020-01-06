@@ -309,7 +309,7 @@ function _parse_page($basedir, $tpl_name, $hf, $page='', $parent_hf=0){
                     $tagvalue='';
                     $hfcount=count($repeat_array);
                     $k1=0;
-                    foreach($repeat_array as $k => $v){
+                    foreach($repeat_array as $v){
                        $hfrow=$v;
                        $hfrow['repeat.last']=($k1==$hfcount-1)?1:0;
                        $hfrow['repeat.first']=($k1==0)?1:0;
@@ -524,7 +524,7 @@ function tag_if($attrs, $hf){
   //first - check attrs that control show tag or not
   $oper='';
   $eqvar=NULL;
-  foreach ($PARSE_PAGE_OPS as $k => $v){
+  foreach ($PARSE_PAGE_OPS as $v){
     if ( array_key_exists($v,$attrs) ){
         $oper=$v;
         $eqvar=$attrs[$v];
@@ -659,7 +659,7 @@ function parse_select_tag($basedir, $tpl_path, $tag, $hf, $attrs){
       return '';
     }
 
-    foreach ($hf[$tag] as $key => $item) {
+    foreach ($hf[$tag] as $item) {
       $desc=$item['iname'];
       if (array_key_exists('id', $item)){
         $value = trim($item['id']);
@@ -761,7 +761,7 @@ function parse_selvalue_tag($basedir, $tpl_path, $tag, $hf, $attrs){
       return '';
     }
 
-    foreach ($hf[$tag] as $key => $item) {
+    foreach ($hf[$tag] as $item) {
       $desc=$item['iname'];
       if (array_key_exists('id', $item)){
         $value = trim($item['id']);
@@ -854,7 +854,7 @@ function precache_file($infile, $isdie=false){
 #Cached Template parser
 #
 function parse_cache_template($page,$hf,$out_filename=''){
- global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG, $PARSE_PAGE_OPENEND_TAG;
+ global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG;
  global $CONFIG;
 
  preg_match_all("/$PARSE_PAGE_OPEN_TAG([^$PARSE_PAGE_CLOSE_TAG]+)$PARSE_PAGE_CLOSE_TAG/",$page,$out,PREG_PATTERN_ORDER);
@@ -862,7 +862,7 @@ function parse_cache_template($page,$hf,$out_filename=''){
  $tags[]='ROOT_URL';
  $hf['ROOT_URL']=$CONFIG['ROOT_URL'];
 
- foreach ($tags as $key=>$tag){
+ foreach ($tags as $tag){
    $page=preg_replace("/".$PARSE_PAGE_OPEN_TAG.preg_quote($tag,"/").$PARSE_PAGE_CLOSE_TAG."/",hfvalue($tag, $hf),$page);
  }
 

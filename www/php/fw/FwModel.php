@@ -255,7 +255,7 @@ abstract class FwModel {
     }
 
     public function getUploadUrl($id, $ext, $size=''){
-        return UploadUtils::getUploadUrl($id, $this->getUploadBaseDir(), $this->getUploadBaseUrl(), $ext, $size);
+        return UploadUtils::getUploadUrl($id, $this->getUploadBaseUrl(), $ext, $size);
     }
 
     public function removeUpload($id, $ext){

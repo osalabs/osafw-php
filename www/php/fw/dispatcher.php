@@ -113,6 +113,15 @@ class Dispatcher {
         return $this->callClassMethod($controller.'Controller', $action.'Action', $aparams);
     }
 
+    /**
+     * return standard description for a HTTP code
+     * @param  string $http_code http code
+     * @return string            human descrition or empty string
+     */
+    public function getHTTPDescription($http_code){
+        return self::$HTTP_CODE[$http_code] ?? '';
+    }
+
     # call functions and methods
     # for classes - creates object instance first
     # IN: class name, method, params
@@ -330,7 +339,7 @@ class Dispatcher {
                 }
 
                 $rest_oper = $this->detectOperation($method, $cur_id, $cur_action_more);
-                $cur_action=$this::$REST2METHOD_MAP[$rest_oper];
+                $cur_action=self::$REST2METHOD_MAP[$rest_oper];
 
                 #check if there is mapping module => class present and replace dest class
                 if ( array_key_exists($cur_controller, $ROUTES) ){

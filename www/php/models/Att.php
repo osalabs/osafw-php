@@ -86,7 +86,7 @@ class Att extends FwModel {
      */
     public function addAndUploadOneTable($files, $rel_table_name, $rel_item_id){
         $result=array();
-        foreach ($files as $key => $file) {
+        foreach ($files as $file) {
             $fields=array(
                 'iname' => 'new file upload',
                 'status' => 1, //under upload
