@@ -4,7 +4,7 @@
  convenient wrapper for mysqli
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2015 Oleg Savchuk www.osalabs.com
+ (c) 2009-2020 Oleg Savchuk www.osalabs.com
 */
 
 /**
@@ -113,7 +113,7 @@
  * $email=1;
  * $vars=array(
  *     'nick'   => 'Jon',
- *     'upd_time'   => '~!now()', #will set upd_time=now()
+ *     'upd_time'   => DB::NOW, #will set upd_time=now()
  * );
  * db_update('users', $vars, $email, 'email');
  *
@@ -127,7 +127,7 @@
  * #update record by where
  * $vars=array(
  *     'nick'   => 'John',
- *     'upd_time'   => '~!now()', #will set upd_time=now()
+ *     'upd_time'   => DB::NOW, #will set upd_time=now()
  * );
  * $where=array(
  *     'email'  => 'john@test.com',
@@ -158,7 +158,7 @@ function dbqi($value){
 }
 
 /**
- * explicitly quote variable. If $field_type not defined and $value is '~!NULL' or '~!now()' - pass as NULL or now() accoridngly
+ * explicitly quote variable. If $field_type not defined and $value is NULL or DB::NOW - pass as NULL or now() accoridngly
  * @param  string  $value      value to be quoted
  * @param  string  $field_type 's'(string, default if empty), 'i'(int), 'x'(no quote)
  * @return string, integer or 'NULL' string (if $field_type is not defined and $value is null)
@@ -184,7 +184,7 @@ function dbq_ident($value){
  *
  * @return string or null           return value from the field
  */
-function db_value($sql_or_table, $field_or_where=NULL, $field_name=NULL, $order_by=NULL){
+function db_value($sql_or_table, $field_or_where = null, $field_name = null, $order_by = null) {
     return DB::i()->value($sql_or_table, $field_or_where, $field_name, $order_by);
 }
 
@@ -199,7 +199,7 @@ function db_value($sql_or_table, $field_or_where=NULL, $field_name=NULL, $order_
  *
  * @return array                    assoc array (has keys as field names and values as field values)
  */
-function db_row($sql_or_table, $where=NULL, $order_by=NULL){
+function db_row($sql_or_table, $where = null, $order_by = null) {
     return DB::i()->row($sql_or_table, $where, $order_by);
 }
 
@@ -227,7 +227,7 @@ function db_obj($table, $id){
  *
  * @return array                    array of values from the column, empty array if no rows fetched
  */
-function db_col($sql_or_table, $field_or_where=NULL, $field_name=NULL, $order_by=NULL){
+function db_col($sql_or_table, $field_or_where = null, $field_name = null, $order_by = null) {
     return DB::i()->col($sql_or_table, $field_or_where, $field_name, $order_by);
 }
 
@@ -243,7 +243,7 @@ function db_col($sql_or_table, $field_or_where=NULL, $field_name=NULL, $order_by
  *
  * @return array                    array of arrays (outer array has numerical keys and values as one fetched row; inner arrays has keys as field names and values as field values)
  */
-function db_array($sql_or_table, $where=NULL, $order_by=NULL, $limit=NULL){
+function db_array($sql_or_table, $where = null, $order_by = null, $limit = null) {
     return DB::i()->arr($sql_or_table, $where, $order_by, $limit);
 }
 
@@ -253,7 +253,7 @@ function db_array($sql_or_table, $where=NULL, $order_by=NULL, $limit=NULL){
  * @param  array  $params optional, array of params for prepared queries
  * @return mysqli_result  object
  */
-function db_query($sql, $params=NULL){
+function db_query($sql, $params = null) {
     return DB::i()->query($sql, $params);
 }
 
@@ -263,7 +263,7 @@ function db_query($sql, $params=NULL){
  * @param  array  $params optional, array of params for prepared queries
  * @return nothing
  */
-function db_exec($sql, $params=NULL){
+function db_exec($sql, $params = null) {
     DB::i()->exec($sql, $params);
 }
 
@@ -317,7 +317,6 @@ function db_update($table, $vars, $key_id, $column = 'id', $more_set='', $more_w
     DB::i()->update($table, $vars, $key_id, $column, $more_set, $more_where);
 }
 
-
 /**
  * return true if record exists or false if not. Optionally exclude check for other column/value
  * @param  string $table_name   table name
@@ -327,10 +326,11 @@ function db_update($table, $vars, $key_id, $column = 'id', $more_set='', $more_w
  * @param  string $not_id_column optional, not id column name
  * @return bool                 true if record exists or false if not
  */
-function db_is_record_exists($table_name, $uniq_value, $column, $not_id=NULL, $not_id_column='id') {
+function db_is_record_exists($table_name, $uniq_value, $column, $not_id = null, $not_id_column = 'id') {
     return DB::i()->is_record_exists($table_name, $uniq_value, $column, $not_id, $not_id_column);
 }
 
+class DBException extends Exception {} #exception to be raised by our code
 
 /**
 * DB class
@@ -338,23 +338,34 @@ function db_is_record_exists($table_name, $uniq_value, $column, $not_id=NULL, $n
 * TODO - full OO sample
 */
 class DB {
+    const NOW                    = '###special_case_value_for_current_timestamp###';
     public static $SQL_QUERY_CTR = 0; //counter for SQL queries in request
     public static $instance;
 
     public $dbh;                    //mysqli object
-    public $config = array();       //should contain: DBNAME, USER, PWD, HOST, PORT, [SQL_SERVER], IS_LOG
+    public $config = array();       //should contain: DBNAME, USER, PWD, HOST, PORT, [SQL_SERVER], [IS_LOG], [TIMEOUT]
                                     //if IS_LOG - external function logger() will be called for logging
+    public $lastRows; #affected_rows from last exec operations
 
-    function __construct($config=NULL){
+    #not made as constants to allow configurability per instance
+    public $MAX_CONNECT_RETRIES = 1; # max retries for connect(), set >1 if server is
+    public $MAX_DEADLOCK_RETRIES = 3; # max retries to retry query on deadlock
+    public $MAX_RANDOM_SLEEP     = 3; # seconds, max random sleep time (min is 1s)
+
+    public function __construct($config = null) {
         global $CONFIG;
         if (is_null($config)){
             $this->config = $CONFIG['DB']; //use site config, if config not passed explicitly
         }else{
             $this->config = $config;
         }
+
+        #mysqli_report(MYSQLI_REPORT_OFF);
+        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT); #Throw mysqli_sql_exception for errors instead of warning
     }
 
     # return singleton instance
+    /** @return DB */
     public static function i(){
         if (!DB::$instance){
             DB::$instance = new DB();
@@ -367,18 +378,32 @@ class DB {
      * @return nothing
      */
     public function connect(){
-        $this->dbh=new mysqli($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ( $this->config['PORT']>'' ? (int)$this->config['PORT'] : NULL ) );
-        if ($this->dbh->connect_error){
-            $msg='Cannot connect to the database because: ('.$this->dbh->connect_errno.') '.$this->dbh->connect_error;
-            $this->logger('FATAL', $msg);
-            throw new Exception($msg);
+        $attempt = $this->MAX_CONNECT_RETRIES;
+        do {
+            try {
+                $last_ex = null;
+                $this->connect_inner();
+                break;
+            } catch (mysqli_sql_exception $ex) {
+                #for example: got too many connections, timeod out, no host, server has gone away
+                $last_ex = $ex;
+                sleep(rand(1, $this->MAX_RANDOM_SLEEP)); #just a bit random sleep before retry
+            }
+        } while ($attempt--);
+
+        if ($last_ex) {
+            $this->handle_error($last_ex);
         }
+    }
 
-        $res = $this->dbh->set_charset("utf8mb4");
-        $this->handle_error($res);
+    public function connect_inner(){
+        $this->dbh = new mysqli($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ($this->config['PORT'] > '' ? (int) $this->config['PORT'] : null));
+        $this->dbh->set_charset("utf8mb4");
+        #$this->query("SET SESSION sql_mode = ''"); #might need for fw to work on MySQL 5.5+
 
-        #above is preffered way $this->query("SET NAMES utf8mb4");
-        $this->query("SET SESSION sql_mode = ''"); #required fw to work on MySQL 5.5+
+        if ($this->config['TIMEOUT'] > 0) {
+            $this->query("SET SESSION wait_timeout=" . dbqi($this->config['TIMEOUT']));
+        }
     }
 
     /**
@@ -386,7 +411,18 @@ class DB {
      * @return nothing
      */
     public function check_connect(){
-        if (is_null($this->dbh) || !$this->dbh->ping()){
+        $is_reconnect = is_null($this->dbh);
+
+        if (!$is_reconnect) {
+            try {
+                $is_reconnect = !@$this->dbh->ping(); #we don't need Warning: mysqli::ping(): MySQL server has gone away
+            } catch (mysqli_sql_exception $ex) {
+                //if ping fails - MySQL server has gone away
+                $is_reconnect = true;
+            }
+        }
+
+        if ($is_reconnect) {
             $this->connect();
         }
     }
@@ -396,21 +432,63 @@ class DB {
      * @return nothing
      */
     public function disconnect(){
-        $this->dbh->close();
+        if (!is_null($this->dbh)) {
+            $this->dbh->close();
+        }
+
         $this->dbh = null;
     }
 
     /**
-     * check if statement or result is FALSE and throw Exception
-     * @param  mixed $check     statement or result to check
-     * @return nothing, logger an error and throws an exception
+     * handle mysqli_sql_exception
+     * @param  mysqli_sql_exception $ex original mysql exception
+     * @return throws DBException
      */
-    public function handle_error($checkvar){
-        if ($checkvar===FALSE){
-            $err_str = 'Error in DB operation: ('.$this->dbh->errno.') '.$this->dbh->error;
-            $this->logger('ERROR', $err_str);
-            throw new Exception($err_str);
+    public function handle_error($ex) {
+        $err_str = '(' . $ex->getCode() . ') ' . $ex->getMessage();
+        #$this->logger('ERROR', $ex); uncommenting this will duplicate error messages if errors logged at higher level
+        throw new DBException($err_str, $ex->getCode());
+    }
+
+    /**
+     * perform query and return result statement. Throws an exception if error occured.
+     * Note: on deadlock - automatically tries to repeat query couple times
+     * @param  string $sql    SQL query
+     * @param  array  $params optional, array of params for prepared queries
+     * @return mysqli_result  object or null
+     */
+    public function query($sql, $params = null) {
+        $result = null;
+        $this->check_connect();
+        DB::$SQL_QUERY_CTR++;
+
+        $attempt = $this->MAX_DEADLOCK_RETRIES;
+        $last_ex           = null;
+
+        do {
+            try {
+                $last_ex = null;
+                $result  = $this->query_inner($sql, $params);
+                break;
+            } catch (DBException $ex) {
+                $last_ex = $ex;
+                $err_msg = $ex->getMessage();
+                if (preg_match("/deadlock/i", $err_msg)) {
+                    $this->logger('INFO', "Sleep/retry on deadlock", "attempts left:" . $attempt, $err_msg);
+                    sleep(rand(1, $this->MAX_RANDOM_SLEEP)); #if got deadlock - random sleep before repeat
+                } else {
+                    throw $ex;
+                }
+            }
         }
+        while ($attempt--);
+
+        if (is_null($result) && !is_null($last_ex)) {
+            #looks like repeats not helped
+            throw $last_ex;
+        }
+
+        return $result;
     }
 
     /**
@@ -419,47 +497,108 @@ class DB {
      * @param  array  $params optional, array of params for prepared queries
      * @return mysqli_result  object
      */
-    public function query($sql, $params=NULL){
+    public function query_inner($sql, $params = null) {
+        $host = $this->config['HOST'];
+        #for logger - just leave first first name  in domain
+        $dbhost_info = substr($host, 0, strpos($host, '.')) . ':' . $this->config['DBNAME'] . ' ';
+
+        try {
+            if (is_array($params) && count($params)) {
+                //use prepared query
+                $this->logger('INFO', $dbhost_info . $sql, $params);
+
+                $st = $this->dbh->prepare($sql);
+
+                $query_types  = str_repeat("s", count($params)); #just bind all params as strings, TODO - support of passing types
+                $query_params = array($query_types);
+                foreach ($params as $k => $v) {
+                    $query_params[] = &$params[$k];
+                }
+                call_user_func_array(array($st, 'bind_param'), $query_params);
+
+                $res = $st->execute();
+                #$this->handle_error($res);
+
+                $meta = $st->result_metadata();
+                if ($meta === false) {
+                    #this is non-select query, no need to get_result
+                } else {
+                    $meta->free();
+                    $result = $st->get_result();
+                }
+
+                $st->close();
+            } else {
+                //use direct query
+                $this->logger('INFO', $dbhost_info . $sql);
+
+                $result = $this->dbh->query($sql);
+                #no need to check for metadata here as query returns TRUE for non-select
+                #$this->handle_error($result);
+            }
+        } catch (Exception $ex) {
+            $this->handle_error($ex);
+        }
+
+        return $result;
+    }
+
+    /**
+     * prepares sql and return prepared statement, use then in query_prepared()
+     * Throws an exception if error occured.
+     * @param  string $sql sql query
+     * @return object      prepared statement
+     */
+    public function prepare($sql) {
         $this->check_connect();
 
+        $dbhost_info = $this->config['HOST'] . ':' . $this->config['DBNAME'] . ' ';
+        $this->logger('INFO', $dbhost_info . 'PREPARE SQL: ' . $sql);
+
+        try {
+            $st = $this->dbh->prepare($sql);
+        } catch (Exception $ex) {
+            $this->handle_error($ex);
+        }
+
+        return $st;
+    }
+
+    /**
+     * executes previously prepared statement with params
+     * Throws an exception if error occured.
+     * @param  object $st prepared statement using prepare()
+     * @param  array  $params optional, array of params for prepared queries
+     * @return mysqli_result  object
+     */
+    public function query_prepared($st, $params) {
         DB::$SQL_QUERY_CTR++;
 
-        $dbhost_info=$this->config['HOST'].':'.$this->config['DBNAME'].' ';
+        $dbhost_info = $this->config['HOST'] . ':' . $this->config['DBNAME'] . ' ';
 
-        if (is_array($params) && count($params)){
-            //use prepared query
-            $this->logger('INFO', $dbhost_info.$sql);
-            $this->logger('INFO', $params);
+        //use prepared query
+        $this->logger('INFO', $dbhost_info . 'EXEC PREPARED', $params);
 
-            $st = $this->dbh->prepare($sql);
-            $this->handle_error($st);
-
-            $query_types = str_repeat("s", count($params)); #just bind all params as strings, TODO - support of passing types
+        try {
+            $query_types  = str_repeat("s", count($params)); #just bind all params as strings, TODO - support of passing types
             $query_params = array($query_types);
             foreach ($params as $k => $v) {
                 $query_params[] = &$params[$k];
             }
-            call_user_func_array(array($st,'bind_param'), $query_params);
+            call_user_func_array(array($st, 'bind_param'), $query_params);
 
             $res = $st->execute();
-            $this->handle_error($res);
+            #$this->handle_error($res);
 
             $meta = $st->result_metadata();
-            if ($meta===FALSE){
+            if ($meta === false) {
                 #this is non-select query, no need to get_result
-            }else{
+            } else {
                 $meta->free();
                 $result = $st->get_result();
             }
-
-            $st->close();
-        }else{
-            //use direct query
-            $this->logger('INFO', $dbhost_info.$sql);
-
-            $result = $this->dbh->query($sql);
-            #no need to check for metadata here as query returns TRUE for non-select
-            $this->handle_error($result);
+        } catch (Exception $ex) {
+            $this->handle_error($ex);
         }
 
         return $result;
@@ -471,8 +610,9 @@ class DB {
      * @param  array  $params optional, array of params for prepared queries
      * @return nothing
      */
-    public function exec($sql, $params=NULL){
+    public function exec($sql, $params = null) {
         $this->query($sql, $params);
+        $this->lastRows = $this->dbh->affected_rows;
     }
 
     /**
@@ -486,12 +626,12 @@ class DB {
      *
      * @return array or FALSE           assoc array (has keys as field names and values as field values) or FALSE if no rows returned
      */
-    public function row($sql_or_table, $where=NULL, $order_by=NULL){
+    public function row($sql_or_table, $where = null, $order_by = null) {
         $rows = $this->arr($sql_or_table, $where, $order_by, 1);
         if (count($rows)){
             $result=$rows[0];
         }else{
-            $result=FALSE;
+            $result = false;
         }
         return $result;
     }
@@ -519,7 +659,7 @@ class DB {
      *
      * @return array                    array of assoc arrays (outer array has numerical keys and values as inner array; inner arrays has keys as field names and values)
      */
-    public function arr($sql_or_table, $where=NULL, $order_by=NULL, $limit=NULL){
+    public function arr($sql_or_table, $where = null, $order_by = null, $limit = null) {
         $result = array();
         //detect syntax
         if (is_array($where)){
@@ -536,13 +676,15 @@ class DB {
         }
         */
         $result = $res->fetch_all(MYSQLI_ASSOC);
-        if (!is_array($result)) $result = array();
+        if (!is_array($result)) {
+            $result = array();
+        }
+
         $res->free();
 
         #$this->logger('DEBUG', $result);
         return $result;
     }
-
 
     /**
      * return one value (0 column or named column) from $sql or table/where/orderby
@@ -552,13 +694,13 @@ class DB {
      * syntax 2: (table/params)
      * @param  string $table_name       table name to read from
      * @param  string $where            array of (field => value) where conditions
-     * @param  string $field_name       optional, field name to fetch and return. If not set - first field returned. Special case - "count(*)", will return count
+     * @param  string $field_name       optional, field name to fetch and return. If not set - first field returned. Special case - "count(*),sum(field),avg,max,min", will return count/sum/...
      * @param  string $order_by         optional, order string to be added to ORDER BY
      *
      * @return string or null           return value from the field
      */
-    public function value($sql_or_table, $field_or_where=NULL, $field_name=NULL, $order_by=NULL){
-        $result = NULL;
+    public function value($sql_or_table, $field_or_where = null, $field_name = null, $order_by = null) {
+        $result = null;
         //detect syntax
         if (is_array($field_or_where)){
             //syntax 2
@@ -567,7 +709,13 @@ class DB {
                 $select_fields = '*';
             }elseif ($field_name=='count(*)'){
                 $select_fields = $field_name;
-                $field_name=NULL;//reset to empty, so first field will be returned
+                $field_name    = null; //reset to empty, so first field will be returned
+            } elseif (preg_match('/^(\w+)\((\w+)\)$/', $field_name, $m)) {
+                // sum, avg, max, min
+                $func          = $m[1];
+                $fld           = $this->quote_ident($m[2]);
+                $select_fields = $func . '(' . $fld . ')';
+                $field_name    = null;
             }else{
                 $select_fields = $this->quote_ident($field_name);
             }
@@ -575,9 +723,11 @@ class DB {
             list($sql, $params) = $this->build_sql_params($sql_or_table, $select_fields, $field_or_where, $order_by, 1);
             $res = $this->query($sql, $params);
             $rows = $res->fetch_all(MYSQLI_ASSOC);
-            if (!is_array($rows)) $rows = array();
-            $res->free();
+            if (!is_array($rows)) {
+                $rows = array();
+            }
 
+            $res->free();
         }else{
             //syntax 1
             $field_name = $field_or_where;
@@ -608,17 +758,19 @@ class DB {
      *
      * @return array                    array of values from the column, empty array if no rows fetched
      */
-    public function col($sql_or_table, $field_or_where=NULL, $field_name=NULL, $order_by=NULL){
+    public function col($sql_or_table, $field_or_where = null, $field_name = null, $order_by = null) {
         $result = array();
         //detect syntax
-        if (is_array($field_or_where)){
+        if (is_array($field_or_where)) {
             //syntax 2
-            list($sql, $params) = $this->build_sql_params($sql_or_table, ( is_null($field_name) ? '*' : $this->quote_ident($field_name) ), $field_or_where, $order_by);
-            $res = $this->query($sql, $params);
-            $rows = $res->fetch_all(MYSQLI_ASSOC);
-            if (!is_array($rows)) $rows = array();
-            $res->free();
+            list($sql, $params) = $this->build_sql_params($sql_or_table, (is_null($field_name) ? '*' : $this->quote_ident($field_name)), $field_or_where, $order_by);
+            $res                = $this->query($sql, $params);
+            $rows               = $res->fetch_all(MYSQLI_ASSOC);
+            if (!is_array($rows)) {
+                $rows = array();
+            }
 
+            $res->free();
         }else{
             //syntax 1
             $field_name = $field_or_where;
@@ -649,7 +801,6 @@ class DB {
         $this->exec($sql);
     }
 
-
     /**
      * insert or replace record into db
      * @param  string $table    table name
@@ -657,14 +808,18 @@ class DB {
      * @param  array $options   optional, options: ignore, replace, no_identity
      * @return int              last insert id or null (if no_identity option provided)
      *
-     * Note - multi-insert doesn't support ~!NULL and ~!now()
+     * Note - multi-insert doesn't support DB::NOW
      */
-    public function insert($table, $vars, $options=array()){
-        $sql_command='INSERT';
-        if ($options['replace']) $sql_command='REPLACE';
+    public function insert($table, $vars, $options = array()) {
+        $sql_command = 'INSERT';
+        if ($options['replace']) {
+            $sql_command = 'REPLACE';
+        }
 
-        $sql_ignore='';
-        if ($options['ignore']) $sql_ignore=' IGNORE';
+        $sql_ignore = '';
+        if ($options['ignore']) {
+            $sql_ignore = ' IGNORE';
+        }
 
         $sql_insert=$sql_command.$sql_ignore.' INTO '.$this->quote_ident($table);
 
@@ -699,7 +854,6 @@ class DB {
                 $sql = $sql_insert.'('.implode(',', $anames).') VALUES '.implode(',', $avalues);
                 $this->exec($sql, $params);
             }
-
         }else{
             #single row mode
             list($vars_quoted, $params) = $this->quote_array_params($vars);
@@ -714,7 +868,6 @@ class DB {
             return $this->get_identity();
         }
     }
-
 
     /**
      * update record in db by one column value or multiple where conditions
@@ -738,10 +891,9 @@ class DB {
         //detect syntax
         if (is_array($key_id_or_where)){
             //syntax 2
-            list($sql_where, $params_where) = $this->quote_array_params($key_id_or_where);
-            $sql='UPDATE '.$this->quote_ident($table).' SET '.implode(', ', $sql_set).' WHERE '.implode(' AND ', $sql_where);
+            list($sql_where, $params_where) = $this->quote_array_params($key_id_or_where, true);
+            $sql                            = 'UPDATE ' . $this->quote_ident($table) . ' SET ' . implode(', ', $sql_set) . ' WHERE ' . implode(' AND ', $sql_where);
             $this->exec($sql, array_merge($params_set, $params_where));
-
         }else{
             //syntax 1
             $sql='UPDATE '.$this->quote_ident($table).' SET '.implode(', ', $sql_set).' '.$more_set.' WHERE '.$this->quote_ident($column).'='.$this->quote($key_id_or_where).' '.$more_where;
@@ -758,7 +910,7 @@ class DB {
      * @param  string $not_id_column optional, not id column name
      * @return bool                 true if record exists or false if not
      */
-    public function is_record_exists($table_name, $uniq_value, $column, $not_id=NULL, $not_id_column='id') {
+    public function is_record_exists($table_name, $uniq_value, $column, $not_id = null, $not_id_column = 'id') {
         $not_sql='';
         if (!is_null($not_id)){
             $not_sql = ' AND '.$this->quote_ident($not_id_column).'<>'.$this->quote($not_id);
@@ -768,8 +920,21 @@ class DB {
         return $val==1 ? true : false;
     }
 
-
     //************* helpers
+
+    //to use with IN sql queries with proper quoting, ex:
+    // $sql=" AND `sender` ".$this->in_implode($scopes);
+    // note: if $values array empty the follwign sql returned: " IN ('') "
+    public function in_implode($values) {
+        #quote first
+        $arr = array();
+        foreach ($values as $value) {
+            $arr[] = $this->q($value);
+        }
+        $sql = ($arr ? implode(",", $arr) : "''");
+        #return sql
+        return ' IN (' . $sql . ') ';
+    }
 
     public function quote_array($vars){
         $quoted = array();
@@ -781,13 +946,17 @@ class DB {
         return $quoted;
     }
 
-    public function quote_array_params($vars){
+    // is_where=true - this quoted for where (i.e. use IS NULL instead of "=")
+    public function quote_array_params($vars, $is_where = false) {
         $quoted = array();
         $params = array();
-        if (is_array($vars)){
+        if (is_array($vars)) {
             foreach ($vars as $key => $value) {
-                if (preg_match("/^~!(?:NULL|now\(\))$/i", $value)){  //special case for NULL and now() - if started from ~! - don't quote, just remove '~!'
-                    $quoted[] = $this->quote_ident($key).'='.substr($value, 2); #cut everything starting from position after ~!
+                //special case for NULL and now()
+                if ($value === DB::NOW) {
+                    $quoted[] = $this->quote_ident($key) . '=NOW()';
+                } elseif (is_null($value)) {
+                    $quoted[] = $this->quote_ident($key) . ($is_where ? ' IS NULL' : '=NULL');
                 }else{
                     $quoted[] = $this->quote_ident($key).'=?';
                     $params[] = $value;
@@ -805,11 +974,39 @@ class DB {
      */
     public function build_where_str($where){
         $result = '';
-        if (!is_array($where)) return $where;
+        if (!is_array($where)) {
+            return $where;
+        }
 
         $where_quoted = $this->quote_array($where);
         if (count($where_quoted)){
             $result=implode(' AND ', $where_quoted);
+        }
+        return $result;
+    }
+
+    /**
+     * build where string from array
+     * @param  array|int $where number (where id=number), array (where build as AND conditions against all array fields/values), if null - empty string returned
+     * @return string        "where xxxx" string or empty if no
+     */
+    public function _where($where, $noident = false) {
+        $result = '';
+        if (is_array($where)) {
+            $afields_sql = array();
+            foreach ($where as $key => $value) {
+                if (is_null($value)) {
+                    #special case for NULL values
+                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' IS NULL';
+                } else {
+                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . '=' . $this->q($value);
+                }
+            }
+            if (count($afields_sql)) {
+                $result = "where " . implode(" and ", $afields_sql);
+            }
+        } elseif (!is_null($where)) {
+            $result = " where id=" . $this->q($where);
         }
         return $result;
     }
@@ -823,11 +1020,11 @@ class DB {
      * @param  string $limit    optional, string to append to LIMIT
      * @return array of (sql, params)
      */
-    public function build_sql_params($table, $select_fields, $where, $order_by=NULL, $limit=NULL){
-        $sql='SELECT '.$select_fields.' FROM '.$this->quote_ident($table);
+    public function build_sql_params($table, $select_fields, $where, $order_by = null, $limit = null) {
+        $sql = 'SELECT ' . $select_fields . ' FROM ' . $this->quote_ident($table);
 
-        if (is_array($where)){
-            list($where_quoted, $params) = $this->quote_array_params($where);
+        if (is_array($where)) {
+            list($where_quoted, $params) = $this->quote_array_params($where, true);
             if (count($where_quoted)){
                 $sql.=' WHERE '.implode(' AND ', $where_quoted);
             }
@@ -853,25 +1050,30 @@ class DB {
         $table_name=str_replace("`","",$table_name);    #mysql names should'nt contain ` !
         return '`'.$table_name.'`';
     }
+    #alias for quote_ident
+    public function qident($table_name) {
+        return $this->quote_ident($table_name);
+    }
+
+    #alias for quote
+    public function q($value, $field_type = '') {
+        return $this->quote($value, $field_type);
+    }
 
     public function quote($value, $field_type=''){
         $this->check_connect();
 
         if ($field_type=='x'){
           $value=$value;
-
-        }elseif ($field_type=='s'){ //explicit setting of string, no matter of ~!
-          $value="'".$this->dbh->real_escape_string($value)."'";
-
-        }elseif ($field_type=='i'){ //explicit setting of number, no matter of ~!
-          $value=intval($value);
-
-        }elseif ( is_null($value) ){ //null value
-          $value='NULL';
-
-        }elseif (preg_match("/^~!(?:NULL|now\(\))$/i", $value)){  //special case - if started from ~! - don't quote, just remove '~!'
-          $value=substr($value, 2); #cut everything starting from position after ~!
-
+        } elseif ($field_type == 's') {
+            $value = "'" . $this->dbh->real_escape_string($value) . "'";
+        } elseif ($field_type == 'i') {
+            $value = intval($value);
+        } elseif (is_null($value)) {
+            //null value
+            $value = 'NULL';
+        } elseif ($value === DB::NOW) {
+            $value = 'NOW()';
         } else {
           $value="'".$this->dbh->real_escape_string($value)."'"; //real_escape_string doesn't add '' at begin/end
         }
@@ -955,14 +1157,21 @@ class DB {
     }
 
     /**
-     * [logger description]
-     * @param  str $log_type 'ERROR'|'DEBUG'|'INFO'
-     * @param  str $value    value to log
+     * db logger, calls external global logger()
+     * by default all db logs set to INFO allowing to track code execution flow
+     * @param  str $log_type 'ERROR'|'DEBUG'|'INFO'|'NOTICE'
+     * @param  mixed $value  value to log
+     * @param  mixed $value2 optional second value (usually params for param query)
      * @return none
      */
-    public function logger($log_type, $value){
-        if ($this->config['IS_LOG']) logger($log_type, $value);
+    public function logger($log_type, $value, $value2 = null) {
+        if ($this->config['IS_LOG']) {
+            #do it separately depending if $value2 set for cleaner logs
+            if (is_null($value2)) {
+                logger($log_type, $value);
+            } else {
+                logger($log_type, $value, $value2);
+            }
+        }
     }
 }
-
- ?>
