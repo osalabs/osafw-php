@@ -4,6 +4,12 @@ class MainController extends FwController {
     const access_level = 0; #logged only
     const route_default_action = 'index';
 
+    public function __construct() {
+        parent::__construct();
+
+        $this->base_url='/Main';
+    }
+
     public function IndexAction() {
         $ps = array();
         $panes = array();
@@ -104,6 +110,11 @@ class MainController extends FwController {
         return $ps;
     }
 
+    public function ThemeAction($form_id){
+        $_SESSION["theme"]=intval($form_id);
+
+        fw::redirect($this->base_url);
+    }
 }
 
 ?>
