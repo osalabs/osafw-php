@@ -2,13 +2,12 @@
 /*
 Part of PHP osa framework  www.osalabs.com/osafw/php
 (c) 2009-2015 Oleg Savchuk www.osalabs.com
-*/
+ */
 
 class Utils {
-
     //just return logged user id
     public static function me() {
-        return @$_SESSION['user_id']+0;
+        return @$_SESSION['user_id'] + 0;
     }
 
     public static function killMagicQuotes($value){
@@ -18,17 +17,26 @@ class Utils {
         return $value;
     }
 
-    //split string by "whitespace characters" and return array
+    /**
+     * split string by "whitespace characters" and return array
+     * Example: $array = qw('one two three'); => array('one', 'two', 'three');
+     * @param  string $str space-char separated words
+     * @return array      array of words or empty array
+     */
     public static function qw($str) {
-        if (is_array($str)) return $str; #if array passed - don't chagne it
-        $str=trim($str);
-        if ($str>""){
-            $arr=preg_split("/\s+/", $str);
+        if (is_array($str)) {
+            #if array passed - don't chagne it
+            return $str;
+        }
+
+        $str = trim($str);
+        if ($str > "") {
+            $arr = preg_split("/\s+/", $str);
             foreach ($arr as $key => $value) {
-                $arr[$key]=str_replace('&nbsp;', ' ', $value);
+                $arr[$key] = str_replace('&nbsp;', ' ', $value);
             }
             return $arr;
-        }else{
+        } else {
             return array();
         }
     }
@@ -38,7 +46,7 @@ class Utils {
     public static function qwRevert($arr) {
         $result = '';
         foreach ($arr as $value) {
-            $result.= str_replace(' ', '&nbsp;', $value).' ';
+            $result .= str_replace(' ', '&nbsp;', $value) . ' ';
         }
         return $result;
     }
@@ -52,65 +60,85 @@ class Utils {
     DDD => 1 (default value 1)
 
     WARN! replaces all "&nbsp;" to spaces (after convert)
-    */
-    public static function qh($str, $default_value=1) {
-        if (is_array($str)) return $str; #if array passed - don't chagne it
-        $result=array();
+     */
+    public static function qh($str, $default_value = 1) {
+        if (is_array($str)) {
+            #if array passed - don't chagne it
+            return $str;
+        }
+
+        $result = array();
         foreach (static::qw($str) as $value) {
             #$value=str_replace('&nbsp;', ' ', $value);
-            $kv = explode('|', $value, 2);
+            $kv  = explode('|', $value, 2);
             $val = $default_value;
-            if (count($kv)==2) $val = $kv[1];
+            if (count($kv) == 2) {
+                $val = $kv[1];
+            }
 
-            $result[ $kv[0] ] = $val;
+            $result[$kv[0]] = $val;
         }
         return $result;
     }
 
     public static function qhRevert($sh) {
-        $result=array();
+        $result = array();
         foreach ($sh as $key => $value) {
-            $result[]=str_replace(' ', '&nbsp;', $key).'|'.$value;
+            $result[] = str_replace(' ', '&nbsp;', $key) . '|' . $value;
         }
         return implode(' ', $result);
     }
 
     //get string with random chars A-Fa-f0-9
-    public static function getRandStr($len){
-        $result='';
-        $chars=array("A","B","C","D","E","F","a","b","c","d","e","f",0,1,2,3,4,5,6,7,8,9);
-        for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars)-1)];
+    public static function getRandStr($len) {
+        $result = '';
+        $chars  = array("A", "B", "C", "D", "E", "F", "a", "b", "c", "d", "e", "f", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+        for ($i = 0; $i < $len; $i++) {
+            $result .= $chars[mt_rand(0, count($chars) - 1)];
+        }
+
         return $result;
     }
 
     //get icode with a given length based on a full set A-Za-z0-9
     //default length is 4
-    public static function getIcode($len=4){
-        $result='';
-        $chars=array(0,1,2,3,4,5,6,7,8,9);
-        for($i=ord('A');$i<=ord('Z');$i++) $chars[]=chr($i);
-        for($i=ord('a');$i<=ord('z');$i++) $chars[]=chr($i);
+    public static function getIcode($len = 4) {
+        $result = '';
+        $chars  = array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+        for ($i = ord('A'); $i <= ord('Z'); $i++) {
+            $chars[] = chr($i);
+        }
 
-        for($i=0;$i<$len;$i++) $result.=$chars[mt_rand(0,count($chars)-1)];
+        for ($i = ord('a'); $i <= ord('z'); $i++) {
+            $chars[] = chr($i);
+        }
+
+        for ($i = 0; $i < $len; $i++) {
+            $result .= $chars[mt_rand(0, count($chars) - 1)];
+        }
+
         return $result;
     }
 
-    public static function urlescape($str){
+    public static function urlescape($str) {
         return urlencode($str);
     }
 
-    public static function n2br($str, $is_compress=''){
-        $res=preg_replace("/\r/","",$str);
-        $regexp="/\n/";
-        if ($is_compress) $regexp="/\n+/";
-        return preg_replace($regexp,"<br>",$res);
+    public static function n2br($str, $is_compress = '') {
+        $res    = preg_replace("/\r/", "", $str);
+        $regexp = "/\n/";
+        if ($is_compress) {
+            $regexp = "/\n+/";
+        }
+
+        return preg_replace($regexp, "<br>", $res);
     }
-    public static function br2n($str){
-        return preg_replace("/<br>/i","\n",$str);
+    public static function br2n($str) {
+        return preg_replace("/<br>/i", "\n", $str);
     }
-    public static function dehtml($str){
-        $aaa=preg_replace("/<[^>]*>/","",$str);
-        return preg_replace("/%%[^%]*%%/","",$aaa);  //remove special tags too
+    public static function dehtml($str) {
+        $aaa = preg_replace("/<[^>]*>/", "", $str);
+        return preg_replace("/%%[^%]*%%/", "", $aaa); //remove special tags too
     }
 
     /**
@@ -120,7 +148,7 @@ class Utils {
      * @param  array $toadd keys/values to add
      * @return none, $rows changed by ref
      */
-    public static function arrayInject(&$rows, $toadd){
+    public static function arrayInject(&$rows, $toadd) {
         foreach ($rows as $k => $row) {
             #array merge
             foreach ($toadd as $key => $value) {
@@ -135,39 +163,43 @@ class Utils {
      * @param  array $fields plain array - field names
      * @return string one csv line with properly quoted values and "\n" at the end
      */
-    public static function toCSVRow($row, $fields){
-        $result='';
+    public static function toCSVRow($row, $fields) {
+        $result = '';
 
         foreach ($fields as $fld) {
             $str = $row[$fld];
-            if ( preg_match('/[",]/', $str) ){
+            if (preg_match('/[",]/', $str)) {
                 //quote string
-                $str='"'.str_replace('"','""',nl2br($str)).'"';
+                $str = '"' . str_replace('"', '""', nl2br($str)) . '"';
             }
-            $result.=(($result)?",":"").$str;
+            $result .= (($result) ? "," : "") . $str;
         }
 
-        return $result."\n";
+        return $result . "\n";
     }
 
     //export $rows with $fields into csv format and echo to output
-    public static function exportCSV($rows, $fields=''){
-        if (!is_array($fields)) $fields = static::qh($fields);
+    public static function exportCSV($rows, $fields = '') {
+        if (!is_array($fields)) {
+            $fields = static::qh($fields);
+        }
 
         #headers - if no fields set - read first row and get header names
-        $headers_str='';
-        if (!count($fields)){
-            if (!count($rows)) return "";
+        $headers_str = '';
+        if (!count($fields)) {
+            if (!count($rows)) {
+                return "";
+            }
 
-            $fields = array_keys($rows[0]);
+            $fields        = array_keys($rows[0]);
             $fields_header = $fields;
-        }else{
+        } else {
             $fields_header = array_values($fields);
-            $fields = array_keys($fields);
+            $fields        = array_keys($fields);
         }
-        $headers_str=implode(',', $fields_header);
+        $headers_str = implode(',', $fields_header);
 
-        echo $headers_str."\n";
+        echo $headers_str . "\n";
         foreach ($rows as $row) {
             echo static::toCSVRow($row, $fields);
         }
@@ -179,15 +211,14 @@ class Utils {
      * @var string|array $fields fields to export - string for qh or hash - (fieldname => field name in header), default - all export fields
      * @var string $filename human name of the file for browser, default "export.csv"
      */
-    public static function responseCSV($rows, $fields='', $filename='export.csv'){
+    public static function responseCSV($rows, $fields = '', $filename = 'export.csv') {
         $filename = str_replace('"', "'", $filename); #quote filename
 
         header('Content-type: text/csv');
-        header('Content-Disposition: attachment; filename="'.$filename.'"');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
 
         static::exportCSV($rows, $fields);
     }
-
 
     /**
      * bytes 2 human readable string
@@ -200,17 +231,17 @@ class Utils {
      * 1234567 - 1.23 MiB
      * 1234567890 - 1.23 GiB
      */
-    public static function bytes2str($b){
-        $result=$b;
+    public static function bytes2str($b) {
+        $result = $b;
 
-        if ($b<1024){
-            $result.=" B";
-        }elseif ($b<1048576){
-            $result=(ceil($b/1024*100)/100)." KiB";
-        }elseif ($b<1073741824){
-            $result=(ceil($b/1048576*100)/100)." MiB";
-        }else{
-            $result=(ceil($b/1073741824*100)/100)." GiB";
+        if ($b < 1024) {
+            $result .= " B";
+        } elseif ($b < 1048576) {
+            $result = (ceil($b / 1024 * 100) / 100) . " KiB";
+        } elseif ($b < 1073741824) {
+            $result = (ceil($b / 1048576 * 100) / 100) . " MiB";
+        } else {
+            $result = (ceil($b / 1073741824 * 100) / 100) . " GiB";
         }
 
         return $result;
@@ -218,15 +249,15 @@ class Utils {
 
     //return UUID v4, ex: 67700f72-57a4-4bc6-9c69-836e980390ce
     //WARNING: tries to use random_bytes or openssl_random_pseudo_bytes. If not present - pseudo-random data used
-    public static function uuid(){
-        if (function_exists('random_bytes')){ //PHP 7 only
-            $data=random_bytes(16);
-        }elseif (function_exists('openssl_random_pseudo_bytes')){
-            $data=openssl_random_pseudo_bytes(16);
-        }else{
-            $data='';
-            for($i=0;$i<16;$i++){
-               $data.=chr(mt_rand(0,255));
+    public static function uuid() {
+        if (function_exists('random_bytes')) { //PHP 7 only
+            $data = random_bytes(16);
+        } elseif (function_exists('openssl_random_pseudo_bytes')) {
+            $data = openssl_random_pseudo_bytes(16);
+        } else {
+            $data = '';
+            for ($i = 0; $i < 16; $i++) {
+                $data .= chr(mt_rand(0, 255));
             }
         }
 
@@ -241,8 +272,8 @@ class Utils {
      * @param  string $prefix optional, default 'osafw_'
      * @return string         path
      */
-    public static function getTmpFilename($prefix='osafw_'){
-        return sys_get_temp_dir().DIRECTORY_SEPARATOR.$prefix.self::uuid();
+    public static function getTmpFilename($prefix = 'osafw_') {
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . $prefix . self::uuid();
     }
 
     /**
@@ -255,7 +286,7 @@ class Utils {
      * TODO: use https://github.com/defuse/php-encryption instead
      */
     public static function crypt($action, $string, $v, $k) {
-        $output = FALSE;
+        $output         = false;
         $encrypt_method = "AES-256-CBC";
 
         // hash
@@ -264,10 +295,10 @@ class Utils {
         // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
         $iv = substr(hash('sha256', $v), 0, 16);
 
-        if( $action == 'encrypt' ) {
+        if ($action == 'encrypt') {
             $output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
             $output = base64_encode($output);
-        }elseif( $action == 'decrypt' ){
+        } elseif ($action == 'decrypt') {
             $output = openssl_decrypt(base64_decode($string), $encrypt_method, $key, 0, $iv);
         }
 
@@ -275,17 +306,17 @@ class Utils {
     }
 
     #simple encrypt/decrypt pwd based on config keys
-    public static function encrypt($value){
+    public static function encrypt($value) {
         return Utils::crypt('encrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
-    public static function decrypt($value){
+    public static function decrypt($value) {
         return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
 
-    public static function jsonEncode($data){
+    public static function jsonEncode($data) {
         return json_encode($data);
     }
-    public static function jsonDecode($str){
+    public static function jsonDecode($str) {
         return json_decode($str, true);
     }
 
@@ -297,24 +328,26 @@ class Utils {
      * @param array $to_file optional, save response to file (for file downloads)
      * @return string content received. FALSE if error
      */
-    public static function loadURL($url, $params=null, $headers=null, $to_file=''){
+    public static function loadURL($url, $params = null, $headers = null, $to_file = '') {
         logger('TRACE', "CURL load from: [$url]", $params, $headers, $to_file);
         $cu = curl_init();
 
-        curl_setopt($cu, CURLOPT_URL,$url);
+        curl_setopt($cu, CURLOPT_URL, $url);
         curl_setopt($cu, CURLOPT_TIMEOUT, 60);
         curl_setopt($cu, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($cu, CURLOPT_FAILONERROR, true); #cause fail on >=400 errors
-        if (is_array($headers)) curl_setopt($cu, CURLOPT_HTTPHEADER, $headers);
+        if (is_array($headers)) {
+            curl_setopt($cu, CURLOPT_HTTPHEADER, $headers);
+        }
 
-        if (!is_null($params)){
+        if (!is_null($params)) {
             curl_setopt($cu, CURLOPT_POST, 1);
             curl_setopt($cu, CURLOPT_POSTFIELDS, $params);
         }
-        if ($to_file>''){
+        if ($to_file > '') {
             #downloading to tmp file first
-            $tmp_file = $to_file.'.download';
-            $fh_to_file=fopen($tmp_file, 'wb');
+            $tmp_file   = $to_file . '.download';
+            $fh_to_file = fopen($tmp_file, 'wb');
             curl_setopt($cu, CURLOPT_FILE, $fh_to_file);
             curl_setopt($cu, CURLOPT_TIMEOUT, 3600); #1h timeout
         }
@@ -324,20 +357,20 @@ class Utils {
         $result = curl_exec($cu);
         logger('TRACE', 'RESULT:', $result);
         #logger('TRACE', 'CURL INFO:', curl_getinfo($cu));
-        if(curl_error($cu)){
-            logger('ERROR', 'CURL error: '.curl_error($cu));
-            $result=FALSE;
+        if (curl_error($cu)) {
+            logger('ERROR', 'CURL error: ' . curl_error($cu));
+            $result = false;
         }
         curl_close($cu);
         #logger("CURL RESULT:", $result);
 
-        if ($to_file>''){
+        if ($to_file > '') {
             fclose($fh_to_file);
             #if file download successfull - rename to destination
             #if failed - just remove tmp file
-            if ($result!==FALSE){
+            if ($result !== false) {
                 rename($tmp_file, $to_file);
-            }else{
+            } else {
                 unlink($tmp_file);
             }
         }
@@ -346,26 +379,32 @@ class Utils {
     }
 
     #send file to URL with optional params using curl
-    public static function sendFileToURL($url, $from_file, $params=null, $headers=null){
+    public static function sendFileToURL($url, $from_file, $params = null, $headers = null) {
         logger('TRACE', "CURL post file [$from_file] to: [$url]", $params, $headers);
         $cu = curl_init();
 
-        curl_setopt($cu, CURLOPT_URL,$url);
+        curl_setopt($cu, CURLOPT_URL, $url);
         curl_setopt($cu, CURLOPT_POST, 1);
         curl_setopt($cu, CURLOPT_TIMEOUT, 3600); #1h timeout
         curl_setopt($cu, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($cu, CURLOPT_FAILONERROR, true); #cause fail on >=400 errors
 
-        $headers1=array(
-            'Content-Type: multipart/form-data'
+        $headers1 = array(
+            'Content-Type: multipart/form-data',
         );
-        if (is_array($headers)) $headers1 += $headers;
+        if (is_array($headers)) {
+            $headers1 += $headers;
+        }
+
         curl_setopt($cu, CURLOPT_HTTPHEADER, $headers1);
 
-        $params1=array(
-            'file'  => new CURLFile($from_file)
+        $params1 = array(
+            'file' => new CURLFile($from_file),
         );
-        if (is_array($params)) $params1 += $params;
+        if (is_array($params)) {
+            $params1 += $params;
+        }
+
         curl_setopt($cu, CURLOPT_POSTFIELDS, $params1);
 
         #curl_setopt($cu, CURLOPT_VERBOSE,true);
@@ -373,9 +412,9 @@ class Utils {
 
         $result = curl_exec($cu);
         #logger(curl_getinfo($cu));
-        if(curl_error($cu)){
-            logger('ERORR','CURL error: '.curl_error($cu));
-            $result=FALSE;
+        if (curl_error($cu)) {
+            logger('ERORR', 'CURL error: ' . curl_error($cu));
+            $result = false;
         }
         curl_close($cu);
         #logger("CURL RESULT:", $result);
@@ -390,23 +429,23 @@ class Utils {
      * @param array $to_file optional, save response to file (for file downloads)
      * @return array json data received. FALSE if error
      */
-    public static function postJson($url, $json, $to_file=''){
+    public static function postJson($url, $json, $to_file = '') {
         $jsonstr = json_encode($json);
 
-        $headers=array(
+        $headers = array(
             'Accept: application/json',
             'Content-Type: application/json',
             'Content-Length: ' . strlen($jsonstr),
         );
-        $result=static::loadURL($url, $jsonstr, $headers, $to_file);
-        if ($result!==FALSE) {
-            if ($to_file>''){
+        $result = static::loadURL($url, $jsonstr, $headers, $to_file);
+        if ($result !== false) {
+            if ($to_file > '') {
                 #if it was file transfer, just construct successful response
                 $result = array(
-                    'success'   => true,
-                    'fsize'     => filesize($to_file)
+                    'success' => true,
+                    'fsize'   => filesize($to_file),
                 );
-            }else{
+            } else {
                 $result = json_decode($result, true);
             }
         }
@@ -420,22 +459,23 @@ class Utils {
      * @param array $headers optional, additional headers
      * @return array json data received. FALSE if error
      */
-    public static function getJson($url, $to_file='',$headers=null){
-
-        $headers2=array(
-            'Accept: application/json'
+    public static function getJson($url, $to_file = '', $headers = null) {
+        $headers2 = array(
+            'Accept: application/json',
         );
-        if (is_array($headers)) $headers2 = array_merge($headers2, $headers);
+        if (is_array($headers)) {
+            $headers2 = array_merge($headers2, $headers);
+        }
 
-        $result=static::loadURL($url, null, $headers2, $to_file);
-        if ($result!==FALSE) {
-            if ($to_file>''){
+        $result = static::loadURL($url, null, $headers2, $to_file);
+        if ($result !== false) {
+            if ($to_file > '') {
                 #if it was file transfer, just construct successful response
                 $result = array(
-                    'success'   => true,
-                    'fsize'     => filesize($to_file)
+                    'success' => true,
+                    'fsize'   => filesize($to_file),
                 );
-            }else{
+            } else {
                 $result = json_decode($result, true);
             }
         }
@@ -446,11 +486,8 @@ class Utils {
      * return parsed json from the POST request
      * @return array json or FALSE
      */
-    public static function getPostedJson(){
+    public static function getPostedJson() {
         $raw = file_get_contents("php://input");
         return json_decode($raw, true);
     }
-
 }
-
-?>

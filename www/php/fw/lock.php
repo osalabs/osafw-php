@@ -1,5 +1,5 @@
 <?php
-/* 
+/*
  Functions for work with files using LOCKS for access
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
@@ -71,7 +71,7 @@ function get_lockfile_arr($filename, $clearafterall=0){  #clear after read?
 # $outstr=$_[1];
 # $isReplace=$_[2];  #replace?
 # $isBinary=$_[3];   #is binary (for win)
-# $usemask=$_[4];  #uses umask 
+# $usemask=$_[4];  #uses umask
 function add_lockfile($logfile, $outstr, $isReplace='', $isBinary=1, $usemask=''){
  $savemask=0;
 
