@@ -852,11 +852,11 @@ function logger() {
         }
     }
 
-    @error_log($strlog, $CONFIG['LOGGER_MESSAGE_TYPE'], $CONFIG['site_error_log']); #using @ to prevent warnings if log not writable
+    @error_log($strlog, $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']); #using @ to prevent warnings if log not writable
 
     if ($logtype == 'STACK') {
         $e = new Exception();
-        @error_log($e->getTraceAsString() . "\n", $CONFIG['LOGGER_MESSAGE_TYPE'], $CONFIG['site_error_log']);
+        @error_log($e->getTraceAsString() . "\n", $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']);
     }
 }
 

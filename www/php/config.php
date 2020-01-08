@@ -8,14 +8,18 @@
 */
 
 ######### set all variables to defaults with detection of base dirs
-   $site_root         = preg_replace("![\\\/]\w+$!i", "", dirname(__FILE__));
-   $site_root_offline = preg_replace("![\\\/]\w+$!i", "", $site_root);
+$site_root         = preg_replace("![\\\/]\w+$!i", "", dirname(__FILE__));
+$site_root_offline = preg_replace("![\\\/]\w+$!i", "", $site_root);
 
-   #!note, these will be empty if script run from command line
-   $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 ? 'https' : 'http';
+#!note, these $_SERVER vars will be empty if script run from command line
+$proto = 'http';
+if ( (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') == "https") ) {
+    $proto = 'https';
+}
 
-   $root_domain=$proto."://".$_SERVER['HTTP_HOST'];
-   $root_url="";
+$root_domain0 = $_SERVER['HTTP_HOST'] ?? '';
+$root_domain  = $root_domain0 ? $proto . "://" . $root_domain0 : '';
+$root_url     = "";
 
 #global site config
 $FW_CONFIG = array(
@@ -31,28 +35,30 @@ $FW_CONFIG = array(
     'FROM_EMAIL'            => 'noreply@website.com',
 
     'MAIL'  => array(
-                'IS_SMTP'       => false, #if true, use SMTP settings below
-                'SMTPSecure'    => '', #empty or ssl or tls
-                'SMTP_SERVER'   => '', #IP or domain name of SMTP server ";" separated if multiple
-                'SMTP_PORT'     => '', #optional, SMTP port
-                'USER'          => '', #SMTP auth user
-                'PWD'           => '', #SMTP auth pwd
-                ),
+        'IS_SMTP'       => false, #if true, use SMTP settings below
+        'SMTPSecure'    => '', #empty or ssl or tls
+        'SMTP_SERVER'   => '', #IP or domain name of SMTP server ";" separated if multiple
+        'SMTP_PORT'     => '', #optional, SMTP port
+        'USER'          => '', #SMTP auth user
+        'PWD'           => '', #SMTP auth pwd
+        ),
 
     #db connection settings  - REQUIRED
     'DB'    => array(
-                'DBNAME'    => '',      #database name
-                'USER'      => '',      #db user name
-                'PWD'       => '',      #db user password
-                'HOST'      => 'localhost',
-                'PORT'      => '',
-                'SQL_SERVER'=> '', # if empty - MySQL
-                'IS_LOG'    => true, #enable logging via fw
-                ),
+        'DBNAME'    => '',      #database name
+        'USER'      => '',      #db user name
+        'PWD'       => '',      #db user password
+        'HOST'      => 'localhost',
+        'PORT'      => '',
+        'SQL_SERVER'=> '', # if empty - MySQL
+        'IS_LOG'    => true, #enable logging via fw
+        ),
 
-    'site_error_log'        => $site_root_offline.'/logs/osafw.log',
-    'LOGGER_MESSAGE_TYPE'   => 3, #3 - default to $site_error_log
+    'site_error_log'        => $site_root_offline . '/logs/osafw.log',
+    'LOG_MESSAGE_TYPE'      => 3, #3 - default to $site_error_log
     'LOG_LEVEL'             => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'LOG_LIMIT'             => 4096, #trucate log messages at this length
+    'IS_LOG_REMOTE'         => false, #if true - requires, for example, Sentry
     'IS_DEV'                => false, #NEVER set to true on live environments
     'IS_LOG_FWEVENTS'       => true, #by default log all changes via FwEvents
 
@@ -78,44 +84,48 @@ $FW_CONFIG = array(
 
     #prefixes for Dispatcher
     'ROUTE_PREFIXES'        => array(
-                                '/Admin',
-                                '/My',
-                                '/Dev',
-                                ),
+        '/Admin',
+        '/Api',
+        '/My',
+        '/Dev',
+        ),
     #Controllers without need for XSS check
     'NO_XSS'                => array(
-                                'Login',
-                                ),
+        'Login',
+        ),
     #Allowed Access levels for Controllers
     #if set here - overrides Controller::access_level
     #0 - user must be logged in
     #100 - admin user
     'ACCESS_LEVELS'         => array(
-    #                            '/Main'         => 0,
-                                '/AdminAtt/Select' => 0,
-                                ),
+        #'/Main'         => 0,
+        '/AdminAtt/Select' => 0,
+        ),
 
     #multilanguage support settings
     'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
     'LANG'                  => 'en',        #to be updated according to user session
     'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
 
-    'SITE_VERSION'          => '0.18.0127', #also used to re-load css/js to avoid browser cacheing
+    'SITE_VERSION'          => '0.20.0108', #also used to re-load css/js to avoid browser cacheing
     'CRYPT_KEY'             => '', #define in site/dev specific config
     'CRYPT_V'               => '', #define in site/dev specific config
     'PDF_CONVERTER'         => '"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"', #(optional) path to html to pdf converter for reports, if empty - try to use Dompdf
 
+    'loaded_config'         => '', # which config is loaded now
     ########### place site specific configuration variables here:
     'SITE_VAR'              => false,
 );
 
 #load config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
-$conf_server_name = str_replace(':', '_', strtolower($_SERVER['HTTP_HOST']));
-if (!include_once('config.'.$conf_server_name.'.php')){
+$conf_server_name = str_replace(':', '_', strtolower($root_domain0));
+if (!$conf_server_name || !@include_once ('config.' . $conf_server_name . '.php')) {
     #if no config exists for the domain - use site config
     $conf_server_name='site';
     include_once('config.'.$conf_server_name.'.php');
 }
+#set loaded config name
+$FW_CONFIG['loaded_config'] = $conf_server_name;
 $CONFIG = array_merge($FW_CONFIG, $SITE_CONFIG);
 
 /*
@@ -127,5 +137,3 @@ echo "</pre>";
 #exit;
 */
 
-
-?>
