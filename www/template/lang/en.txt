@@ -191,3 +191,13 @@ Parent&nbsp;page ===
 Template === 
 Priority === 
 Sub-Pages === 
+First Name === 
+Last Name === 
+Comment or Question === 
+Contact === 
+Developer Tools === 
+Old Password === 
+Wrong password === 
+New Password === 
+Repeat New Password === 
+Passwords are not equal === 

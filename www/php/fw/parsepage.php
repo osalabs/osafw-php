@@ -1065,22 +1065,27 @@ function lng($str){
  $l=$fw->config->LANG;
  if (!$l) $l=$fw->config->LANG_DEF;
 
+ $is_found=false;
  $result='';
- $lang_file=$fw->config->SITE_TEMPLATES."/lang/$l.txt";
  $str = trim($str);
 
- #logger("$str => $lang_file");
-
  if ($l){
+    $lang_file=$fw->config->SITE_TEMPLATES."/lang/$l.txt";
+    #logger("$str => $lang_file");
     $LANG_STR=load_lang($lang_file);
-    $lang_str=@$LANG_STR[ $str ];
-    $result=$lang_str;
+    if (array_key_exists($str, $LANG_STR)){
+      $result=$LANG_STR[ $str ];
+      $is_found=true;
+      if (!strlen($result)) {
+        $result = $str; #if replacement string is empty - use original string
+      }
+    }
  }
 
- if (!$result){
+ if (!$is_found){
     $result=$str;  #if no language - return original string
 
-#    logger("before update $result");
+    logger("before update $result");
 #    if ($l=='en'){  #update only if we are under English (this keep performance better)
        if ($fw->config->IS_LANG_UPD) update_lang($result, $fw->config->LANG_DEF); #if no translation - add string to en.txt file (but only if we allowed to update)
 #    }
