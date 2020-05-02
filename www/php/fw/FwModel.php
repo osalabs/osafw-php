@@ -101,7 +101,7 @@ abstract class FwModel {
     public function update($id, $item) {
         if (!empty($this->field_upd_users_id) && !isset($item[$this->field_upd_users_id])) $item[$this->field_upd_users_id]=Utils::me();
         if (!empty($this->field_upd_time) && !isset($item[$this->field_upd_time])) $item[$this->field_upd_time]='~!now()';
-        $this->db->update($this->table_name, $item, $id);
+        $this->db->update($this->table_name, $item, $id, $this->field_id);
 
         $this->removeCache($id);
 
