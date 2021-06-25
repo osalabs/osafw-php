@@ -85,7 +85,7 @@ class FormUtils {
     $anames=Utils::qw($names);
     foreach ($anames as $key => $fld) {
         if (array_key_exists($fld, $itemdb) && ($itemdb[$fld]==='' || $itemdb[$fld]=='0')){
-            $itemdb[$fld] = null;
+          $itemdb[$fld] = null;
         }
     }
   }

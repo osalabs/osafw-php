@@ -207,3 +207,5 @@ Server Error Occured ===
 Reload or re-submit the page === 
 Return to previous page and try last action again === 
 Logoff and Re-login to the site === 
+From/To Dates === 
+Report Format === 

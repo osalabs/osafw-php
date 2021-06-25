@@ -7,7 +7,7 @@ class AdminDemosController extends FwAdminController {
     public $required_fields = 'iname email';
     public $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
     public $save_fields_checkboxes = 'is_checkbox';
-    public $save_fields_nullable = 'demo_dicts_id att_id';
+    public $save_fields_nullable = 'demo_dicts_id att_id fdate_pop fdatetime';
     public $model_name = 'Demos';
     public $model_related;
 
@@ -119,7 +119,7 @@ class AdminDemosController extends FwAdminController {
 
         $itemdb['dict_link_auto_id'] = $this->model_related->findOrAddByIname( $item['dict_link_auto_id_iname'] );
         $itemdb['dict_link_multi'] = FormUtils::multi2ids( req('dict_link_multi') );
-        $itemdb['fdate_pop']= DateUtils::Str2SQL($itemdb['fdate_pop']);
+        if ($itemdb['fdate_pop']) $itemdb['fdate_pop']= DateUtils::Str2SQL($itemdb['fdate_pop']);
         #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');
         $itemdb['ftime'] = DateUtils::timestr2int( $item['ftime_str'] ); #ftime - convert from HH:MM to int (0-24h in seconds)
 
