@@ -290,7 +290,7 @@ abstract class FwController {
             if ($this->list_filter['status']>''){
                 $status = $this->list_filter['status']+0;
                 #if want to see trashed and not admin - just show active
-                if ($status==127 && !$this->fw->model('Users')->isAccess('ADMIN')) $status=0;
+                if ($status==127 && !$this->fw->model('Users')->isAccess(Users::ACL_ADMIN)) $status=0;
                 $this->list_where .= " and ".$this->db->quote_ident($this->model->field_status)."=".$this->db->quote($status);
             }else{
                 $this->list_where .= " and ".$this->db->quote_ident($this->model->field_status)."<>127"; #by default - show all non-deleted
