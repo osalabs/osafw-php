@@ -11,13 +11,6 @@ class Utils {
         return @$_SESSION['user_id']+0;
     }
 
-    public static function killMagicQuotes($value){
-        $value = is_array($value) ?
-                  array_map( array('Utils','killMagicQuotes'), $value) :
-                  stripslashes($value);
-        return $value;
-    }
-
     //split string by "whitespace characters" and return array
     public static function qw($str) {
         if (is_array($str)) return $str; #if array passed - don't chagne it

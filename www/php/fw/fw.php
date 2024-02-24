@@ -50,14 +50,6 @@ class fw {
 
         session_start();  #start session on each request
 
-        #initial fixes
-        if (get_magic_quotes_gpc()){
-            $_POST = array_map(array('Utils','killMagicQuotes'), $_POST);
-            $_GET = array_map(array('Utils','killMagicQuotes'), $_GET);
-            $_COOKIE = array_map(array('Utils','killMagicQuotes'), $_COOKIE);
-            $_REQUEST= array_map(array('Utils','killMagicQuotes'), $_REQUEST);
-        }
-
         #setup user's language to use by template engine
         if (isset($_SESSION['lang'])) $fw->config->LANG = $_SESSION['lang'];
 
