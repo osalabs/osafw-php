@@ -7,11 +7,11 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 class FwAdminController extends FwController {
-    const access_level             = 100; #by default Admin Controllers allowed only for Admins
-    const route_default_action     = '';
-    public $base_url               = '/Admin/FwAdmin';
-    public $required_fields        = 'iname';
-    public $save_fields            = 'iname status';
+    const access_level         = Users::ACL_SITE_ADMIN; #by default Admin Controllers allowed only for Admins
+    const route_default_action = '';
+    public $base_url = '/Admin/FwAdmin';
+    public $required_fields = 'iname';
+    public $save_fields = 'iname status';
     public $save_fields_checkboxes = '';
     public $save_fields_nullable = '';
     #public $model_name = 'DemoDicts'; #set in child class!
@@ -58,8 +58,8 @@ class FwAdminController extends FwController {
 
         #optional userlists support
         $ps["select_userlists"] = fw::model('UserLists')->listSelectByEntity($this->list_view);
-        $ps["mylists"] = fw::model('UserLists')->listForItem($this->list_view, 0);
-        $ps["list_view"] = $this->list_view;
+        $ps["mylists"]          = fw::model('UserLists')->listForItem($this->list_view, 0);
+        $ps["list_view"]        = $this->list_view;
 
         return $ps;
     }
@@ -74,15 +74,15 @@ class FwAdminController extends FwController {
         $ps = array(
             'id'                => $id,
             'i'                 => $item,
-            'add_users_id_name' => Users::i()->getFullName($item['add_users_id']??0),
-            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id']??0),
+            'add_users_id_name' => Users::i()->getFullName($item['add_users_id'] ?? 0),
+            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id'] ?? 0),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
 
         #userlists support
         $ps["list_view"] = $this->list_view ? $this->list_view : $this->model->table_name;
-        $ps["mylists"] = fw::model('UserLists')->listForItem($ps["list_view"], $id);
+        $ps["mylists"]   = fw::model('UserLists')->listForItem($ps["list_view"], $id);
 
         return $ps;
     }
@@ -105,8 +105,8 @@ class FwAdminController extends FwController {
         $ps = array(
             'id'                => $id,
             'i'                 => $item,
-            'add_users_id_name' => Users::i()->getFullName($item['add_users_id']??0),
-            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id']??0),
+            'add_users_id_name' => Users::i()->getFullName($item['add_users_id'] ?? 0),
+            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id'] ?? 0),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
@@ -143,13 +143,13 @@ class FwAdminController extends FwController {
     public function Validate($id, $item) {
         $result = $this->validateRequired($item, $this->required_fields);
 
-/*
-if ($result){
-if ($this->model->isExists( $item['iname'], $id ) ){
-$this->setError('iname', 'EXISTS');
-}
-}
- */
+        /*
+        if ($result){
+        if ($this->model->isExists( $item['iname'], $id ) ){
+        $this->setError('iname', 'EXISTS');
+        }
+        }
+         */
         $this->validateCheckResult();
     }
 
@@ -159,7 +159,7 @@ $this->setError('iname', 'EXISTS');
             'i'          => $this->model->one($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
-            'base_url'   => $this->fw->config->ROOT_URL.$this->base_url, #override default template url, remove if you created custom /showdelete templates
+            'base_url'   => $this->fw->config->ROOT_URL . $this->base_url, #override default template url, remove if you created custom /showdelete templates
         );
 
         $this->fw->parser('/common/form/showdelete', $ps);
@@ -184,13 +184,14 @@ $this->setError('iname', 'EXISTS');
             $acb = array();
         }
 
-        $is_delete = reqs('delete') > '';
-        $user_lists_id  = reqi("addtolist");
+        $is_delete            = reqs('delete') > '';
+        $user_lists_id        = reqi("addtolist");
         $remove_user_lists_id = reqi("removefromlist");
 
         if ($user_lists_id) {
             $user_lists = fw::model('UserLists')->one($user_lists_id);
-            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) throw New ApplicationException("Wrong Request");
+            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me())
+                throw new ApplicationException("Wrong Request");
         }
 
         $ctr = 0;
@@ -198,17 +199,19 @@ $this->setError('iname', 'EXISTS');
             if ($is_delete) {
                 $this->model->delete($id);
                 $ctr += 1;
-            }elseif ($user_lists_id){
+            } elseif ($user_lists_id) {
                 fw::model('UserLists')->addItemList($user_lists_id, $id);
                 $ctr += 1;
-            }elseif ($remove_user_lists_id){
+            } elseif ($remove_user_lists_id) {
                 fw::model('UserLists')->delItemList($remove_user_lists_id, $id);
                 $ctr += 1;
             }
         }
 
-        if ($is_delete) $this->fw->flash("multidelete", $ctr);
-        if ($user_lists_id) $this->fw->flash("success", "$ctr records added to the list");
+        if ($is_delete)
+            $this->fw->flash("multidelete", $ctr);
+        if ($user_lists_id)
+            $this->fw->flash("success", "$ctr records added to the list");
 
         fw::redirect($this->getReturnLocation());
     }

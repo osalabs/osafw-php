@@ -1,22 +1,27 @@
 <?php
+/*
+ Admin Reports Controller class
+
+ Part of PHP osa framework  www.osalabs.com/osafw/php
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
+*/
 
 class AdminReportsController extends FwAdminController {
-    const access_level = 80;
-    const route_default_action = 'show';
+    const access_level = Users::ACL_MANAGER;
     public $base_url = '/Admin/Reports';
-    public $required_fields = '';
-    public $save_fields = '';
-    public $save_fields_checkboxes = '';
     public $model_name = 'Reports';
+    public $is_admin = false;
 
     public function __construct() {
         parent::__construct();
 
         //optionally init controller
+        $this->is_admin = Users::i()->isAccess(Users::ACL_MANAGER);
     }
 
-    public function IndexAction(){
-        return array();
+    public function IndexAction() {
+        $ps = array();
+        return $ps;
     }
 
     public function ShowAction($repcode){
@@ -63,5 +68,3 @@ class AdminReportsController extends FwAdminController {
     }
 
 }//end of class
-
-?>

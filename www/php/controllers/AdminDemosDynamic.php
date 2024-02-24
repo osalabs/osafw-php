@@ -1,14 +1,13 @@
 <?php
 /*
- AdminDemosDynamic Controller class
+ Demo Dynamic Admin controller
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2019 Oleg Savchuk www.osalabs.com
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
 class AdminDemosDynamicController extends FwDynamicController {
-    const access_level = 80;
-    const route_default_action = '';
+    const access_level = Users::ACL_MANAGER;
 
     public function __construct() {
         parent::__construct();
@@ -22,5 +21,3 @@ class AdminDemosDynamicController extends FwDynamicController {
     //or override just: setListSearch, getListRows, getSaveFields
 
 }//end of class
-
-?>

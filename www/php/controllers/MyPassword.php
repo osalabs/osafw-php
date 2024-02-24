@@ -35,6 +35,8 @@ class MyPasswordController extends FwController {
     }
 
     public function SaveAction() {
+        $this->fw->checkXSS();
+
         $id = Utils::me();
         $item = reqh('item');
 

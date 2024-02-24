@@ -10,7 +10,7 @@ class PasswordController extends FwController {
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
-        throw new ApplicationException('Access Denied - TODO');
+        throw new ApplicationException('Access Denied');
     }
 
     public function IndexAction() {
@@ -34,7 +34,7 @@ class PasswordController extends FwController {
         $item['login']=trim($item['login']);
 
         try{
-            $this->Validate($id, $item);
+            $this->Validate(0, $item);
             $user = $this->model->oneByEmail($item['login']);
 
             #$this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
@@ -59,5 +59,3 @@ class PasswordController extends FwController {
     }
 
 }//end of class
-
-?>

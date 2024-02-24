@@ -1,4 +1,10 @@
 <?php
+/*
+ Att - file inline/downloads controller
+
+ Part of PHP osa framework  www.osalabs.com/osafw/php
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
+*/
 
 class AttController extends FwController {
     const route_default_action = 'show';
@@ -10,37 +16,37 @@ class AttController extends FwController {
         return $ps;
     }
 
-    public function DownloadAction($id=''){
-        $id+=0;
-        If (!$id) throw new ApplicationException("404 File Not Found");
+    public function DownloadAction($id = '') {
+        $id += 0;
+        if (!$id)
+            throw new ApplicationException("404 File Not Found");
         $size = reqs('size');
 
         $this->model->transmitFile($id, $size);
     }
 
-    public function ShowAction($id=''){
-        $id+=0;
-        If (!$id) throw new ApplicationException("404 File Not Found");
-        $size = reqs('size');
+    public function ShowAction($id = '') {
+        $id += 0;
+        if (!$id)
+            throw new ApplicationException("404 File Not Found");
+        $size       = reqs('size');
         $is_preview = reqi('preview');
 
-        if ($is_preview){
+        if ($is_preview) {
             $item = $this->model->one($id);
-            if ($item['is_image']){
+            if ($item['is_image']) {
                 $this->model->transmitFile($id, $size, 'inline');
-            }else{
+            } else {
                 #if it's not an image and requested preview - return std image
-                header('location: '.$this->fw->config->ASSETS_URL.'/img/att_file.png');
+                header('location: ' . $this->fw->config->ASSETS_URL . '/img/att_file.png');
 
                 // $filepath = $this->fw->config->site_root.'/img/att_file.png'; # TODO move to web.config or to model?
                 // header('Content-type: '.UploadUtils::getMimeForExt($item['ext']));
                 // $fp = fopen($filepath, 'rb');
                 // fpassthru($fp);
             }
-        }else{
+        } else {
             $this->model->transmitFile($id, $size, 'inline');
         }
     }
 }
-
-?>

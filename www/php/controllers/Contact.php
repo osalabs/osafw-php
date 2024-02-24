@@ -1,4 +1,10 @@
 <?php
+/*
+ Site Contact Form controller
+
+ Part of PHP osa framework  www.osalabs.com/osafw/php
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
+*/
 
 class ContactController extends FwController {
     const route_default_action = '';
@@ -18,5 +24,3 @@ class ContactController extends FwController {
     }
 
 }
-
-?>

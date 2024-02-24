@@ -45,6 +45,8 @@ class SignupController extends FwAdminController {
     }
 
     public function SaveAction($form_id) {
+        $this->fw->checkXSS();
+
         $id = $form_id+0;
         $item = reqh('item');
 
@@ -95,5 +97,3 @@ class SignupController extends FwAdminController {
     }
 
 }//end of class
-
-?>
