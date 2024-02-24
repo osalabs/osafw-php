@@ -12,10 +12,16 @@ $site_root         = preg_replace("![\\\/]\w+$!i", "", dirname(__FILE__));
 $site_root_offline = preg_replace("![\\\/]\w+$!i", "", $site_root);
 
 #!note, these will be empty if script run from command line
-$proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 ? 'https' : 'http';
+# X-forwarded are for the load balancer setup.
+if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') == "https")) {
+    $proto = 'https';
+} else {
+    $proto = 'http';
+};
 
-$root_domain = $proto . "://" . $_SERVER['HTTP_HOST'];
-$root_url    = "";
+$root_domain0 = preg_replace("/[^a-zA-Z0-9\-:.]/", "", ($_SERVER['HTTP_HOST'] ?? '')); #sanitize as it is also used as config filename
+$root_domain  = $root_domain0 ? $proto . "://" . $root_domain0 : '';
+$root_url     = "";
 
 #global site config
 $FW_CONFIG = array(
@@ -117,7 +123,7 @@ $FW_CONFIG = array(
     'SITE_VAR'      => false,
 );
 
-#load config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
+#load $SITE_CONFIG config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
 $conf_server_name = str_replace(':', '_', strtolower($_SERVER['HTTP_HOST']));
 if (!include_once('config.' . $conf_server_name . '.php')) {
     #if no config exists for the domain - use site config

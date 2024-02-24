@@ -5,36 +5,30 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 require_once dirname(__FILE__) . "/../config.php";
+require_once dirname(__FILE__) . "/FwExceptions.php";
+require_once dirname(__FILE__) . "/../FwHooks.php";
 require_once dirname(__FILE__) . "/dispatcher.php";
 require_once dirname(__FILE__) . "/parsepage.php";
 require_once dirname(__FILE__) . "/db.php";
-
-//just to be able to distinguish between system exceptions and applicaiton-level exceptions
-class ApplicationException extends Exception {
-} #code in constructor used as return HTTP code, so you can throw exception with 404 for example
-class ValidationException extends ApplicationException {
-}
-
-class ExitException extends Exception {
-}
-
-class BadAccessException extends Exception {
-}
+#TODO require_once dirname(__FILE__) . '/../vendor/autoload.php';
+require_once dirname(__FILE__) . "/../SiteUtils.php";
 
 class fw {
     public static $instance;
+    public static $start_time;
 
     public $dispatcher;
     public $db;
 
     public $request_url; #current request url (relative to application url)
-    public $route; #current request route data, stdClass
+    public stdClass $route; #current request route data, stdClass
     public $ROUTES = array();
     public $GLOBAL = array(); #"global" vars, initialized with $CONFIG
     public $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
     public $models_cache = array(); #cached model instances
 
     public $page_layout;
+    public $is_session = true; #if use session, can be set to false in initRequest to abort session use
 
     public static $LOG_LEVELS = array(
         'OFF'    => 0, #no logging occurs
@@ -50,9 +44,13 @@ class fw {
 
     # run web application request
     # should be called in index.php
-    public static function run($ROUTES = array()) {
-        $start_time = microtime(true);
-        $fw         = fw::i();
+    public static function run(array $ROUTES = []): void {
+        $uri = strtok($_SERVER["REQUEST_URI"] ?? '', '?');
+
+        logger('*** REQUEST START [' . $uri . ']');
+
+        self::$start_time = microtime(true);
+        $fw               = fw::i();
 
         session_start(); #start session on each request
 
@@ -62,7 +60,7 @@ class fw {
         }
 
         # and now run dispatcher
-        FwHooks::initRequest($fw);
+        FwHooks::initRequest($fw, $uri);
 
         #save flash to current var and update session
         if (isset($_SESSION['_flash'])) {
@@ -74,27 +72,77 @@ class fw {
         $fw->route       = $fw->dispatcher->getRoute();
         $fw->request_url = $fw->dispatcher->request_url;
 
+        if ($fw->is_session) {
+            session_write_close();
+        } else {
+            session_abort();
+        }
+
         $fw->runRoute();
 
-        $total_time = microtime(true) - $start_time;
-        logger('*** REQUEST END in ' . number_format($total_time, 10) . 's, ' . number_format(1 / $total_time, 3) . '/s');
+        self::endRequest($fw);
     }
 
     # initialization code for offline scripts
-    public static function initOffline() {
+    public static function initOffline($caller = "") {
+        self::$start_time = microtime(true);
+
         $fw = fw::i(); #get fw instance
         if (!$fw->isOffline()) {
-            return; #exit - prevent run from web browser url
+            logger("FATAL", "Unauthorized attempt to run offline script");
+            exit; #exit - prevent run from web browser url
         }
 
         set_time_limit(0);
         ignore_user_abort(true);
 
-        FwHooks::initRequest($fw); #additional initializations
+        FwHooks::initRequest($fw, $caller); #additional initializations
+    }
+
+    public static function endRequest($fw = null) {
+        #logger("NOTICE", "fw endRequest");
+        if (is_null($fw)) {
+            $fw = fw::i(); #get fw instance
+        }
+        FwHooks::endRequest($fw);
+
+        if ($fw->isOffline()) {
+            $msg = '*** CMD END in ';
+        } else {
+            $msg = '*** REQUEST END in ';
+        }
+
+        $total_time  = microtime(true) - self::$start_time;
+        $memory_used = memory_get_peak_usage(true);
+        logger("DEBUG", $msg . number_format($total_time, 4) . 's, ' . number_format(1 / $total_time, 3) . '/s, SQL:' . DB::$SQL_QUERY_CTR . ', MEM:' . Utils::bytes2str($memory_used));
+        if ($fw->isOffline()) {
+            # cmd script
+            if ($memory_used > 80 * 1000 * 1000) {
+                # to debug high memory usage (80MB is ~twice more than avg php script)
+                logger("WARN", "Offline Script used a lot of memory", [
+                    'time'   => $total_time,
+                    'sql'    => DB::$SQL_QUERY_CTR,
+                    'memory' => $memory_used
+                ]);
+            }
+        } else {
+            # web
+            if ($total_time >= 30) {
+                logger("WARN", "Server too slow", array(
+                    'time' => $total_time,
+                    'sql'  => DB::$SQL_QUERY_CTR,
+                ));
+            }
+        }
     }
 
     # return singleton instance
-    public static function i() {
+
+    /**
+     * return singleton instance
+     * @return self
+     */
+    public static function i(): self {
         if (!fw::$instance) {
             fw::$instance = new fw();
         }
@@ -104,21 +152,24 @@ class fw {
     /**
      * return model object
      * usage: $model = fw::model('Users');
-     * @param  [type] $model_class [description]
-     * @return [type]              [description]
+     * Note: uses model singleton, i.e. equivalent to Users::i() call
+     * @param string $model_class model class name
+     * @return FwModel             instance of FwModel object
+     * @throws NoModelException
      */
-    public static function model($model_class) {
-        $fw = fw::i();
-        if (array_key_exists(strtolower($model_class), $fw->models_cache)) {
-            return $fw->models_cache[$model_class];
+    public static function model(string $model_class): FwModel {
+        $fw        = fw::i();
+        $cache_key = strtolower($model_class);
+        if (array_key_exists($cache_key, $fw->models_cache)) {
+            return $fw->models_cache[$cache_key];
         }
-        #logger($model_class);
+        #logger("MODEL CACHE MISS:" . $model_class);
         try {
             $object = new $model_class($fw);
         } catch (NoClassException $ex) {
             throw new NoModelException("Model class not found: $model_class");
         }
-        $fw->models_cache[$model_class] = $object;
+        $fw->models_cache[$cache_key] = $object;
         return $object;
     }
 
@@ -146,7 +197,7 @@ class fw {
         if (preg_match('/Controller$/', $class_name)) {
             $is_controller = true;
             $dirs[]        = $bdir . '../controllers/';
-            if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController') {
+            if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController' && $class_name !== 'FwApiController') {
                 $class_name = preg_replace("/Controller$/", "", $class_name);
             }
         } else {
@@ -176,32 +227,27 @@ class fw {
             }
         }
 
-        if (!$file_found) {
+        if ($file_found) {
+            include_once $file_found;
+        } else {
             if ($is_controller) {
                 throw new NoControllerException("Controller class not found: $class_name");
             } else {
-                throw new NoClassException("Class not found: $class_name");
+                //no exception so class_exists() can work without a crash
+                // throw new NoClassException("Class not found: $class_name");
             }
-        }
-        try {
-            #logger("before include [$file_found]");
-            include_once $file_found;
-        } catch (Exception $ex) {
-            logger('FATAL', "********** Error Loading class $class_name");
-            throw new Exception("Error Loading class $class_name");
         }
     }
 
     public function runRoute() {
         try {
             $this->auth($this->route);
-            #logger("BEFORE CALL renderRoute", $this->route);
             $this->renderRoute($this->route);
         } catch (AuthException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
         } catch (NoControllerException $ex) {
             #requested controller not found - use Home->NotFoundAction
-            logger('TRACE', "No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
+            logger("No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
             $this->route->prefix     = '';
             $this->route->controller = 'Home';
             $this->route->action     = 'NotFound';
@@ -256,7 +302,9 @@ class fw {
         }
     }
 
-    public function renderRoute($route) {
+    public function renderRoute(stdClass $route) {
+        FwHooks::beforeRenderRoute($route);
+
         #remember in G for rendering
         $this->GLOBAL['route']                = $route;
         $this->GLOBAL['controller']           = $route->controller;
@@ -264,6 +312,8 @@ class fw {
         $this->GLOBAL['controller.action.id'] = $route->controller . '.' . $route->action . '.' . $route->id;
 
         $ps = $this->dispatcher->runController($route->controller, $route->action, $route->params);
+
+        FwHooks::afterRenderRoute($route, $ps);
 
         #if action doesn't returned array - assume action rendered page by itself
         if (is_array($ps)) {
@@ -309,7 +359,7 @@ class fw {
 
         if ($route->format == 'json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
             $result = 'json';
-        } elseif ($route->format == 'pjax' || @$_SERVER['HTTP_X_REQUESTED_WITH'] > '') {
+        } elseif ($route->format == 'pjax') {
             $result = 'pjax';
         } else {
             $result = $route->format;
@@ -335,6 +385,7 @@ class fw {
     #throw AuthException if request XSS is not passed or not equal to session's value
     public function checkXSS($is_die = true) {
         if ($_SESSION["XSS"] != reqs("XSS")) {
+            #logger("WARN", "XSS CHECK FAIL"); #too excessive logging
             if ($is_die) {
                 throw new AuthException("XSS Error");
             }
@@ -349,10 +400,11 @@ class fw {
     # OUT: return TRUE throw AuthException if not authorized to view the page
     private function auth($route) {
         $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS, CASE_LOWER);
-
         #XSS check for all requests that modify data
-        if ((reqs("XSS") || $this->route->method == "POST" || $this->route->method == "PUT" || $this->route->method == "DELETE")
-            && $_SESSION["XSS"] > "" && $_SESSION["XSS"] != reqs("XSS")
+        $request_xss = reqs("XSS");
+        $session_xss = $_SESSION["XSS"] ?? '';
+        if (($request_xss || $this->route->method == "POST" || $this->route->method == "PUT" || $this->route->method == "DELETE")
+            && $session_xss > "" && $session_xss != $request_xss
             && !in_array($this->route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
             throw new AuthException("XSS Error");
@@ -391,25 +443,49 @@ class fw {
         return true;
     }
 
-    public function handlePageError($error_code, $error_message = '', $exeption = null) {
+    /**
+     * @throws Exception
+     */
+    public function handlePageError(int $error_code, string $error_message = '', ?Exception $ex = null): void {
         #Sentry support
         global $_raven;
         if (isset($_raven)) {
-            $_raven->captureException($exeption, array("message" => $error_message));
+            $_raven->captureException($ex, array("message" => $error_message));
         }
 
+        if ($ex) {
+            $ps = FwHooks::handleException($ex);
+            if ($ps) {
+                // only process exceptions there and only return here if we actually returned something
+                if (!$ps["success"]) {
+                    if ($ps["err_code"] >= 100 && $ps["err_code"] <= 599) {
+                        #if error http code exists
+                        header("HTTP/1.0 " . $ps["err_code"] . " " . $ps["err_msg"], true, $ps["err_code"]);
+                    }
+                    $this->parser('/error', $ps);
+                }
+                return;
+            }
+        }
+
+        $route              = null;
         $custom_error_route = $this->dispatcher->ROUTES[$error_code] ?? '';
         if ($custom_error_route > '') {
             $route = @$this->dispatcher->str2route($custom_error_route);
         }
 
-        logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
+        if ($ex) {
+            logger("FATAL", "Dispatcher - handlePageError exception: " . $ex->getMessage(), $ex);
+        } else {
+            logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
+        }
+
         if ($error_code >= 500) {
-            logger('TRACE', $exeption->getTraceAsString());
+            logger($ex->getTraceAsString());
         }
 
         $is_error_processed = false;
-        if (isset($route)) {
+        if (!is_null($route)) {
             //custom error handling route
             try {
                 $this->renderRoute($route);
@@ -426,7 +502,7 @@ class fw {
 
             header("HTTP/1.0 $error_code $err_code_desc", true, $error_code);
 
-            $err_msg = $error_message ? $error_message : ($err_code_desc ? $err_code_desc : "PAGE NOT YET IMPLEMENTED [$uri] ");
+            $err_msg = $error_message ? $error_message : ($err_code_desc ? $err_code_desc : "PAGE NOT YET IMPLEMENTED [$uri]");
 
             $ps = array(
                 '_json'    => true, #also allow return urls by json
@@ -435,15 +511,23 @@ class fw {
                 'err_msg'  => $err_msg,
                 'err_time' => time(),
             );
-            if ($this->GLOBAL['LOG_LEVEL'] == 'DEBUG' && $_SESSION['access_level'] == 100) {
+
+            //if it was Auth error - add current XSS to response, so client can try to re-send request
+            if ($error_code == 401) {
+                $ps['xss'] = $_SESSION["XSS"];
+            }
+
+            if ($this->GLOBAL['LOG_LEVEL'] == 'DEBUG' && $_SESSION['access_level'] == Users::ACL_SITE_ADMIN) {
+                #for site admins - show additional details
                 $ps['is_dump'] = true;
-                if (!is_null($exeption)) {
+                if (!is_null($ex)) {
                     //remove unnecessary site root path
-                    $ps['DUMP_STACK'] = str_replace($this->config->SITE_ROOT, "", $exeption->getTraceAsString());
+                    $ps['DUMP_STACK'] = str_replace($this->config->SITE_ROOT, "", $ex->getTraceAsString());
                 }
                 $ps['DUMP_FORM']    = print_r($_REQUEST, true);
                 $ps['DUMP_SESSION'] = print_r($_SESSION, true);
             }
+
             $this->parser('/error', $ps);
         }
     }
@@ -470,7 +554,7 @@ class fw {
         $controller = $this->route->controller;
         if ($this->route->prefix) {
             $basedir    .= '/' . $this->route->prefix;
-            $controller = preg_replace('/^' . preg_quote($this->route->prefix) . '/i', '', $controller);
+            $controller = preg_replace('/^' . preg_quote($this->route->prefix, '/') . '/i', '', $controller);
         }
         $basedir      .= '/' . $controller . '/' . $this->route->action;
         $basedir      = strtolower($basedir);
@@ -507,10 +591,13 @@ class fw {
                     parse_json($ps['_json']);
                 }
             } else {
+                #logger("WARN", "JSON response is not enabled for the Controller.Action (set ps[_json]=true to enable).", array($_SERVER, $_REQUEST, $_SESSION));
+
                 parse_json(array(
                     'success' => false,
                     'message' => 'JSON response is not enabled for the Controller.Action (set ps[\"_json\"]=true to enable).',
                 ));
+
             }
         } elseif ($out_format == 'html' || $out_format == 'pjax' || !$out_format) {
             #html output based on ParsePage templates
@@ -524,7 +611,7 @@ class fw {
             }
 
             if (!array_key_exists('ERR', $ps)) {
-                $ps["ERR"] = @$this->GLOBAL['ERR']; #add errors if any
+                $ps["ERR"] = $this->GLOBAL['ERR']; #add errors if any
             }
 
             $ps['current_time'] = time(); #TODO move to GLOBAL[current_time]?
@@ -733,25 +820,20 @@ class fw {
 
     ##########################  STATIC methods
 
-    public static function redirect($url, $noexit = '') {
+    // redirect to relative or absolute url using header
+    public static function redirect($url, $noexit = false) {
+        global $CONFIG;
         $url = fw::url2abs($url);
 
-        logger('TRACE', "REDIRECT to [$url]");
-        $ps = array(
-            'url' => $url,
-        );
-        parse_page("/common", "redirect_js.html", $ps);
+        logger("REDIRECT to [$url]");
+        header("Location: $url");
         if (!$noexit) {
-            throw new ExitException;
+            exit;
         }
     }
-    //TODO:
-    //function redirect($location){
-    //  logger('TRACE', "REDIRECT to [$url]");
-    //  header('location: http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['PHP_SELF']).'/'.$location);
-    //}
 
     #make url absolute
+    # if url start with "/" - it's redirect to url relative to current host
     # /some_site_url?aaaa => http://root_domain/ROOT_URL/some_site_url?aaaa
     public static function url2abs($url) {
         global $CONFIG;
@@ -768,10 +850,10 @@ class fw {
 //get some value from $_REQUEST
 //TODO? make support of infinite []
 function _req($name) {
-    if (preg_match('/^(.+?)(?:\[(.+?)\])/', $name, $m)) {
-        return @$_REQUEST[$m[1]][$m[2]];
+    if (preg_match('/^(.+?)\[(.+?)]/', $name, $m)) {
+        return $_REQUEST[$m[1]][$m[2]] ?? '';
     } else {
-        return @$_REQUEST[$name];
+        return $_REQUEST[$name] ?? '';
     }
 }
 
@@ -803,11 +885,33 @@ function reqh($name) {
     return $h;
 }
 
+//get bool value from $_REQUEST
+// true only if "true" or 1 passed
+//return bool
+function reqb($name) {
+    $value = reqs($name);
+    if ($value == "true" || $value == 1) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+//get decoded json array from $_REQUEST
+//return array
+function reqjson($name) {
+    $result = json_decode(reqs($name), true) ?? [];
+    if (!is_array($result)) {
+        $result = [];
+    }
+    return $result;
+}
+
 ########################## for debug
 # IN: [logtype (ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
 # OUT: none, just write to $site_error_log
 # If not ALL - limit output to 2048 chars per call
-# example: logger('TRACE', 'hello there', $var);
+# example: logger('DEBUG', 'hello there', $var);
 function logger() {
     $args = func_get_args();
     if (FwHooks::logger($args)) {
@@ -815,15 +919,14 @@ function logger() {
         return;
     }
 
-    global $CONFIG, $_raven;
+    global $CONFIG;
     $log_level = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']];
 
     if (!$log_level) {
-        return; #don't log if logger is off (for production)
+        #don't log if logger is off (for production)
+        return;
     }
-    
 
-    $args    = func_get_args();
     $logtype = 'DEBUG'; #default log type
     if (count($args) > 0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL)$/", $args[0], $m)) {
         $logtype = $m[1];
@@ -832,7 +935,7 @@ function logger() {
 
     if (fw::$LOG_LEVELS[$logtype] > $log_level) {
         return; #skip logging if requested level more than config's log level
-    }    
+    }
 
     $arr      = debug_backtrace(); #0-logger(),1-func called logger,...
     $func     = (isset($arr[1]) ? $arr[1] : '');
@@ -882,14 +985,14 @@ function logger() {
 
 ########################### for debugging with output right into the browser or console
 function rw($var) {
+    $is_html = $_SERVER['HTTP_HOST'] ? 1 : 0;
     if (!is_scalar($var)) {
         $var = print_r($var, true);
     }
-    if ($_SERVER['HTTP_HOST']) {
-        echo "<pre>" . $var . "</pre><br>\n";
-    } else {
-        echo $var . "\n";
+    if ($is_html) {
+        $var = "<pre>" . preg_replace("/\n/", "<br>\n", $var) . "</pre>";
     }
+    echo $var . "\n";
     flush();
 }
 

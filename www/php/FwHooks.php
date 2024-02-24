@@ -12,9 +12,10 @@ class FwHooks {
     /**
      * general global initializations before route dispatched
      * @param FW $fw
+     * @param string $uri
      * @return void
      */
-    public static function initRequest(FW $fw): void {
+    public static function initRequest(FW $fw, string $uri): void {
 
         if (!$fw->isOffline()) {
             $me_id = Utils::me();
@@ -31,13 +32,33 @@ class FwHooks {
         }
     }
 
+    //called before each fw->renderRoute called
+    public static function beforeRenderRoute(stdClass $route) {
+    }
+
+    //called after each fw->renderRoute so you can add something to $ps output
+    public static function afterRenderRoute(stdClass $route, ?array $ps) {
+    }
+
+    //called at the end of request processing
+    public static function endRequest(FW $fw) {
+    }
+
     /**
      * Default logger override, see fw::logger()
      *
-     * @return bool, if true returned - fw default logger won't trigger
+     * @return bool if true returned - fw default logger won't trigger
      */
     public static function logger($args): bool {
         return false;
     }
 
+    /**
+     * Default exception handler override, see fw::handleException()
+     * @param Exception $e
+     * @return array|null if array returned - fw default exception handler won't trigger and array will be passed to user
+     */
+    public static function handleException(Exception $e): ?array {
+        return null;
+    }
 }
