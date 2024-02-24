@@ -51,12 +51,12 @@ $FW_CONFIG = array(
         'IS_LOG'     => true, #enable logging via fw
     ),
 
-    'site_error_log'      => $site_root_offline . '/logs/osafw.log',
-    'LOGGER_MESSAGE_TYPE' => 3, #3 - default to $site_error_log
-    'LOG_LEVEL'           => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
-    'IS_LOG_FWEVENTS'     => true, #by default log all changes via FwEvents
-    'IS_DEV'              => false, #NEVER set to true on live environments
-    'IS_TEST'             => false, #if true - test mode, emails sent to current user or test_email
+    'site_error_log'   => $site_root_offline . '/logs/osafw.log',
+    'LOG_MESSAGE_TYPE' => 3, #3 - default to $site_error_log
+    'LOG_LEVEL'        => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'IS_LOG_FWEVENTS'  => true, #by default log all changes via FwEvents
+    'IS_DEV'           => false, #NEVER set to true on live environments
+    'IS_TEST'          => false, #if true - test mode, emails sent to current user or test_email
 
     'IS_SIGNUP'            => false,  #set to true to enable Sign Up module
     'UNLOGGED_DEFAULT_URL' => '/',

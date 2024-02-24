@@ -1,8 +1,8 @@
 <?php
 /*
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2017 Oleg Savchuk www.osalabs.com
-*/
+(c) 2009-2024 Oleg Savchuk www.osalabs.com
+ */
 
 require_once dirname(__FILE__) . "/../config.php";
 require_once dirname(__FILE__) . "/dispatcher.php";
@@ -30,22 +30,22 @@ class fw {
     public $request_url; #current request url (relative to application url)
     public $route; #current request route data, stdClass
     public $ROUTES = array();
-    public $GLOBAL = array();     #"global" vars, initialized with $CONFIG
-    public $config;               #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
+    public $GLOBAL = array(); #"global" vars, initialized with $CONFIG
+    public $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
     public $models_cache = array(); #cached model instances
 
     public $page_layout;
 
     public static $LOG_LEVELS = array(
-        'OFF'   => 0,   #no logging occurs
-        'FATAL' => 10,  #severe error, current request (or even whole application) aborted (notify admin)
-        'ERROR' => 20,  #error happened, but current request might still continue (notify admin)
-        'WARN'  => 30,  #potentially harmful situations for further investigation, request processing continues
-        'INFO'  => 40,  #default for production (easier maintenance/support), progress of the application at coarse-grained level (fw request processing: request start/end, sql, route/external redirects, sql, fileaccess, third-party API)
-        'DEBUG' => 50,  #default for development (default for logger("msg") call), fine-grained level
-        'STACK' => 59,  #as trace but also dumps stack trace
-        'TRACE' => 60,  #very detailed  (in-module details like fw core, despatcher, parse page, ...)
-        'ALL'   => 70,  #just log everything
+        'OFF'    => 0, #no logging occurs
+        'FATAL'  => 10, #severe error, current request (or even whole application) aborted (notify admin)
+        'ERROR'  => 20, #error happened, but current request might still continue (notify admin)
+        'WARN'   => 30, #potentially harmful situations for further investigation, request processing continues
+        'INFO'   => 40, #default for production (easier maintenance/support), progress of the application at coarse-grained level (fw request processing: request start/end, sql, route/external redirects, sql, fileaccess, third-party API)
+        'NOTICE' => 45, #normal, but significant noticeable condition (for Sentry logged as breadcrumbs)
+        'DEBUG'  => 50, #default for development (default for logger("msg") call), fine-grained level
+        'TRACE'  => 60, #very detailed  (in-module details like fw core, despatcher, parse page, ...)
+        'ALL'    => 70, #just log everything
     );
 
     # run web application request
@@ -54,14 +54,15 @@ class fw {
         $start_time = microtime(true);
         $fw         = fw::i();
 
-        session_start();  #start session on each request
+        session_start(); #start session on each request
 
         #setup user's language to use by template engine
-        if (isset($_SESSION['lang']))
+        if (isset($_SESSION['lang'])) {
             $fw->config->LANG = $_SESSION['lang'];
+        }
 
         # and now run dispatcher
-        FwHooks::initRequest();
+        FwHooks::initRequest($fw);
 
         #save flash to current var and update session
         if (isset($_SESSION['_flash'])) {
@@ -76,7 +77,20 @@ class fw {
         $fw->runRoute();
 
         $total_time = microtime(true) - $start_time;
-        logger('INFO', '*** REQUEST END in ' . number_format($total_time, 10) . 's, ' . number_format(1 / $total_time, 3) . '/s');
+        logger('*** REQUEST END in ' . number_format($total_time, 10) . 's, ' . number_format(1 / $total_time, 3) . '/s');
+    }
+
+    # initialization code for offline scripts
+    public static function initOffline() {
+        $fw = fw::i(); #get fw instance
+        if (!$fw->isOffline()) {
+            return; #exit - prevent run from web browser url
+        }
+
+        set_time_limit(0);
+        ignore_user_abort(true);
+
+        FwHooks::initRequest($fw); #additional initializations
     }
 
     # return singleton instance
@@ -112,8 +126,9 @@ class fw {
         global $CONFIG;
         spl_autoload_register(array($this, 'autoload'));
 
-        $this->GLOBAL   = $CONFIG;
-        $CONFIG['LANG'] = $CONFIG['LANG_DEF'];  #use default language
+        $this->GLOBAL        = $CONFIG;
+        $this->GLOBAL['ERR'] = []; #store form errors
+        $CONFIG['LANG']      = $CONFIG['LANG_DEF']; #use default language
 
         # fw vairables
         $this->config      = (object)$CONFIG; #set fw config
@@ -131,12 +146,14 @@ class fw {
         if (preg_match('/Controller$/', $class_name)) {
             $is_controller = true;
             $dirs[]        = $bdir . '../controllers/';
-            if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController')
+            if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController') {
                 $class_name = preg_replace("/Controller$/", "", $class_name);
+            }
         } else {
             $dirs[] = $bdir . '../models/';
-            if ($class_name !== 'FwModel')
+            if ($class_name !== 'FwModel') {
                 $class_name = preg_replace("/Model$/", "", $class_name);
+            }
         }
         $dirs[] = $bdir; #also look at /www/php/fw
         $dirs[] = $bdir . '../'; #also look at /www/php
@@ -152,7 +169,7 @@ class fw {
             }
 
             #if not exists - try normalized
-            $file = $dir . ucfirst(strtolower($class_name)) . '.php';   #normalize name, i.e. users => Users
+            $file = $dir . ucfirst(strtolower($class_name)) . '.php'; #normalize name, i.e. users => Users
             if (file_exists($file)) {
                 $file_found = $file;
                 break;
@@ -180,13 +197,11 @@ class fw {
             $this->auth($this->route);
             #logger("BEFORE CALL renderRoute", $this->route);
             $this->renderRoute($this->route);
-
         } catch (AuthException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
-
         } catch (NoControllerException $ex) {
             #requested controller not found - use Home->NotFoundAction
-            logger('DEBUG', "No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
+            logger('TRACE', "No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
             $this->route->prefix     = '';
             $this->route->controller = 'Home';
             $this->route->action     = 'NotFound';
@@ -194,18 +209,15 @@ class fw {
 
             try {
                 $this->renderRoute($this->route);
-
             } catch (NoClassMethodException $ex2) {
                 logger('WARN', "No HomeController->NotFoundAction() found");
                 $this->handlePageError(404, $ex->getMessage(), $ex);
                 return;
             }
-
         } catch (NoClassException $ex) {
             #if can't call class - this is server error
             $this->handlePageError(500, $ex->getMessage(), $ex);
             return;
-
         } catch (NoClassMethodException $ex) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
@@ -213,7 +225,6 @@ class fw {
             $default_action = $this->dispatcher->getRouteDefaultAction($this->route->controller);
             if ($default_action == 'index') {
                 $this->route->action = 'Index';
-
             } elseif ($default_action == 'show') {
                 #assume action is id and use ShowAction
                 $this->route->id        = $this->route->action;
@@ -228,23 +239,18 @@ class fw {
 
             try {
                 $this->renderRoute($this->route);
-
             } catch (NoClassMethodException $ex2) {
                 #if no method - just call parser() - show template from /cur_controller/cur_action dir
                 logger('WARN', "Default parser");
                 $this->parser();
             }
-
         } catch (ExitException $ex) {
             #not a problem - just graceful exit
             logger('TRACE', "Exit Exception (normal behaviour, usually due to redirect)");
-
         } catch (BadAccessException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
-
         } catch (ApplicationException $ex) {
             $this->handlePageError(($ex->getCode() ? $ex->getCode() : 500), $ex->getMessage(), $ex);
-
         } catch (Exception $ex) {
             $this->handlePageError(500, $ex->getMessage(), $ex);
         }
@@ -282,9 +288,10 @@ class fw {
     }
 
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
-    public function isJsonExpected($route = NULL) {
-        if (!is_object($route))
+    public function isJsonExpected($route = null) {
+        if (!is_object($route)) {
             $route = $this->route;
+        }
 
         if ($route->format == 'json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
             return 1;
@@ -293,9 +300,11 @@ class fw {
         }
     }
 
-    public function getResponseExpectedFormat($route = NULL) {
-        if (!is_object($route))
+    public function getResponseExpectedFormat($route = null) {
+        if (!is_object($route)) {
             $route = $this->route;
+        }
+
         $result = '';
 
         if ($route->format == 'json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
@@ -310,14 +319,28 @@ class fw {
     }
 
     # TODO $args
-    public function routeRedirect($action, $controller = NULL, $params = NULL) {
+    public function routeRedirect($action, $controller = null, $params = null) {
         $this->route->action = $action;
-        if (!is_null($controller))
+        if (!is_null($controller)) {
             $this->route->controller = $controller;
-        if (!is_null($params))
+        }
+
+        if (!is_null($params)) {
             $this->route->params = $params;
+        }
 
         $this->runRoute();
+    }
+
+    #throw AuthException if request XSS is not passed or not equal to session's value
+    public function checkXSS($is_die = true) {
+        if ($_SESSION["XSS"] != reqs("XSS")) {
+            if ($is_die) {
+                throw new AuthException("XSS Error");
+            }
+            return false;
+        }
+        return true;
     }
 
     # simple auth check based on /controller/action - and rules filled in in Config class
@@ -329,7 +352,7 @@ class fw {
 
         #XSS check for all requests that modify data
         if ((reqs("XSS") || $this->route->method == "POST" || $this->route->method == "PUT" || $this->route->method == "DELETE")
-            && $_SESSION["XSS"] > "" && $_SESSION["XSS"] <> reqs("XSS")
+            && $_SESSION["XSS"] > "" && $_SESSION["XSS"] != reqs("XSS")
             && !in_array($this->route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
             throw new AuthException("XSS Error");
@@ -340,8 +363,9 @@ class fw {
         $path2 = strtolower('/' . $this->route->controller);
 
         $current_level = -1;
-        if (isset($_SESSION['access_level']))
+        if (isset($_SESSION['access_level'])) {
             $current_level = $_SESSION['access_level'];
+        }
 
         $rule_level = null;
         if (array_key_exists($path, $ACCESS_LEVELS)) {
@@ -367,23 +391,29 @@ class fw {
         return true;
     }
 
-    public function handlePageError($error_code, $error_message = '', $exeption = NULL) {
-        $custom_error_route = $this->dispatcher->ROUTES[$error_code];
+    public function handlePageError($error_code, $error_message = '', $exeption = null) {
+        #Sentry support
+        global $_raven;
+        if (isset($_raven)) {
+            $_raven->captureException($exeption, array("message" => $error_message));
+        }
+
+        $custom_error_route = $this->dispatcher->ROUTES[$error_code] ?? '';
         if ($custom_error_route > '') {
             $route = @$this->dispatcher->str2route($custom_error_route);
         }
 
         logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
-        if ($error_code >= 500)
-            logger('DEBUG', $exeption->getTraceAsString());
+        if ($error_code >= 500) {
+            logger('TRACE', $exeption->getTraceAsString());
+        }
 
         $is_error_processed = false;
-        if ($route) {
+        if (isset($route)) {
             //custom error handling route
             try {
                 $this->renderRoute($route);
                 $is_error_processed = true;
-
             } catch (NoClassException $ex) {
                 //still error not processed
                 logger('ERROR', 'Additional error occured during processing custom error handler: ' . $ex->getMessage());
@@ -392,8 +422,7 @@ class fw {
 
         if (!$is_error_processed) {
             $uri           = $_SERVER['REQUEST_URI'];
-            $d             = $this->dispatcher;
-            $err_code_desc = $d::$HTTP_CODE[$error_code];
+            $err_code_desc = Dispatcher::$HTTP_CODE[$error_code];
 
             header("HTTP/1.0 $error_code $err_code_desc", true, $error_code);
 
@@ -417,7 +446,6 @@ class fw {
             }
             $this->parser('/error', $ps);
         }
-
     }
 
     # RETURN output to browser according to expected format: full html, pjax, json
@@ -427,7 +455,7 @@ class fw {
     # parser('/controller/action', $ps)   - show page from template  /controller/action = parser('/controller/action/', $PAGE_LAYOUT, $ps)
     # parser('/controller/action', $layout, $ps)   - show page from template  /controller/action = parser('/controller/action/', $layout, $ps)
     # full params:
-    # [$basedir, [$layout,]] $ps
+    # $basedir, $layout, $ps, $out_filename=''|'v'|'filename'
     #
     # output format based on requested format: json, pjax or (default) full page html
     # JSON: for automatic json response support - set ps("_json") = true
@@ -444,10 +472,11 @@ class fw {
             $basedir    .= '/' . $this->route->prefix;
             $controller = preg_replace('/^' . preg_quote($this->route->prefix) . '/i', '', $controller);
         }
-        $basedir .= '/' . $controller . '/' . $this->route->action;
-        $basedir = strtolower($basedir);
-        $layout  = $this->page_layout;
-        $ps      = array();
+        $basedir      .= '/' . $controller . '/' . $this->route->action;
+        $basedir      = strtolower($basedir);
+        $layout       = $this->page_layout;
+        $ps           = array();
+        $out_filename = '';
 
         if (!count($args)) {
             $ps = array();
@@ -456,10 +485,13 @@ class fw {
         } elseif (count($args) == 2 && is_string($args[0]) && is_array($args[1])) {
             $basedir = &$args[0];
             $ps      = &$args[1];
-        } elseif (count($args) == 3 && is_string($args[0]) && is_string($args[1]) && is_array($args[2])) {
+        } elseif (count($args) >= 3 && is_string($args[0]) && is_string($args[1]) && is_array($args[2])) {
             $basedir = &$args[0];
             $layout  = &$args[1];
             $ps      = &$args[2];
+            if (count($args) == 4) {
+                $out_filename = &$args[3];
+            }
         } else {
             throw new Exception("parser - wrong call");
         }
@@ -467,7 +499,7 @@ class fw {
         $out_format = $this->getResponseExpectedFormat();
         if ($out_format == 'json') {
             if (isset($ps['_json'])) {
-                if ($ps['_json'] === TRUE) {
+                if ($ps['_json'] === true) {
                     # just enable whole array as json
                     parse_json($ps);
                 } else {
@@ -480,7 +512,6 @@ class fw {
                     'message' => 'JSON response is not enabled for the Controller.Action (set ps[\"_json\"]=true to enable).',
                 ));
             }
-
         } elseif ($out_format == 'html' || $out_format == 'pjax' || !$out_format) {
             #html output based on ParsePage templates
             if ($out_format == 'pjax') {
@@ -496,27 +527,29 @@ class fw {
                 $ps["ERR"] = @$this->GLOBAL['ERR']; #add errors if any
             }
 
-            logger('DEBUG', "basedir=[$basedir], layout=[$layout]");
-            parse_page($basedir, $layout, $ps);
+            $ps['current_time'] = time(); #TODO move to GLOBAL[current_time]?
 
+            logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
+            return parse_page($basedir, $layout, $ps, $out_filename);
         } else {
             #any other formats - call controller's Export($out_format)
-            logger('DEBUG', "export $out_format using " . $this->route->controller . "Controller.Export()");
+            logger('TRACE', "export $out_format using " . $this->route->controller . "Controller.Export()");
             $this->dispatcher->callClassMethod($this->route->controller . 'Controller', 'Export', array($ps, $out_format));
         }
     }
 
     //flash - read/store flash data (available on the next request and only on it)
-    public function flash($name, $value = NULL) {
+    public function flash($name, $value = null) {
         if (is_null($value)) {
             #read mode
             return $this->GLOBAL['_flash'][$name];
         } else {
             #write for next request
+            #@session_start();
             $_SESSION['_flash'][$name] = $value;
+            #@session_write_close();
         }
     }
-
 
     ########################## Email functions
 
@@ -537,19 +570,22 @@ class fw {
         $MAIL   = $this->config->MAIL;
         $result = true;
 
-        if (!is_array($ToEmail))
+        if (!is_array($ToEmail)) {
             $ToEmail = array($ToEmail);
+        }
 
         $from = $options['from'];
-        if (!$from)
+        if (!$from) {
             $from = $this->config->FROM_EMAIL;
+        }
 
         $files = $options['files'];
-        if (!$files)
+        if (!$files) {
             $files = array();
+        }
 
         logger('INFO', "Sending email. From=[$from], To=[" . implode(",", $ToEmail) . "], Subj=[$Subj]");
-        logger('DEBUG', $Message);
+        logger('TRACE', $Message);
 
         #detect if message is in html format - it should start with <!DOCTYPE or <html tag
         $is_html = false;
@@ -560,22 +596,25 @@ class fw {
         #try to send using PHPMailer class
         $file_phpmailer = dirname(__FILE__) . '/mail/class.phpmailer.php';
         if (file_exists($file_phpmailer)) {
-            require_once($file_phpmailer);
+            require_once $file_phpmailer;
             $mail = new PHPMailer;
 
             if ($MAIL['IS_SMTP']) {
-                require_once(dirname(__FILE__) . '/mail/class.smtp.php');
+                require_once dirname(__FILE__) . '/mail/class.smtp.php';
                 $mail->isSMTP();
             }
 
             try {
-                if ($this->config->LOG_LEVEL == 'TRACE')
+                if ($this->config->LOG_LEVEL == 'TRACE') {
                     $mail->SMTPDebug = 3; // Enable verbose debug output
+                }
                 $mail->SMTPAuth   = true;
                 $mail->SMTPSecure = $MAIL['SMTPSecure'];
                 $mail->Host       = $MAIL['SMTP_SERVER'];
-                if ($MAIL['SMTP_PORT'])
+                if ($MAIL['SMTP_PORT']) {
                     $mail->Port = $MAIL['SMTP_PORT'];
+                }
+
                 $mail->Username = $MAIL['USER'];
                 $mail->Password = $MAIL['PWD'];
 
@@ -591,12 +630,17 @@ class fw {
                     $mail->setFrom($from);
                 }
 
-                if ($options['reply'])
+                if ($options['reply']) {
                     $mail->addReplyTo($options['reply']);
-                if ($options['cc'])
+                }
+
+                if ($options['cc']) {
                     $mail->addCC($options['cc']);
-                if ($options['bcc'])
+                }
+
+                if ($options['bcc']) {
                     $mail->addBCC($options['bcc']);
+                }
 
                 $mail->Subject = $Subj;
                 $mail->Body    = $Message;
@@ -614,37 +658,48 @@ class fw {
                     $result = false;
                     logger('WARN', 'Error sending email via PHPMailer: ' . $mail->ErrorInfo);
                 }
-
             } catch (Exception $e) {
                 logger('WARN', $e->getMessage());
                 $result = false;
             }
-
         } else {
-            if ($MAIL['IS_SMTP'])
+            if ($MAIL['IS_SMTP']) {
                 logger('ERROR', 'mail() cannot send via SMTP');
-            if ($is_html)
+            }
+
+            if ($is_html) {
                 logger('WARN', 'mail() cannot send html emails');
-            if ($files)
+            }
+
+            if ($files) {
                 logger('WARN', 'mail() cannot send emails with file attachments');
+            }
 
             #send using usual php mailer
             $more = "Content-Type: text/plain; charset=\"utf-8\" ; format=\"flowed\"\n";
-            if ($from)
+            if ($from) {
                 $more .= "From: $from\n";
-            if ($options['reply'])
-                $more .= "Reply-to: " . $options['reply'] . "\n";
-            if ($options['cc'])
-                $more .= "Cc: " . explode(',', $options['cc']) . "\n";
-            if ($options['bcc'])
-                $more .= "Bcc: " . $options['bcc'] . "\n";
+            }
 
-            if (preg_match("/\W/", $Subj))
+            if ($options['reply']) {
+                $more .= "Reply-to: " . $options['reply'] . "\n";
+            }
+
+            if ($options['cc']) {
+                $more .= "Cc: " . explode(',', $options['cc']) . "\n";
+            }
+
+            if ($options['bcc']) {
+                $more .= "Bcc: " . $options['bcc'] . "\n";
+            }
+
+            if (preg_match("/\W/", $Subj)) {
                 $Subj = "=?utf-8?B?" . base64_encode($Subj) . "?=";
+            }
 
             foreach ($ToEmail as $k => $v) {
                 $res = mail($v, $Subj, $Message, $more);
-                if ($res === FALSE) {
+                if ($res === false) {
                     logger('WARN', 'Error sending email via mail(): ' . error_get_last()['message']);
                     $result = false;
                 }
@@ -681,17 +736,18 @@ class fw {
     public static function redirect($url, $noexit = '') {
         $url = fw::url2abs($url);
 
-        logger('DEBUG', "REDIRECT to [$url]");
+        logger('TRACE', "REDIRECT to [$url]");
         $ps = array(
-            'url' => $url
+            'url' => $url,
         );
         parse_page("/common", "redirect_js.html", $ps);
-        if (!$noexit)
+        if (!$noexit) {
             throw new ExitException;
+        }
     }
     //TODO:
     //function redirect($location){
-    //  logger('DEBUG', "REDIRECT to [$url]");
+    //  logger('TRACE', "REDIRECT to [$url]");
     //  header('location: http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['PHP_SELF']).'/'.$location);
     //}
 
@@ -699,12 +755,12 @@ class fw {
     # /some_site_url?aaaa => http://root_domain/ROOT_URL/some_site_url?aaaa
     public static function url2abs($url) {
         global $CONFIG;
-        if (substr($url, 0, 1) == '/')
+        if (substr($url, 0, 1) == '/') {
             $url = $CONFIG['ROOT_DOMAIN'] . $CONFIG['ROOT_URL'] . $url;
+        }
 
         return $url;
     }
-
 }
 
 //Helper/debug functions - TODO move to fw or Utils class?
@@ -722,7 +778,7 @@ function _req($name) {
 //get integer value from $_REQUEST
 //return 0
 function reqi($name) {
-    return _req($name) + 0;
+    return intval(_req($name));
 }
 
 //get string value from $_REQUEST
@@ -740,23 +796,32 @@ function req($name) {
 //return hash/array from request (if no such param or not array - returns empty array)
 function reqh($name) {
     $h = $_REQUEST[$name];
-    if (!is_array($h))
+    if (!is_array($h)) {
         $h = array();
+    }
+
     return $h;
 }
-
 
 ########################## for debug
 # IN: [logtype (ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
 # OUT: none, just write to $site_error_log
 # If not ALL - limit output to 2048 chars per call
-# example: logger('DEBUG', 'hello there', $var);
+# example: logger('TRACE', 'hello there', $var);
 function logger() {
-    global $CONFIG;
+    $args = func_get_args();
+    if (FwHooks::logger($args)) {
+        #if logger overridden - don't use standard logger
+        return;
+    }
+
+    global $CONFIG, $_raven;
     $log_level = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']];
 
-    if (!$log_level)
-        return;  #don't log if logger is off (for production)
+    if (!$log_level) {
+        return; #don't log if logger is off (for production)
+    }
+    
 
     $args    = func_get_args();
     $logtype = 'DEBUG'; #default log type
@@ -765,26 +830,20 @@ function logger() {
         array_shift($args);
     }
 
-    if (fw::$LOG_LEVELS[$logtype] > $log_level)
+    if (fw::$LOG_LEVELS[$logtype] > $log_level) {
         return; #skip logging if requested level more than config's log level
+    }    
 
-    $arr = debug_backtrace();#0-logger(),1-func called logger,...
-
-    $funcfile = $arr[0]['file'];
-    $line     = $arr[0]['line'];
-    $function = $arr[0]['function'];
-    if (isset($arr[1])) {
-        $function = $arr[1]['function'];
-    }
+    $arr      = debug_backtrace(); #0-logger(),1-func called logger,...
+    $func     = (isset($arr[1]) ? $arr[1] : '');
+    $function = isset($func['function']) ? $func['function'] : '';
+    $line     = $arr[1]['line'];
 
     //remove unnecessary site_root_offline path
-    $funcfile = preg_replace("/^" . preg_quote($CONFIG['SITE_ROOT']) . "/i", "", $funcfile);
-    #$func['file']=str_replace( strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']) );
+    $func['file'] = str_replace(strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']));
 
-    $ts     = microtime(true);
-    $secs   = intval($ts);
-    $msec   = intval(($ts - $secs) * 1000);
-    $strlog = strftime('%Y-%m-%d %H:%M:%S', $secs) . '.' . $msec . ' ' . $logtype . ' ' . $funcfile . '::' . $function . '(' . $line . ') ';
+    $date   = new DateTime();
+    $strlog = $date->format("Y-m-d H:i:s.v") . ' ' . getmypid() . ' ' . $logtype . ' ' . $func['file'] . '::' . $function . '(' . $line . ') ';
     foreach ($args as $str) {
         if (is_scalar($str)) {
             $strlog .= $str;
@@ -796,19 +855,29 @@ function logger() {
 
     if ($logtype != 'ALL') {
         //cut too long logging
-        if (strlen($strlog) > 2048)
+        if (strlen($strlog) > 2048) {
             $strlog = substr($strlog, 0, 2048) . '...' . substr($strlog, -128);
-        if (!preg_match("/\n$/", $strlog))
+        }
+
+        if (!preg_match("/\n$/", $strlog)) {
             $strlog .= "\n";
+        }
     }
 
-    @error_log($strlog, $CONFIG['LOGGER_MESSAGE_TYPE'], $CONFIG['site_error_log']); #using @ to prevent warnings if log not writable
+    @error_log($strlog, $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']); #using @ to prevent warnings if log not writable
+
+    #Sentry support - if enabled also log to Sentry breadcrumbs
+    if (isset($_raven)) {
+        $_raven->breadcrumbs->record(array(
+            'message' => $strlog,
+            'level'   => strtolower($logtype),
+        ));
+    }
 
     if ($logtype == 'STACK') {
         $e = new Exception();
-        @error_log($e->getTraceAsString() . "\n", $CONFIG['LOGGER_MESSAGE_TYPE'], $CONFIG['site_error_log']);
+        @error_log($e->getTraceAsString() . "\n", $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']);
     }
-
 }
 
 ########################### for debugging with output right into the browser or console
