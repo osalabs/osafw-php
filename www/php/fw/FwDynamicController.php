@@ -3,7 +3,7 @@
  Base Fw Controller class for standard module with list/form screens
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2019 Oleg Savchuk www.osalabs.com
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
 class FwDynamicController extends FwController {
@@ -28,7 +28,7 @@ class FwDynamicController extends FwController {
         $this->setListSearchStatus();
         // set here non-standard search
         if ($f["field"] > '') {
-            $this->list_where .= " and field=".dbq($f["field"]);
+            $this->list_where .= " and field=" . dbq($f["field"]);
         }
 
         $this->getListRows();
@@ -38,21 +38,21 @@ class FwDynamicController extends FwController {
             $this->list_rows[$k]['field'] = 'value';
         }
         */
-        $ps=array(
-            'list_rows'     => $this->list_rows,
-            'count'         => $this->list_count,
-            'pager'         => $this->list_pager,
-            'f'             => $this->list_filter,
-            'related_id'    => $this->related_id,
-            'return_url'    => $this->return_url,
+        $ps = array(
+            'list_rows'  => $this->list_rows,
+            'count'      => $this->list_count,
+            'pager'      => $this->list_pager,
+            'f'          => $this->list_filter,
+            'related_id' => $this->related_id,
+            'return_url' => $this->return_url,
         );
 
         #optional userlists support
         $ps["select_userlists"] = fw::model('UserLists')->listSelectByEntity($this->list_view);
-        $ps["mylists"] = fw::model('UserLists')->listForItem($this->list_view, 0);
-        $ps["list_view"] = $this->list_view;
+        $ps["mylists"]          = fw::model('UserLists')->listForItem($this->list_view, 0);
+        $ps["list_view"]        = $this->list_view;
 
-        if ($this->is_dynamic_index){
+        if ($this->is_dynamic_index) {
             #customizable headers
             $this->setViewList($ps, reqh("search"));
         }
@@ -61,90 +61,98 @@ class FwDynamicController extends FwController {
     }
 
     public function ShowAction($form_id) {
-        $id = $form_id+0;
+        $id   = $form_id + 0;
         $item = $this->model->one($id);
-        if (!$item) throw new ApplicationException("Not Found", 404);
+        if (!$item)
+            throw new ApplicationException("Not Found", 404);
 
         $ps = array(
-            'id'    => $id,
-            'i'     => $item,
+            'id'                => $id,
+            'i'                 => $item,
             #added/updated should be filled before dynamic fields
-            'add_users_id_name'  => fw::model('Users')->getFullName($item['add_users_id']),
-            'upd_users_id_name'  => fw::model('Users')->getFullName($item['upd_users_id']),
+            'add_users_id_name' => fw::model('Users')->getFullName($item['add_users_id']),
+            'upd_users_id_name' => fw::model('Users')->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
 
         #dynamic fields
-        if ($this->is_dynamic_show) $ps["fields"] = $this->prepareShowFields($item, $ps);
+        if ($this->is_dynamic_show)
+            $ps["fields"] = $this->prepareShowFields($item, $ps);
 
         #optional userlists support
         $ps["list_view"] = $this->list_view ? $this->model->table_name : $this->list_view;
-        $ps["mylists"] = fw::model('UserLists')->listForItem($ps["list_view"], $id);
+        $ps["mylists"]   = fw::model('UserLists')->listForItem($ps["list_view"], $id);
 
         return $ps;
     }
 
     public function ShowFormAction($form_id) {
-        $id = $form_id+0;
+        $id = $form_id + 0;
 
-        if ($this->fw->isGetRequest()){
-            if ($id>0){
+        if ($this->fw->isGetRequest()) {
+            if ($id > 0) {
                 $item = $this->model->one($id);
-            }else{
+            } else {
                 #defaults
-                $item=$this->form_new_defaults;
+                $item = $this->form_new_defaults;
             }
-        }else{
+        } else {
             $itemdb = $id ? $this->model->one($id) : array();
-            $item = array_merge($itemdb, reqh('item'));
+            $item   = array_merge($itemdb, reqh('item'));
         }
 
         $ps = array(
-            'id'    => $id,
-            'i'     => $item,
-            'return_url'    => $this->return_url,
-            'related_id'    => $this->related_id,
+            'id'         => $id,
+            'i'          => $item,
+            'return_url' => $this->return_url,
+            'related_id' => $this->related_id,
         );
-        if ($this->model->field_add_users_id) $ps['add_users_id_name'] = fw::model('Users')->getFullName($item['add_users_id']);
-        if ($this->model->field_upd_users_id) $ps['upd_users_id_name'] = fw::model('Users')->getFullName($item['upd_users_id']);
+        if ($this->model->field_add_users_id)
+            $ps['add_users_id_name'] = fw::model('Users')->getFullName($item['add_users_id']);
+        if ($this->model->field_upd_users_id)
+            $ps['upd_users_id_name'] = fw::model('Users')->getFullName($item['upd_users_id']);
 
-        if ($this->is_dynamic_showform) $ps["fields"] = $this->prepareShowFormFields($item, $ps);
+        if ($this->is_dynamic_showform)
+            $ps["fields"] = $this->prepareShowFormFields($item, $ps);
 
-        if ($this->fw->GLOBAL['ERR']) logger($this->fw->GLOBAL['ERR']);
+        if ($this->fw->GLOBAL['ERR'])
+            logger($this->fw->GLOBAL['ERR']);
 
         return $ps;
     }
 
-    public function modelAddOrUpdate($id, $fields){
-        if ($this->is_dynamic_showform) $this->processSaveShowFormFields($id, $fields);
+    public function modelAddOrUpdate($id, $fields) {
+        if ($this->is_dynamic_showform)
+            $this->processSaveShowFormFields($id, $fields);
 
         $id = parent::modelAddOrUpdate($id, $fields);
 
-        if ($this->is_dynamic_showform) $this->processSaveShowFormFieldsAfter($id, $fields);
+        if ($this->is_dynamic_showform)
+            $this->processSaveShowFormFieldsAfter($id, $fields);
 
         return $id;
     }
 
     public function SaveAction($form_id) {
-        $id = $form_id+0;
+        $id   = $form_id + 0;
         $item = reqh('item');
 
-        $success = true;
-        $is_new  = ($id==0);
+        $success  = true;
+        $is_new   = ($id == 0);
         $location = '';
 
-        try{
+        try {
             $this->Validate($id, $item);
 
-            $itemdb=$this->getSaveFields($id, $item);
+            $itemdb = $this->getSaveFields($id, $item);
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
             $location = $this->getReturnLocation($id);
 
-        }catch( ApplicationException $ex ){
-            $success=false;
+        } catch (ApplicationException $ex) {
+            $success = false;
             $this->setFormError($ex->getMessage());
         }
 
@@ -152,17 +160,18 @@ class FwDynamicController extends FwController {
     }
 
     public function Validate($id, $item) {
-        $result= $this->validateRequiredDynamic($item);
+        $result = $this->validateRequiredDynamic($item);
 
-        if ($result && $this->is_dynamic_showform) $this->validateSimpleDynamic($id, $item);
+        if ($result && $this->is_dynamic_showform)
+            $this->validateSimpleDynamic($id, $item);
 
-/*
-        if ($result){
-            if ($this->model->isExists( $item['iname'], $id ) ){
-                $this->setError('iname', 'EXISTS');
-            }
-        }
-*/
+        /*
+                if ($result){
+                    if ($this->model->isExists( $item['iname'], $id ) ){
+                        $this->setError('iname', 'EXISTS');
+                    }
+                }
+        */
         $this->validateCheckResult();
     }
 
@@ -172,13 +181,14 @@ class FwDynamicController extends FwController {
         if (!$this->required_fields && $this->is_dynamic_showform) {
             #if required_fields not defined - fill from showform_fields
             $fields = $this->config["showform_fields"];
-            $req=array();
+            $req    = array();
             foreach ($fields as $def) {
-                if ($def['required']) $req[]=$def['field'];
+                if ($def['required'])
+                    $req[] = $def['field'];
             }
             $result = $this->validateRequired($item, $req);
 
-        }else{
+        } else {
             $result = $this->validateRequired($item, $this->required_fields);
         }
 
@@ -186,34 +196,35 @@ class FwDynamicController extends FwController {
     }
 
     #simple validation via showform_fields
-    public function validateSimpleDynamic($id, $item){
-        $result=true;
+    public function validateSimpleDynamic($id, $item) {
+        $result = true;
 
         $fields = $this->config["showform_fields"];
         foreach ($fields as $def) {
-            $field=$def['field'];
-            if (!$field) continue;
+            $field = $def['field'];
+            if (!$field)
+                continue;
 
             $val = Utils::qh($def["validate"]);
-            if (array_key_exists('exists', $val) && $this->model->isExists( $item[$field], $id ) ){
+            if (array_key_exists('exists', $val) && $this->model->isExists($item[$field], $id)) {
                 $this->setError($field, 'EXISTS');
-                $result=false;
+                $result = false;
             }
-            if (array_key_exists('isemail', $val) && !FormUtils::isEmail($item[$field]) ){
+            if (array_key_exists('isemail', $val) && !FormUtils::isEmail($item[$field])) {
                 $this->setError($field, 'WRONG');
-                $result=false;
+                $result = false;
             }
-            if (array_key_exists('isphone', $val) && !FormUtils::isPhone($item[$field]) ){
+            if (array_key_exists('isphone', $val) && !FormUtils::isPhone($item[$field])) {
                 $this->setError($field, 'WRONG');
-                $result=false;
+                $result = false;
             }
-            if (array_key_exists('isdate', $val) && !FormUtils::isDate($item[$field]) ){
+            if (array_key_exists('isdate', $val) && !FormUtils::isDate($item[$field])) {
                 $this->setError($field, 'WRONG');
-                $result=false;
+                $result = false;
             }
-            if (array_key_exists('isfloat', $val) && !FormUtils::isFloat($item[$field]) ){
+            if (array_key_exists('isfloat', $val) && !FormUtils::isFloat($item[$field])) {
                 $this->setError($field, 'WRONG');
-                $result=false;
+                $result = false;
             }
 
             #if (!$result) break; #uncomment to break on first error
@@ -222,86 +233,91 @@ class FwDynamicController extends FwController {
         return $result;
     }
 
-    public function ShowDeleteAction($id){
-        $id+=0;
+    public function ShowDeleteAction($id) {
+        $id += 0;
         $ps = array(
-            'i' => $this->model->one($id),
-            'return_url'        => $this->return_url,
-            'related_id'        => $this->related_id,
-            'base_url'          => $this->base_url, #override default template url, remove if you created custom /showdelete templates
+            'i'          => $this->model->one($id),
+            'return_url' => $this->return_url,
+            'related_id' => $this->related_id,
+            'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates
         );
 
         $this->fw->parser('/common/form/showdelete', $ps);
         //return $ps; #use this instead of parser if you created custom /showdelete templates
     }
 
-    public function DeleteAction($id){
-        $id+=0;
+    public function DeleteAction($id) {
+        $id += 0;
         $this->model->delete($id);
 
         $this->fw->flash("onedelete", 1);
         fw::redirect($this->getReturnLocation());
     }
 
-    public function SaveMultiAction(){
+    public function SaveMultiAction() {
         $acb = req('cb');
-        if (!is_array($acb)) $acb=array();
-        $is_delete = reqs('delete')>'';
-        $user_lists_id  = reqi("addtolist");
+        if (!is_array($acb))
+            $acb = array();
+        $is_delete            = reqs('delete') > '';
+        $user_lists_id        = reqi("addtolist");
         $remove_user_lists_id = reqi("removefromlist");
 
         if ($user_lists_id) {
             $user_lists = fw::model('UserLists')->one($user_lists_id);
-            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) throw New ApplicationException("Wrong Request");
+            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me())
+                throw new ApplicationException("Wrong Request");
         }
 
-        $ctr=0;
+        $ctr = 0;
         foreach ($acb as $id => $value) {
-            if ($is_delete){
+            if ($is_delete) {
                 $this->model->delete($id);
-                $ctr+=1;
-            }elseif ($user_lists_id){
+                $ctr += 1;
+            } elseif ($user_lists_id) {
                 fw::model('UserLists')->addItemList($user_lists_id, $id);
                 $ctr += 1;
-            }elseif ($remove_user_lists_id){
+            } elseif ($remove_user_lists_id) {
                 fw::model('UserLists')->delItemList($remove_user_lists_id, $id);
                 $ctr += 1;
             }
         }
 
-        if ($is_delete) $this->fw->flash("multidelete", $ctr);
-        if ($user_lists_id) $this->fw->flash("success", "$ctr records added to the list");
+        if ($is_delete)
+            $this->fw->flash("multidelete", $ctr);
+        if ($user_lists_id)
+            $this->fw->flash("success", "$ctr records added to the list");
 
         fw::redirect($this->getReturnLocation());
     }
 
     ###################### support for autocomlete related items
-    public function AutocompleteAction(){
-        if (!$this->model_related) throw new ApplicationException('No model_related defined');
+    public function AutocompleteAction() {
+        if (!$this->model_related)
+            throw new ApplicationException('No model_related defined');
         $items = $this->model_related->getAutocompleteList(reqs("q"));
 
         return array('_json' => $items);
     }
 
     ###################### support for customizable list screen
-    public function UserViewsAction($id){
-        $id+=0;
+    public function UserViewsAction($id) {
+        $id += 0;
 
-        $ps=array(
+        $ps = array(
             'rows' => $this->getViewListArr($this->getViewListUserFields(), true)
         );
 
         $this->fw->parser("/common/list/userviews", $ps);
     }
 
-    public function SaveUserViewsAction(){
-        $item = reqh('item');
+    public function SaveUserViewsAction() {
+        $item    = reqh('item');
         $success = true;
 
         try {
             if (reqi("is_reset")) {
                 fw::model('UserViews')->updateByScreen($this->base_url, $this->view_list_defaults);
-            }else{
+            } else {
                 #save fields
                 #order by value
                 $ordered = reqh("fld");
@@ -310,14 +326,14 @@ class FwDynamicController extends FwController {
                 #and then get ordered keys
                 $anames = array();
                 foreach ($ordered as $key => $value) {
-                    $anames[]=$key;
+                    $anames[] = $key;
                 }
 
                 fw::model('UserViews')->updateByScreen($this->base_url, implode(' ', $anames));
             }
 
         } catch (Exception $ex) {
-            $success=false;
+            $success = false;
             $this->setFormError($ex->getMessage());
         }
 
@@ -328,68 +344,72 @@ class FwDynamicController extends FwController {
 
     /**
      * prepare data for fields repeat in ShowAction based on config.json show_fields parameter
-     * @param  array $item one item
-     * @param  array $ps   for parsepage
+     * @param array $item one item
+     * @param array $ps for parsepage
      * @return array       array of hashtables to build fields in templates
      */
-    public function prepareShowFields($item, $ps){
-        $id = $item['id']+0;
+    public function prepareShowFields($item, $ps) {
+        $id = $item['id'] + 0;
 
         $fields = $this->config["show_fields"];
-        if (!$fields) throw New ApplicationException("Controller config.json doesn't contain 'show_fields'");
+        if (!$fields)
+            throw new ApplicationException("Controller config.json doesn't contain 'show_fields'");
         foreach ($fields as &$def) {
             $def['i'] = $item;
-            $dtype = $def["type"];
-            $field = $def["field"];
+            $dtype    = $def["type"];
+            $field    = $def["field"];
 
-            if ($dtype == "row" || $dtype == "row_end" || $dtype == "col" || $dtype == "col_end"){
+            if ($dtype == "row" || $dtype == "row_end" || $dtype == "col" || $dtype == "col_end") {
                 #structural tags
                 $def["is_structure"] = true;
 
-            }elseif ($dtype == "multi"){
+            } elseif ($dtype == "multi") {
                 #complex field
                 $def["multi_datarow"] = fw::model($def["lookup_model"])->getMultiList($item[$field], $def["lookup_params"]);
 
-            }elseif ($dtype == "att"){
+            } elseif ($dtype == "att") {
                 $def["att"] = fw::model('Att')->one($item[$field]);
 
-            }elseif ($dtype == "att_links"){
+            } elseif ($dtype == "att_links") {
                 $def["att_links"] = fw::model('Att')->getAllLinked($this->model->table_name, $id);
 
-            }else{
+            } else {
                 #single values
                 #lookups
-                if (array_key_exists('lookup_table', $def)){
+                if (array_key_exists('lookup_table', $def)) {
                     #lookup by table
                     $lookup_key = $def["lookup_key"];
-                    if (!$lookup_key) $lookup_key = "id";
+                    if (!$lookup_key)
+                        $lookup_key = "id";
 
                     $lookup_field = $def["lookup_field"];
-                    if (!$lookup_field) $lookup_field = "iname";
+                    if (!$lookup_field)
+                        $lookup_field = "iname";
 
-                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]) );
-                    $def["value"] = $def["lookup_row"][$lookup_field];
+                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]));
+                    $def["value"]      = $def["lookup_row"][$lookup_field];
 
-                }elseif(array_key_exists('lookup_model', $def)){
+                } elseif (array_key_exists('lookup_model', $def)) {
                     #lookup by model
 
                     $def["lookup_row"] = fw::model($def["lookup_model"])->one($item[$field]);
 
                     $lookup_field = $def["lookup_field"];
-                    if (!$lookup_field) $lookup_field = "iname";
+                    if (!$lookup_field)
+                        $lookup_field = "iname";
 
                     $def["value"] = $def["lookup_row"][$lookup_field];
 
-                }elseif(array_key_exists('lookup_tpl', $def)){
+                } elseif (array_key_exists('lookup_tpl', $def)) {
                     $def["value"] = get_selvalue($def["lookup_tpl"], $item[$field]);
-                }else{
+                } else {
                     $def["value"] = $item[$field];
                 }
             }
 
             #convertors
-            if (array_key_exists('conv', $def)){
-                if ($def["conv"] == "time_from_seconds"){
+            if (array_key_exists('conv', $def)) {
+                if ($def["conv"] == "time_from_seconds") {
                     $def["value"] = DateUtils::int2timestr($def["value"]);
                 }
             }
@@ -401,26 +421,27 @@ class FwDynamicController extends FwController {
 
     /**
      * prepare data for fields repeat in ShowFormAction based on config.json showform_fields parameter
-     * @param  array $item one item
-     * @param  array $ps   for parsepage
+     * @param array $item one item
+     * @param array $ps for parsepage
      * @return array       array of hashtables to build fields in templates
      */
-    public function prepareShowFormFields($item, $ps){
-        $id = $item['id']+0;
+    public function prepareShowFormFields($item, $ps) {
+        $id = $item['id'] + 0;
 
         $fields = $this->config["showform_fields"];
-        if (!$fields) throw New ApplicationException("Controller config.json doesn't contain 'showform_fields'");
+        if (!$fields)
+            throw new ApplicationException("Controller config.json doesn't contain 'showform_fields'");
         foreach ($fields as &$def) {
-            $def['i'] = $item;  #ref to item
+            $def['i']  = $item;  #ref to item
             $def['ps'] = $ps;   #ref to whole ps
-            $dtype = $def["type"]; #type is required
-            $field = $def["field"];
+            $dtype     = $def["type"]; #type is required
+            $field     = $def["field"];
 
-            if ($dtype == "row" || $dtype == "row_end" || $dtype == "col" || $dtype == "col_end"){
+            if ($dtype == "row" || $dtype == "row_end" || $dtype == "col" || $dtype == "col_end") {
                 #structural tags
                 $def["is_structure"] = true;
 
-            }elseif ($dtype == "multicb"){
+            } elseif ($dtype == "multicb") {
                 #complex field
                 $def["multi_datarow"] = fw::model($def["lookup_model"])->getMultiList($item[$field], $def["lookup_params"]);
                 foreach ($def["multi_datarow"] as &$row) {
@@ -428,55 +449,57 @@ class FwDynamicController extends FwController {
                 }
                 unset($row);
 
-            }elseif ($dtype == "att_edit"){
-                $def["att"] = fw::model('Att')->one($item[$field]);
+            } elseif ($dtype == "att_edit") {
+                $def["att"]   = fw::model('Att')->one($item[$field]);
                 $def["value"] = $item[$field];
 
-            }elseif ($dtype == "att_links_edit"){
+            } elseif ($dtype == "att_links_edit") {
                 $def["att_links"] = fw::model('Att')->getAllLinked($this->model->table_name, $id);
 
-            }else{
+            } else {
                 #single values
                 #lookups
-                if (array_key_exists('lookup_table', $def)){
+                if (array_key_exists('lookup_table', $def)) {
                     #lookup by table
                     $lookup_key = $def["lookup_key"];
-                    if (!$lookup_key) $lookup_key = "id";
+                    if (!$lookup_key)
+                        $lookup_key = "id";
 
                     $lookup_field = $def["lookup_field"];
-                    if (!$lookup_field) $lookup_field = "iname";
+                    if (!$lookup_field)
+                        $lookup_field = "iname";
 
-                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]) );
-                    $def["value"] = $def["lookup_row"][$lookup_field];
+                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]));
+                    $def["value"]      = $def["lookup_row"][$lookup_field];
 
-                }elseif(array_key_exists('lookup_model', $def)){
-                    if (array_key_exists('lookup_field', $def)){
+                } elseif (array_key_exists('lookup_model', $def)) {
+                    if (array_key_exists('lookup_field', $def)) {
                         #lookup value
                         $def["lookup_row"] = fw::model($def["lookup_model"])->one($item[$field]);
-                        $def["value"] = $def["lookup_row"][$def["lookup_field"]];
-                    }else{
+                        $def["value"]      = $def["lookup_row"][$def["lookup_field"]];
+                    } else {
                         #lookup select
                         $def["select_options"] = fw::model($def["lookup_model"])->listSelectOptions($def['lookup_params']);
-                        $def["value"] = $item[$field];
+                        $def["value"]          = $item[$field];
                     }
 
-                }elseif(array_key_exists('lookup_tpl', $def)){
+                } elseif (array_key_exists('lookup_tpl', $def)) {
                     $def['select_options'] = FormUtils::selectTplOptions($def['lookup_tpl'], $item[$field]);
-                    $def["value"] = $item[$field];
+                    $def["value"]          = $item[$field];
                     foreach ($def['select_options'] as &$row) { #contains id, iname
                         $row["is_inline"] = $def["is_inline"];
-                        $row["field"] = $def["field"];
-                        $row["value"] = $item["field"];
+                        $row["field"]     = $def["field"];
+                        $row["value"]     = $item["field"];
                     }
                     unset($row);
-                }else{
+                } else {
                     $def["value"] = $item[$field];
                 }
             }
 
             #convertors
-            if (array_key_exists('conv', $def)){
-                if ($def["conv"] == "time_from_seconds"){
+            if (array_key_exists('conv', $def)) {
+                if ($def["conv"] == "time_from_seconds") {
                     $def["value"] = DateUtils::int2timestr($def["value"]);
                 }
             }
@@ -487,26 +510,26 @@ class FwDynamicController extends FwController {
     }
 
     #auto-process fields BEFORE record saved to db
-    public function processSaveShowFormFields($id, &$fields){
+    public function processSaveShowFormFields($id, &$fields) {
         $item = reqh("item");
 
         $showform_fields = $this->_fieldsToHash($this->config["showform_fields"]);
         #special auto-processing for fields of particular types
         foreach (array_keys($fields) as $field) {
-            if (array_key_exists($field, $showform_fields)){
+            if (array_key_exists($field, $showform_fields)) {
                 $def = $showform_fields[$field];
-                if ($def['type']=='multicb'){
+                if ($def['type'] == 'multicb') {
                     #multiple checkboxes
-                    $fields[$field] = FormUtils::multi2ids(reqh($field."_multi"));
-                }elseif ($def['type']=='autocomplete'){
+                    $fields[$field] = FormUtils::multi2ids(reqh($field . "_multi"));
+                } elseif ($def['type'] == 'autocomplete') {
                     $fields[$field] = fw::model($def["lookup_model"])->findOrAddByIname($fields[$field]);
-                }elseif ($def['type']=='date_combo'){
+                } elseif ($def['type'] == 'date_combo') {
                     $fields[$field] = FormUtils::dateForCombo($item, $field);
-                }elseif ($def['type']=='date_popup'){
+                } elseif ($def['type'] == 'date_popup') {
                     $fields[$field] = DateUtils::Str2SQL($fields[$field]); #convert date to sql format
-                }elseif ($def['type']=='time'){
+                } elseif ($def['type'] == 'time') {
                     $fields[$field] = DateUtils::timestr2int($fields[$field]); #ftime - convert from HH:MM to int (0-24h in seconds)
-                }elseif ($def['type']=='number'){
+                } elseif ($def['type'] == 'number') {
                     $fields[$field] = floatval($fields[$field]); #number - convert to number (if field empty or non-number - it will become 0)
                 }
             }
@@ -516,10 +539,10 @@ class FwDynamicController extends FwController {
     }
 
     #auto-process fields AFTER record saved to db
-    protected function processSaveShowFormFieldsAfter($id, $fields){
+    protected function processSaveShowFormFieldsAfter($id, $fields) {
         #for now we just look if we have att_links_edit field and update att links
         foreach ($this->config['showform_fields'] as $def) {
-            if ($def['type']=='att_links_edit'){
+            if ($def['type'] == 'att_links_edit') {
                 fw::model('Att')->updateAttLinks($this->model->table_name, $id, reqh("att")); #TODO make att configurable
             }
         }
@@ -527,16 +550,14 @@ class FwDynamicController extends FwController {
 
     #convert config's fields list into hashtable as field => {}
     #if there are more than one field - just first field added to the hash
-    protected function _fieldsToHash($fields){
-        $result=array();
+    protected function _fieldsToHash($fields) {
+        $result = array();
         foreach ($fields as $fldinfo) {
-            if (array_key_exists('field', $fldinfo) && !array_key_exists($fldinfo['field'], $result)){
-                $result[$fldinfo['field']]=$fldinfo;
+            if (array_key_exists('field', $fldinfo) && !array_key_exists($fldinfo['field'], $result)) {
+                $result[$fldinfo['field']] = $fldinfo;
             }
         }
         return $result;
     }
 
 }//end of class
-
-?>
