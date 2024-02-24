@@ -1,7 +1,7 @@
 <?php
 /*
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2015 Oleg Savchuk www.osalabs.com
+(c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
 require_once dirname(__FILE__)."/ImageUtils.php";
