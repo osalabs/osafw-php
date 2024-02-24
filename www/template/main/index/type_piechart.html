@@ -1,4 +1,4 @@
-<~bsubtitle2 if="title" inline><h5 class="card-title"><~title var></h5></~bsubtitle2>
+<~bsubtitle2 if="title" inline><h5 class="card-title fs-6 fw-semibold"><~title var></h5></~bsubtitle2>
 <div class="chart-container">
     <canvas id="chart_<~id>"></canvas>
 </div>
@@ -11,22 +11,15 @@
                 labels: [<~rows repeat inline>"<~ilabel>",</~rows>], //zzz
                 datasets: [{
                     data: [<~rows repeat inline ivalues><~ivalue>,</~rows>], //zzz
-                    backgroundColor: [
-                        '#007bff',
-                        '#3295FF',
-                        '#66AFFF',
-                        '#99CAFF',
-                        '#B2D7FF',
-                        '#CCE4FF',
-                        '#E5F1FF',
-                        '#F2F8FF'
-                    ]
+                    backgroundColor: window.Chart.defaults.doughnut.backgroundColor
                 }]
             },
             options: {
-                // responsive: true
-                legend: {
-                    display: true
+                cutout: '80%',
+                plugins:{
+                    legend: {
+                        display: true
+                    }
                 }
             }
         });

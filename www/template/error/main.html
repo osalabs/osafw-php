@@ -8,20 +8,24 @@ As of <~err_time date="sql"> we know the following:
 </div>
 
 <~dump if="is_dump" inline>
-<div class="text-left">
+<div class="text-start">
     <h3>Debug info</h3>
     <div class="dropinfo">
-        <a href="#" class="on-dropinfo"><strong>Stack trace:</strong> <i class="glyphicon glyphicon-menu-up"></i></a>
+        <a href="#" class="on-dropinfo"><strong>Last SQL:</strong> <~/common/icons/caret-up><~/common/icons/caret-down></a>
+        <pre class="alert alert-info" style="white-space: pre-wrap;word-wrap:break-word"><~DUMP_SQL></pre>
+    </div>
+    <div class="dropinfo">
+        <a href="#" class="on-dropinfo"><strong>Stack trace:</strong> <~/common/icons/caret-up><~/common/icons/caret-down></a>
         <pre class="alert alert-info"><~DUMP_STACK></pre>
     </div>
 
     <div class="dropinfo">
-        <a href="#" class="on-dropinfo"><strong>Form:</strong> <i class="glyphicon glyphicon-menu-up"></i></a>
+        <a href="#" class="on-dropinfo"><strong>Form:</strong> <~/common/icons/caret-up><~/common/icons/caret-down></a>
         <pre class="alert alert-info"><~DUMP_FORM></pre>
     </div>
 
     <div class="dropinfo">
-        <a href="#" class="on-dropinfo"><strong>Session:</strong> <i class="glyphicon glyphicon-menu-up"></i></a>
+        <a href="#" class="on-dropinfo"><strong>Session:</strong> <~/common/icons/caret-up><~/common/icons/caret-down></a>
         <pre class="alert alert-info"><~DUMP_SESSION></pre>
     </div>
 </div>
@@ -40,7 +44,7 @@ As of <~err_time date="sql"> we know the following:
         </li>
         </~links>
         <li>
-            <a href="<~ROOT_URL>/Logoff">`Logoff and Re-login to the site`</a>
+            <a href="<~/login/url_logoff>">`Logoff and Re-login to the site`</a>
         </li>
         <li>
             If nothing helps - contact site support

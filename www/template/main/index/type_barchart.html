@@ -1,4 +1,4 @@
-<~bsubtitle2 if="title" inline><h5 class="card-title"><~title var></h5></~bsubtitle2>
+<~bsubtitle2 if="title" inline><h5 class="card-title fs-6 fw-semibold"><~title var></h5></~bsubtitle2>
 <div class="chart-container">
     <canvas id="chart_<~id>"></canvas>
 </div>
@@ -10,6 +10,7 @@
             data: {
                 labels: [<~rows repeat inline>"<~ilabel>",</~rows>], //zzz
                 datasets: [{
+                    borderRadius: 20,
                     data: [<~rows repeat inline ivalues><~ivalue>,</~rows>] //zzz
                 }]
             },

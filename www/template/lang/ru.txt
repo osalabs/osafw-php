@@ -1,1 +1,2 @@
-aaa === this is a test for russian
+Main Dashboard === Дашборд
+My Profile === Мои Настройки

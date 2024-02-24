@@ -9,9 +9,15 @@
         </tr>
     </thead>
     <tbody>
+
+        <tr>
+            <td>Environment</td>
+            <td><~ok if="is_config_env"><~fail unless="is_config_env"></td>
+            <td><~ASPNETCORE_ENVIRONMENT></td>
+        </tr>
         <tr>
             <td>Config file</td>
-            <td><~ok></td>
+            <td><~ok if="is_config_env"><~fail unless="is_config_env"></td>
             <td><~config_file_name></td>
         </tr>
         <tr>
@@ -44,6 +50,8 @@
                     <code>mysql -u root -p &lt; db/database.sql</code>
                     <br>
                     or using <a href="http://phpminiadmin.sourceforge.net/" target="_blank">phpMiniAdmin</a>
+                    <br>
+                    or <button type="button" class="btn btn-default on-fw-submit" data-url="<~../url>/(InitDB)">Initialize DB</button>
                 </~failmsg3>
             </td>
         </tr>
@@ -57,7 +65,7 @@
             </td>
         </tr>
         <tr>
-            <td>Error log</td>
+            <td>/logs/main.log</td>
             <td><~ok if="is_error_log"><~fail unless="is_error_log"></td>
             <td><~GLOBAL[site_error_log]> <~error_log_size>
                 <~failmsg5 unless="is_error_log" inline>

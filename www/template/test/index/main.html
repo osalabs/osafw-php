@@ -84,9 +84,17 @@
        <~now date="sql"> - yyyy-mm-dd hh:mm:ss<br>
     </li>
     <li>
-       json dump of parse data: 
+        currency:<br>
+       <~money currency> - $1,234.56<br>
+    </li>
+    <li>
+       json dump of parse data:
        <div>
        <~myself json>
        </div>
+    </li>
+    <li>
+       user id: <~user[id]><br>
+       user non-existing key: <~user[nonexisting]>
     </li>
 </ul>
