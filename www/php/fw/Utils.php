@@ -5,11 +5,6 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 class Utils {
-    //just return logged user id
-    public static function me() {
-        return intval($_SESSION['user_id'] ?? 0);
-    }
-
     /**
      * split string by "whitespace characters" and return array
      * Example: $array = qw('one two three'); => array('one', 'two', 'three');
