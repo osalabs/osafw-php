@@ -61,10 +61,11 @@ class FwDynamicController extends FwController {
     }
 
     public function ShowAction($form_id) {
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = $this->model->one($id);
-        if (!$item)
+        if (!$item) {
             throw new ApplicationException("Not Found", 404);
+        }
 
         $ps = array(
             'id'                => $id,
@@ -77,8 +78,9 @@ class FwDynamicController extends FwController {
         );
 
         #dynamic fields
-        if ($this->is_dynamic_show)
+        if ($this->is_dynamic_show) {
             $ps["fields"] = $this->prepareShowFields($item, $ps);
+        }
 
         #optional userlists support
         $ps["list_view"] = $this->list_view ? $this->model->table_name : $this->list_view;
@@ -88,7 +90,7 @@ class FwDynamicController extends FwController {
     }
 
     public function ShowFormAction($form_id) {
-        $id = $form_id + 0;
+        $id = intval($form_id);
 
         if ($this->fw->isGetRequest()) {
             if ($id > 0) {
@@ -108,34 +110,40 @@ class FwDynamicController extends FwController {
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
         );
-        if ($this->model->field_add_users_id)
+        if ($this->model->field_add_users_id) {
             $ps['add_users_id_name'] = fw::model('Users')->getFullName($item['add_users_id']);
-        if ($this->model->field_upd_users_id)
+        }
+        if ($this->model->field_upd_users_id) {
             $ps['upd_users_id_name'] = fw::model('Users')->getFullName($item['upd_users_id']);
+        }
 
-        if ($this->is_dynamic_showform)
+        if ($this->is_dynamic_showform) {
             $ps["fields"] = $this->prepareShowFormFields($item, $ps);
+        }
 
-        if ($this->fw->GLOBAL['ERR'])
+        if ($this->fw->GLOBAL['ERR']) {
             logger($this->fw->GLOBAL['ERR']);
+        }
 
         return $ps;
     }
 
     public function modelAddOrUpdate($id, $fields) {
-        if ($this->is_dynamic_showform)
+        if ($this->is_dynamic_showform) {
             $this->processSaveShowFormFields($id, $fields);
+        }
 
         $id = parent::modelAddOrUpdate($id, $fields);
 
-        if ($this->is_dynamic_showform)
+        if ($this->is_dynamic_showform) {
             $this->processSaveShowFormFieldsAfter($id, $fields);
+        }
 
         return $id;
     }
 
     public function SaveAction($form_id) {
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = reqh('item');
 
         $success  = true;
@@ -162,8 +170,9 @@ class FwDynamicController extends FwController {
     public function Validate($id, $item) {
         $result = $this->validateRequiredDynamic($item);
 
-        if ($result && $this->is_dynamic_showform)
+        if ($result && $this->is_dynamic_showform) {
             $this->validateSimpleDynamic($id, $item);
+        }
 
         /*
                 if ($result){
@@ -183,8 +192,9 @@ class FwDynamicController extends FwController {
             $fields = $this->config["showform_fields"];
             $req    = array();
             foreach ($fields as $def) {
-                if ($def['required'])
+                if ($def['required']) {
                     $req[] = $def['field'];
+                }
             }
             $result = $this->validateRequired($item, $req);
 
@@ -202,8 +212,9 @@ class FwDynamicController extends FwController {
         $fields = $this->config["showform_fields"];
         foreach ($fields as $def) {
             $field = $def['field'];
-            if (!$field)
+            if (!$field) {
                 continue;
+            }
 
             $val = Utils::qh($def["validate"]);
             if (array_key_exists('exists', $val) && $this->model->isExists($item[$field], $id)) {
@@ -256,16 +267,18 @@ class FwDynamicController extends FwController {
 
     public function SaveMultiAction() {
         $acb = req('cb');
-        if (!is_array($acb))
+        if (!is_array($acb)) {
             $acb = array();
+        }
         $is_delete            = reqs('delete') > '';
         $user_lists_id        = reqi("addtolist");
         $remove_user_lists_id = reqi("removefromlist");
 
         if ($user_lists_id) {
             $user_lists = fw::model('UserLists')->one($user_lists_id);
-            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me())
+            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) {
                 throw new ApplicationException("Wrong Request");
+            }
         }
 
         $ctr = 0;
@@ -282,18 +295,21 @@ class FwDynamicController extends FwController {
             }
         }
 
-        if ($is_delete)
+        if ($is_delete) {
             $this->fw->flash("multidelete", $ctr);
-        if ($user_lists_id)
+        }
+        if ($user_lists_id) {
             $this->fw->flash("success", "$ctr records added to the list");
+        }
 
         fw::redirect($this->getReturnLocation());
     }
 
     ###################### support for autocomlete related items
     public function AutocompleteAction() {
-        if (!$this->model_related)
+        if (!$this->model_related) {
             throw new ApplicationException('No model_related defined');
+        }
         $items = $this->model_related->getAutocompleteList(reqs("q"));
 
         return array('_json' => $items);
@@ -349,11 +365,12 @@ class FwDynamicController extends FwController {
      * @return array       array of hashtables to build fields in templates
      */
     public function prepareShowFields($item, $ps) {
-        $id = $item['id'] + 0;
+        $id = intval($item['id']);
 
         $fields = $this->config["show_fields"];
-        if (!$fields)
+        if (!$fields) {
             throw new ApplicationException("Controller config.json doesn't contain 'show_fields'");
+        }
         foreach ($fields as &$def) {
             $def['i'] = $item;
             $dtype    = $def["type"];
@@ -379,12 +396,14 @@ class FwDynamicController extends FwController {
                 if (array_key_exists('lookup_table', $def)) {
                     #lookup by table
                     $lookup_key = $def["lookup_key"];
-                    if (!$lookup_key)
+                    if (!$lookup_key) {
                         $lookup_key = "id";
+                    }
 
                     $lookup_field = $def["lookup_field"];
-                    if (!$lookup_field)
+                    if (!$lookup_field) {
                         $lookup_field = "iname";
+                    }
 
                     $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]));
                     $def["value"]      = $def["lookup_row"][$lookup_field];
@@ -395,8 +414,9 @@ class FwDynamicController extends FwController {
                     $def["lookup_row"] = fw::model($def["lookup_model"])->one($item[$field]);
 
                     $lookup_field = $def["lookup_field"];
-                    if (!$lookup_field)
+                    if (!$lookup_field) {
                         $lookup_field = "iname";
+                    }
 
                     $def["value"] = $def["lookup_row"][$lookup_field];
 
@@ -426,11 +446,12 @@ class FwDynamicController extends FwController {
      * @return array       array of hashtables to build fields in templates
      */
     public function prepareShowFormFields($item, $ps) {
-        $id = $item['id'] + 0;
+        $id = intval($item['id']);
 
         $fields = $this->config["showform_fields"];
-        if (!$fields)
+        if (!$fields) {
             throw new ApplicationException("Controller config.json doesn't contain 'showform_fields'");
+        }
         foreach ($fields as &$def) {
             $def['i']  = $item;  #ref to item
             $def['ps'] = $ps;   #ref to whole ps
@@ -462,12 +483,14 @@ class FwDynamicController extends FwController {
                 if (array_key_exists('lookup_table', $def)) {
                     #lookup by table
                     $lookup_key = $def["lookup_key"];
-                    if (!$lookup_key)
+                    if (!$lookup_key) {
                         $lookup_key = "id";
+                    }
 
                     $lookup_field = $def["lookup_field"];
-                    if (!$lookup_field)
+                    if (!$lookup_field) {
                         $lookup_field = "iname";
+                    }
 
                     $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]));
                     $def["value"]      = $def["lookup_row"][$lookup_field];

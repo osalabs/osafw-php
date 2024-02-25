@@ -299,7 +299,7 @@ abstract class FwController {
     public function setListSearchStatus() {
         if ($this->model && strlen($this->model->field_status)) {
             if ($this->list_filter['status'] > '') {
-                $status = $this->list_filter['status'] + 0;
+                $status = intval($this->list_filter['status']);
                 #if want to see trashed and not admin - just show active
                 if ($status == 127 && !$this->fw->model('Users')->isAccess(Users::ACL_ADMIN)) {
                     $status = 0;

@@ -65,7 +65,7 @@ class FwAdminController extends FwController {
     }
 
     public function ShowAction($form_id) {
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = $this->model->one($id);
         if (!$item) {
             throw new ApplicationException("Not Found", 404);
@@ -88,7 +88,7 @@ class FwAdminController extends FwController {
     }
 
     public function ShowFormAction($form_id) {
-        $id = $form_id + 0;
+        $id = intval($form_id);
 
         if ($this->fw->isGetRequest()) {
             if ($id > 0) {
@@ -117,7 +117,7 @@ class FwAdminController extends FwController {
     public function SaveAction($form_id) {
         $this->fw->checkXSS();
 
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = reqh('item');
 
         $success  = true;
@@ -190,8 +190,9 @@ class FwAdminController extends FwController {
 
         if ($user_lists_id) {
             $user_lists = fw::model('UserLists')->one($user_lists_id);
-            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me())
+            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) {
                 throw new ApplicationException("Wrong Request");
+            }
         }
 
         $ctr = 0;
@@ -208,10 +209,12 @@ class FwAdminController extends FwController {
             }
         }
 
-        if ($is_delete)
+        if ($is_delete) {
             $this->fw->flash("multidelete", $ctr);
-        if ($user_lists_id)
+        }
+        if ($user_lists_id) {
             $this->fw->flash("success", "$ctr records added to the list");
+        }
 
         fw::redirect($this->getReturnLocation());
     }

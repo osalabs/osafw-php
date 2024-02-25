@@ -86,17 +86,18 @@ class AdminSpagesController extends FwAdminController {
         $pages_tree                     = $this->model->tree($where, "parent_id, prio desc, iname");
         $ps["select_options_parent_id"] = $this->model->getPagesTreeSelectHtml($item["parent_id"], $pages_tree);
 
-        $ps["parent_url"] = $this->model->getFullUrl($item["parent_id"] + 0);
-        $ps["full_url"]   = $this->model->getFullUrl($item["id"] + 0);
+        $ps["parent_url"] = $this->model->getFullUrl($item["parent_id"]);
+        $ps["full_url"]   = $this->model->getFullUrl($item["id"]);
 
-        $ps["parent"] = $this->model->one($item["parent_id"] + 0);
+        $ps["parent"] = $this->model->one($item["parent_id"]);
 
         if ($item["head_att_id"]) {
             $ps["head_att_id_url_s"] = $this->fw->model('Att')->getUrlDirect($item["head_att_id"], "s");
         }
 
-        if ($id)
+        if ($id) {
             $ps["subpages"] = $this->model->listChildren($id);
+        }
 
         return $ps;
     }
@@ -105,7 +106,7 @@ class AdminSpagesController extends FwAdminController {
     public function SaveAction($form_id) {
         $this->fw->checkXSS();
 
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = reqh('item');
 
         $success  = true;
@@ -130,14 +131,16 @@ class AdminSpagesController extends FwAdminController {
             } else {
                 $itemdb["pub_time"] = DB::NOW;
             }
-            if (!$itemdb["head_att_id"])
+            if (!$itemdb["head_att_id"]) {
                 $itemdb["head_att_id"] = null;
+            }
             logger($itemdb);
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            if ($item_old["is_home"] == 1)
-                FwCache::remove("home_page"); #reset home page cache if Home page changed
+            if ($item_old["is_home"] == 1) {
+                FwCache::remove("home_page");
+            } #reset home page cache if Home page changed
 
             $location = $this->getReturnLocation($id);
 

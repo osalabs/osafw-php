@@ -18,7 +18,7 @@ class Settings extends FwModel {
     }
 
     public static function readi($icode) {
-        return (fw::model('Settings')->getValue($icode)) + 0;
+        return intval(fw::model('Settings')->getValue($icode));
     }
 
     public static function readd($icode) {

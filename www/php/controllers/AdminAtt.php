@@ -60,7 +60,7 @@ class AdminAttController extends FwAdminController {
     }
 
     public function ShowFormAction($form_id) {
-        $id              = $form_id + 0;
+        $id              = intval($form_id);
         $dict_link_multi = array();
 
         if ($this->fw->isGetRequest()) {
@@ -95,7 +95,7 @@ class AdminAttController extends FwAdminController {
     public function SaveAction($form_id) {
         $this->fw->checkXSS();
 
-        $id    = $form_id + 0;
+        $id    = intval($form_id);
         $item  = reqh('item');
         $files = UploadUtils::getPostedFiles('file1');
 
@@ -105,20 +105,24 @@ class AdminAttController extends FwAdminController {
             #$item_old = $this->model->one($id);
 
             $itemdb = FormUtils::filter($item, $this->save_fields);
-            if (!strlen($itemdb["iname"]))
+            if (!strlen($itemdb["iname"])) {
                 $itemdb["iname"] = 'new file upload';
-            if (!$id)
-                $itemdb['status'] = 1; #under upload
-            if (!$itemdb['att_categories_id'])
-                $itemdb['att_categories_id'] = 1; #default cat - general
+            }
+            if (!$id) {
+                $itemdb['status'] = 1;
+            } #under upload
+            if (!$itemdb['att_categories_id']) {
+                $itemdb['att_categories_id'] = 1;
+            } #default cat - general
 
 
             $is_add = ($id == 0);
             $id     = $this->modelAddOrUpdate($id, $itemdb);
 
             #Proceed upload
-            if (count($files))
+            if (count($files)) {
                 $this->model->upload($id, $files[0], $is_add);
+            }
 
             if ($this->fw->isJsonExpected()) {
                 $item = $this->model->one($id);
@@ -184,7 +188,7 @@ class AdminAttController extends FwAdminController {
         $ps = array(
             'att_dr'                   => $rows,
             'select_att_categories_id' => $AttCat->listSelectOptions(),
-            'att_categories_id' => $att_categories_id,
+            'att_categories_id'        => $att_categories_id,
         );
         return $ps;
     }

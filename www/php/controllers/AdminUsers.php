@@ -29,14 +29,14 @@ class AdminUsersController extends FwAdminController {
 
     public function ShowFormAction($form_id) {
         $ps        = parent::ShowFormAction($form_id);
-        $ps['att'] = $ps['i']['att_id'] ? fw::model('Att')->one($ps['i']['att_id'] + 0) : '';
+        $ps['att'] = $ps['i']['att_id'] ? fw::model('Att')->one($ps['i']['att_id']) : '';
         return $ps;
     }
 
     public function SaveAction($form_id) {
         $this->fw->checkXSS();
 
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = reqh('item');
 
         try {
@@ -46,13 +46,15 @@ class AdminUsersController extends FwAdminController {
 
             $itemdb        = $this->getSaveFields($id, $item);
             $itemdb['pwd'] = trim($itemdb['pwd']);
-            if (!strlen($itemdb['pwd']))
+            if (!strlen($itemdb['pwd'])) {
                 unset($itemdb['pwd']);
+            }
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            if ($id == Utils::me())
+            if ($id == Utils::me()) {
                 $this->model->reloadSession();
+            }
 
             fw::redirect($this->base_url . '/' . $id . '/edit');
 
@@ -80,8 +82,9 @@ class AdminUsersController extends FwAdminController {
     }
 
     public function Export($ps, $format) {
-        if ($format != 'csv')
+        if ($format != 'csv') {
             throw new ApplicationException("Unsupported format");
+        }
 
         $fields = array(
             'fname'    => 'First Name',
@@ -96,7 +99,7 @@ class AdminUsersController extends FwAdminController {
     public function SendPwdAction($form_id) {
         $this->fw->checkXSS();
 
-        $id = $form_id + 0;
+        $id = intval($form_id);
 
         $user = $this->model->one($id);
         $this->fw->sendEmailTpl($user['email'], 'email_pwd.txt', $user);

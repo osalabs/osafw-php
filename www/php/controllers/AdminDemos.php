@@ -62,7 +62,7 @@ class AdminDemosController extends FwAdminController {
     public function ShowAction($form_id) {
         $ps   = parent::ShowAction($form_id);
         $item = $ps['i'];
-        $id   = $item['id'] + 0;
+        $id   = intval($item['id']);
 
         $item["ftime_str"] = DateUtils::int2timestr($item["ftime"]);
         $dict_link_multi   = FormUtils::ids2multi($item['dict_link_multi']);
@@ -73,7 +73,7 @@ class AdminDemosController extends FwAdminController {
             'demo_dicts'     => $this->model_related->one($item['demo_dicts_id']),
             'dict_link_auto' => $this->model_related->one($item['dict_link_auto_id']),
             'multi_datarow'  => $this->model_related->getMultiList($dict_link_multi),
-            'att'            => fw::model('Att')->one($item['att_id'] + 0),
+            'att'            => fw::model('Att')->one($item['att_id']),
             'att_links'      => fw::model('Att')->getAttLinks($this->model->table_name, $id),
         ));
 
@@ -82,7 +82,7 @@ class AdminDemosController extends FwAdminController {
 
     //Add/Edit item form screen
     public function ShowFormAction($form_id) {
-        $id              = $form_id + 0;
+        $id              = intval($form_id);
         $dict_link_multi = array();
 
         if ($this->fw->isGetRequest()) {
@@ -93,8 +93,9 @@ class AdminDemosController extends FwAdminController {
             } else {
                 #defaults
                 $item = $this->form_new_defaults;
-                if ($this->related_id)
+                if ($this->related_id) {
                     $item['demo_dicts_id'] = $this->related_id;
+                }
             }
         } else {
             $itemdb          = $id ? $this->model->one($id) : array();
@@ -115,11 +116,12 @@ class AdminDemosController extends FwAdminController {
             'select_options_demo_dicts_id' => $this->model_related->listSelectOptions(),
             'dict_link_auto_id_iname'      => $item['dict_link_auto_id'] ? $this->model_related->iname($item['dict_link_auto_id']) : $item['dict_link_auto_id_iname'],
             'multi_datarow'                => $this->model_related->getMultiList($dict_link_multi),
-            'att'                          => fw::model('Att')->one($item['att_id'] + 0),
+            'att'                          => fw::model('Att')->one($item['att_id']),
             'att_links'                    => fw::model('Att')->getAttLinks($this->model->table_name, $id),
         );
-        if ($this->fw->GLOBAL['ERR'])
+        if ($this->fw->GLOBAL['ERR']) {
             logger($this->fw->GLOBAL['ERR']);
+        }
         #combo date
         #TODO FormUtils::comboForDate( $item['fdate_combo'], $ps, 'fdate_combo');
 

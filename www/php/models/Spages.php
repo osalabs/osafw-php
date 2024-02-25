@@ -49,8 +49,9 @@ class Spages extends FwModel {
         $parent_id = 0;
         $item      = array();
         foreach ($url_parts as $i => $url_part) {
-            if (!$i)
-                continue; #skip first
+            if (!$i) {
+                continue;
+            } #skip first
 
             $item = $this->oneByUrl($url_part, $parent_id);
             if (!$item) {
@@ -193,18 +194,20 @@ class Spages extends FwModel {
      * RECURSIVE!
      */
     public function getFullUrl($id) {
-        if (!$id)
+        if (!$id) {
             return '';
+        }
 
         $item = $this->one($id);
-        return $this->getFullUrl($item["parent_id"] + 0) . "/" . $item["url"];
+        return $this->getFullUrl($item["parent_id"]) . "/" . $item["url"];
     }
 
     #return correct url - TODO
     public function getUrl($id, $icode, $url = null) {
         if ($url > '') {
-            if (preg_match("!^/!", $url))
+            if (preg_match("!^/!", $url)) {
                 $url = $this->fw->config->ROOT_URL . $url;
+            }
             return $url;
         } else {
             $icode = $this->str2icode($icode);

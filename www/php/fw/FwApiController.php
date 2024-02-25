@@ -72,7 +72,7 @@ class FwApiController extends FwController {
 
     //sample API method /Api/SomeController/(Test)/$form_id
     // public function TestAction($form_id = '') {
-    //     $id = $form_id + 0;
+    //     $id = intval($form_id);
     //     $ps = array(
     //         '_json'   => true,
     //         'success' => true,

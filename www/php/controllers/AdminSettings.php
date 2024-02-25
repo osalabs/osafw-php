@@ -34,7 +34,7 @@ class AdminSettingsController extends FwAdminController {
 
         //other filters add to $this->list_where here
         //if search - no category
-        if ($f['s']=='' && isset($f['icat'])){
+        if ($f['s'] == '' && isset($f['icat'])) {
             $this->list_where .= ' and icat=' . $this->db->quote($f['icat']);
         }
 
@@ -58,7 +58,7 @@ class AdminSettingsController extends FwAdminController {
     public function SaveAction($form_id) {
         $this->fw->checkXSS();
 
-        $id   = $form_id + 0;
+        $id   = intval($form_id);
         $item = reqh('item');
 
         try {
@@ -86,8 +86,9 @@ class AdminSettingsController extends FwAdminController {
     public function Validate($id, $item) {
         $result = $this->validateRequired($item, $this->required_fields);
 
-        if ($id == 0)
+        if ($id == 0) {
             throw new ApplicationException("Wrong Settings ID");
+        }
 
         $this->validateCheckResult();
     }
