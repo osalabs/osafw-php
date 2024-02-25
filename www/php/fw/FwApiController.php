@@ -46,7 +46,7 @@ class FwApiController extends FwController {
         $result = false;
 
         #check if user logged
-        if ($_SESSION['is_logged']) {
+        if ($this->fw->isLogged()) {
             $result = true;
         }
 

@@ -415,10 +415,7 @@ class fw {
         $path  = strtolower('/' . $this->route->controller . '/' . $this->route->action);
         $path2 = strtolower('/' . $this->route->controller);
 
-        $current_level = Users::ACL_VISITOR;
-        if (isset($_SESSION['access_level'])) {
-            $current_level = $_SESSION['access_level'];
-        }
+        $current_level = self::userAccessLevel();
 
         $rule_level = null;
         if (array_key_exists($path, $ACCESS_LEVELS)) {
@@ -518,7 +515,7 @@ class fw {
                 $ps['xss'] = $_SESSION["XSS"];
             }
 
-            if ($this->GLOBAL['LOG_LEVEL'] == 'DEBUG' && ($_SESSION['access_level'] ?? 0) == Users::ACL_SITE_ADMIN) {
+            if ($this->GLOBAL['LOG_LEVEL'] == 'DEBUG' && self::userAccessLevel() == Users::ACL_SITE_ADMIN) {
                 #for site admins - show additional details
                 $ps['is_dump'] = true;
                 if (!is_null($ex)) {
@@ -643,6 +640,14 @@ class fw {
      */
     public static function userId(): int {
         return intval($_SESSION['user_id'] ?? 0);
+    }
+
+    public static function userAccessLevel(): int {
+        return intval($_SESSION['access_level'] ?? 0);
+    }
+
+    public static function isLogged(): bool {
+        return (self::userId() > 0);
     }
 
     ########################## Email functions

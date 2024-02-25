@@ -117,8 +117,7 @@ class Users extends FwModel {
 
         @session_destroy();
         @session_start();
-        $_SESSION['is_logged'] = true;
-        $_SESSION['XSS']       = Utils::getRandStr(16); #setup XSS code
+        $_SESSION['XSS'] = Utils::getRandStr(16); #setup XSS code
 
         #fill up session data
         $this->reloadSession($id);
@@ -140,14 +139,14 @@ class Users extends FwModel {
             $id = $this->fw->userId();
         }
 
-        $hU = $this->one($id);
+        $user = $this->one($id);
 
         $_SESSION['user_id']      = $id;
-        $_SESSION['login']        = $hU['email'];
-        $fname                    = trim($hU['fname']);
-        $lname                    = trim($hU['lname']);
+        $_SESSION['login']        = $user['email'];
+        $fname                    = trim($user['fname']);
+        $lname                    = trim($user['lname']);
         $_SESSION['user_name']    = $fname . ($fname ? ' ' : '') . $lname; #will be empty if no user name set
-        $_SESSION['access_level'] = $hU['access_level'];
+        $_SESSION['access_level'] = $user['access_level'];
     }
 
     private function updateAfterLogin($id) {
@@ -239,7 +238,7 @@ class Users extends FwModel {
     #check access for "exact" level
     public function isAccessExact($acl) {
         $req_level = intval($acl);
-        return $_SESSION['access_level'] == $req_level ? true : false;
+        return $this->fw->userAccessLevel() == $req_level;
     }
 
     public function checkAccessExact($acl, $is_die = true) {
@@ -253,7 +252,7 @@ class Users extends FwModel {
     #check access for "at least" level
     public function isAccess($acl) {
         $req_level = intval($acl);
-        return $_SESSION['access_level'] >= $req_level ? true : false;
+        return $this->fw->userAccessLevel() >= $req_level;
     }
 
     public function checkAccess($acl, $is_die = true) {
