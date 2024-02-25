@@ -20,11 +20,15 @@ class DevConfigureController extends FwController {
             'hide_sidebar' => true,
         );
 
-        $ps['config_file_name'] = "/php/config.$conf_server_name.php";
+        $config_file            = "/php/config.$conf_server_name.php";
+        $ps['config_file_name'] = $config_file;
+
+        $ps['is_config_env'] = file_exists(dirname(__FILE__) . '/../..' . $config_file);
 
         $ps['is_db_config'] = false;
-        if ($this->fw->config->DB['DBNAME'] && $this->fw->config->DB['USER'])
+        if ($this->fw->config->DB['DBNAME'] && $this->fw->config->DB['USER']) {
             $ps['is_db_config'] = true;
+        }
 
         $ps['is_db_conn'] = false;
         if ($ps['is_db_config']) {
@@ -40,7 +44,7 @@ class DevConfigureController extends FwController {
         $ps['is_db_tables'] = false;
         if ($ps['is_db_conn']) {
             try {
-                $value              = $db->value("select count(*) from fwevents_log"); #checking last table in a script as first tables might be filled
+                $value              = $db->value("select count(*) from user_filters"); #checking last table in a script as first tables might be filled
                 $ps['is_db_tables'] = true;
             } catch (Exception $e) {
                 $ps['db_tables_err'] = $e->getMessage();
@@ -48,12 +52,14 @@ class DevConfigureController extends FwController {
         }
 
         $ps['is_write_dirs'] = false;
-        if (is_writable($this->fw->config->PUBLIC_UPLOAD_DIR))
+        if (is_writable($this->fw->config->PUBLIC_UPLOAD_DIR)) {
             $ps['is_write_dirs'] = true;
+        }
 
         $ps['is_error_log'] = false;
-        if (is_writable($this->fw->config->site_error_log))
+        if (is_writable($this->fw->config->site_error_log)) {
             $ps['is_error_log'] = true;
+        }
         $ps['error_log_size'] = Utils::bytes2str(filesize($this->fw->config->site_error_log));
 
         return $ps;
