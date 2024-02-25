@@ -414,7 +414,7 @@ class fw {
         $path  = strtolower('/' . $this->route->controller . '/' . $this->route->action);
         $path2 = strtolower('/' . $this->route->controller);
 
-        $current_level = -1;
+        $current_level = Users::ACL_VISITOR;
         if (isset($_SESSION['access_level'])) {
             $current_level = $_SESSION['access_level'];
         }
@@ -433,7 +433,7 @@ class fw {
 
         if (is_null($rule_level)) {
             #if no access level set in config and in controller - no restictions
-            $rule_level = -1;
+            $rule_level = Users::ACL_VISITOR;
         }
 
         if ($current_level < $rule_level) {
