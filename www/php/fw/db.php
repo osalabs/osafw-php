@@ -261,7 +261,7 @@ function db_query($sql, $params = null) {
  * exectute query without returning result set. Throws an exception if error occured.
  * @param string $sql SQL query
  * @param array $params optional, array of params for prepared queries
- * @return nothing
+ * @return void
  */
 function db_exec($sql, $params = null) {
     DB::i()->exec($sql, $params);
@@ -283,7 +283,7 @@ function db_identity() {
  * @param string $value id value
  * @param string $column optional, column name for value, default = 'id'
  * @param string|array $more_where additonal where for delete
- * @return nothing
+ * @return void
  */
 function db_delete($table, $value, $column = 'id', $more_where = '') {
     DB::i()->delete($table, $value, $column, $more_where);
@@ -344,14 +344,26 @@ class DB {
     const ERROR_TABLE_NOT_EXISTS          = 1146;
     const ERROR_CANT_CONNECT              = 2002;
     const ERROR_GONE_AWAY                 = 2006;
+    const ERROR_DUPLICATE_ENTRY           = 1062;
 
     const NOW = '###special_case_value_for_current_timestamp###';
+    const NOTNULL        = '###special_case_value_for_not_null###';
+    const MORE_THAN_ZERO = '###special_case_value_for_more_than_zero###';
+
     public static $SQL_QUERY_CTR = 0; //counter for SQL queries in request
     public static $instance;
 
-    public $dbh; //mysqli object
+    public ?mysqli $dbh = null; //mysqli object
     public $config = array(); //should contain: DBNAME, USER, PWD, HOST, PORT, [SQL_SERVER], IS_LOG
+    #can also contain:
+    # CONNECT_ATTEMPTS - how many times to try to connect (default 16)
+    # CONNECT_TIMEOUT - how many seconds to wait for connection (default 0 - no timeout)
+    # WAIT_TIMEOUT - how many seconds to wait for query (default 0 - no timeout)
+    # DEADLOCK_RETRY_ATTEMPTS - how many times to execute query+retry on deadlock (default 16 retries before exception, min=1 - no retries)
+    # IS_LOG - if true - log all queries (default false)
+
     public $lastRows; #affected_rows from last exec operations
+    public $is_connected = false; #set to true if connect() were successful
 
     //if IS_LOG - external function logger() will be called for logging
     public function __construct($config = null) {
@@ -378,31 +390,52 @@ class DB {
 
     /**
      * connect to sql server using config passed in constructor. Also prepares connection params (MySQL: utf, sql mode). Throw an exception if connection error occurs.
-     * @return nothing
+     * @return void
      */
     public function connect() {
-        $attempts = 10;
+        $attempts = $this->config['CONNECT_ATTEMPTS'] ?? 16; #need enough repeats so when Aurora switches ACU we'll keep patient
         while ($attempts--) {
             try {
                 $last_exception = null;
-                $this->dbh      = new mysqli($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ($this->config['PORT'] > '' ? (int)$this->config['PORT'] : null));
+
+                if (isset($this->config['CONNECT_TIMEOUT'])) {
+                    #if need to set connect timeout - initialize in a different way
+                    $this->dbh = mysqli_init();
+                    $this->dbh->options(MYSQLI_OPT_CONNECT_TIMEOUT, $this->config['CONNECT_TIMEOUT']);
+                    $this->dbh->real_connect($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ($this->config['PORT'] > '' ? (int)$this->config['PORT'] : null));
+                } else {
+                    #@ hides connection warning, which is unnecessary as exception thrown anyway
+                    @$this->dbh = new mysqli($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ($this->config['PORT'] > '' ? (int)$this->config['PORT'] : null));
+                }
+
+                $this->is_connected = true;
+
                 $this->dbh->set_charset("utf8mb4");
                 #above is preffered way $this->query("SET NAMES utf8mb4");
                 #$this->query("SET SESSION sql_mode = ''"); #required fw to work on MySQL 5.5+
 
-                if ($this->config['TIMEOUT'] ?? 0 > 0) {
-                    $this->query("SET SESSION wait_timeout=" . dbqi($this->config['TIMEOUT']));
+                if ($this->config['WAIT_TIMEOUT'] ?? 0 > 0) {
+                    $this->query("SET SESSION wait_timeout=" . dbqi($this->config['WAIT_TIMEOUT']));
                 }
 
                 break;
-            } catch (mysqli_sql_exception $e) {
+
+            } catch (Exception $e) {
+                #looks like for network connectivity issues we got ErrorException instead of mysqli_sql_exception - log some details for now
+                #php_network_getaddresses: getaddrinfo failed: Temporary failure in name resolution
+                #Error while reading greeting packet.
                 $last_exception = $e;
-                if (in_array($e->getCode(), [self::ERROR_TOO_MANY_CONNECTIONS, self::ERROR_CANT_CONNECT, self::ERROR_GONE_AWAY])) {
-                    // too many connections, connection timed out/no route to host, server has gone away,
-                    $this->logger('NOTICE', "Attempting to reconnect", $e->getMessage());
-                    sleep(rand(1, 3)); #if got too many connections
+                $this->logger('NOTICE', "Got Exception in connect()", "code=" . $e->getCode() . ", msg=" . $e->getMessage() . ", host=" . $this->config['HOST'], $e);
+                if ($e instanceof mysqli_sql_exception) {
+                    if ($attempts > 0 && in_array($e->getCode(), [self::ERROR_TOO_MANY_CONNECTIONS, self::ERROR_TOO_MANY_CONNECTIONS_USER, self::ERROR_CANT_CONNECT, self::ERROR_GONE_AWAY])) {
+                        // too many connections, connection timed out/no route to host, server has gone away,
+                        $this->logger('NOTICE', "Attempting to reconnect", $e->getMessage());
+                        sleep(rand(1, 3)); #if got too many connections
+                    } else {
+                        break; #no repeat
+                    }
                 } else {
-                    $this->handle_error($e);
+                    break; #no repeat
                 }
             }
         }
@@ -413,10 +446,11 @@ class DB {
 
     /**
      * check connection and reconnect if necessary
-     * @return nothing
+     * @return void
+     * @throws DBException
      */
     public function check_connect() {
-        $is_reconnect = is_null($this->dbh);
+        $is_reconnect = !$this->is_connected || is_null($this->dbh);
 
         if (!$is_reconnect) {
             try {
@@ -434,7 +468,7 @@ class DB {
 
     /**
      * close connection to sql server
-     * @return nothing
+     * @return void
      */
     public function disconnect() {
         if (!is_null($this->dbh)) {
@@ -446,8 +480,8 @@ class DB {
 
     /**
      * handle mysqli_sql_exception
-     * @param mysqli_sql_exception $ex original mysql exception
-     * @return throws DBException
+     * @param Exception $ex original mysql exception
+     * @throws DBException
      */
     public function handle_error($ex) {
         $err_str = '(' . $ex->getCode() . ') ' . $ex->getMessage();
@@ -458,13 +492,13 @@ class DB {
     /**
      * check if statement or result is FALSE and throw Exception
      * @param mixed $check statement or result to check
-     * @return nothing, logger an error and throws an exception
+     * @return void, logger an error and throws an exception
      */
     public function handle_errorOLD($checkvar) {
         if ($checkvar === false) {
             $err_str = '(' . $this->dbh->errno . ') ' . $this->dbh->error;
             $this->logger('ERROR', $err_str);
-            throw new DBException($err_str);
+            throw new DBException($err_str, $this->dbh->errno);
         }
     }
 
@@ -474,13 +508,14 @@ class DB {
      * @param string $sql SQL query
      * @param array $params optional, array of params for prepared queries
      * @return mysqli_result  object or null
+     * @throws DBException
      */
     public function query($sql, $params = null) {
         $result = null;
         $this->check_connect();
         DB::$SQL_QUERY_CTR++;
 
-        $deadlock_attempts = 16; #max deadlock retry attempts
+        $deadlock_attempts = $this->config['DEADLOCK_RETRY_ATTEMPTS'] ?? 16; #max deadlock retry attempts
         $last_ex           = null;
 
         while ($deadlock_attempts--) {
@@ -511,13 +546,14 @@ class DB {
      * perform query and return result statement. Throws an exception if error occured.
      * @param string $sql SQL query
      * @param array $params optional, array of params for prepared queries
-     * @return mysqli_result  object
+     * @return null|bool|mysqli_result  object
+     * @throws DBException
      */
-    public function query_inner($sql, $params = null) {
+    public function query_inner($sql, $params = null): null|bool|mysqli_result {
         $result = null;
         $host   = $this->config['HOST'];
         #for logger - just leave first name in domain
-        $dbhost_info = substr($host, 0, strpos($host, '.')) . ':' . $this->config['DBNAME'] . ' ';
+        $dbhost_info = substr($host, 0, strpos($host, '.')) . '(' . $this->config['USER'] . '):' . $this->config['DBNAME'] . ' ';
 
         try {
             if (is_array($params) && count($params)) {
@@ -535,14 +571,13 @@ class DB {
                 call_user_func_array(array($st, 'bind_param'), $query_params);
 
                 $res = $st->execute();
+                $this->lastRows = $this->dbh->affected_rows;
                 #$this->handle_error($res);
 
-                $meta = $st->result_metadata();
-                if ($meta === false) {
-                    #this is non-select query, no need to get_result
-                } else {
-                    $meta->free();
-                    $result = $st->get_result();
+                $result = $st->get_result();
+                #if non-query - returns false, no need to check result_metadata
+                if ($result === FALSE) {
+                    $result = null;
                 }
 
                 $st->close();
@@ -551,6 +586,7 @@ class DB {
                 $this->logger('NOTICE', $dbhost_info . $sql);
 
                 $result = $this->dbh->query($sql);
+                $this->lastRows = $this->dbh->affected_rows;
                 #no need to check for metadata here as query returns TRUE for non-select
                 #$this->handle_error($result);
             }
@@ -565,9 +601,10 @@ class DB {
      * prepares sql and return prepared statement, use then in query_prepared()
      * Throws an exception if error occured.
      * @param string $sql sql query
-     * @return object      prepared statement
+     * @return mysqli_stmt prepared statement
+     * @throws DBException
      */
-    public function prepare($sql) {
+    public function prepare($sql): mysqli_stmt {
         $this->check_connect();
 
         $dbhost_info = $this->config['HOST'] . ':' . $this->config['DBNAME'] . ' ';
@@ -585,36 +622,41 @@ class DB {
     /**
      * executes previously prepared statement with params
      * Throws an exception if error occured.
-     * @param object $st prepared statement using prepare()
-     * @param array $params optional, array of params for prepared queries
-     * @return mysqli_result  object
+     * @param mysqli_stmt $st prepared statement using prepare()
+     * @param array $params optional, array of params for prepared queries. note! for associative arrays assign key/values in the same order as for prepare()
+     * @return null|array null for non-select queries, array of rows for select queries
+     * @throws DBException
      */
-    public function query_prepared($st, $params) {
+    public function query_prepared(mysqli_stmt $st, $params): null|array {
         DB::$SQL_QUERY_CTR++;
 
         $dbhost_info = $this->config['HOST'] . ':' . $this->config['DBNAME'] . ' ';
+        $result      = null;
 
-        //use prepared query
-        $this->logger('NOTICE', $dbhost_info . 'EXEC PREPARED', $params);
+        if (count($params) > 2) {
+            // log as separate params if more than 2
+            $this->logger('NOTICE', $dbhost_info . 'EXEC PREPARED', $params);
+        } else {
+            // more compact log if less than 3 params
+            $this->logger('NOTICE', $dbhost_info . 'EXEC PREPARED: ' . implode(',', array_values($params)));
+        }
 
         try {
-            $query_types  = str_repeat("s", count($params)); #just bind all params as strings, TODO - support of passing types
-            $query_params = array($query_types);
-            foreach ($params as $k => $v) {
-                $query_params[] = &$params[$k];
+            #just bind all params as strings, TODO - support of passing types
+            $query_params = [];
+            #re-assign to new array as $params can be associative array and we only need values
+            foreach ($params as $v) {
+                $query_params[] = $v;
             }
-            call_user_func_array(array($st, 'bind_param'), $query_params);
 
-            $res = $st->execute();
-            #$this->handle_error($res);
+            $st->bind_param(str_repeat("s", count($query_params)), ...$query_params);
+            $st->execute();
 
-            $meta = $st->result_metadata();
-            if ($meta === false) {
-                #this is non-select query, no need to get_result
-            } else {
-                $meta->free();
-                $result = $st->get_result();
+            if ($st->field_count > 0) {
+                #this is select query - get result
+                $result = $st->get_result()->fetch_all(MYSQLI_ASSOC);
             }
+
         } catch (Exception $e) {
             $this->handle_error($e);
         }
@@ -626,7 +668,8 @@ class DB {
      * exectute query without returning result set. Throws an exception if error occured.
      * @param string $sql SQL query
      * @param array $params optional, array of params for prepared queries
-     * @return nothing
+     * @return void
+     * @throws DBException
      */
     public function exec($sql, $params = null) {
         $this->query($sql, $params);
@@ -644,7 +687,7 @@ class DB {
      *
      * @return array                  assoc array (has keys as field names and values as field values) or empty array if no rows returned
      */
-    public function row($sql_or_table, $where = null, $order_by = null) {
+    public function row($sql_or_table, $where = null, $order_by = null): array {
         $rows = $this->arr($sql_or_table, $where, $order_by, 1);
         if (count($rows)) {
             $result = $rows[0];
@@ -725,7 +768,7 @@ class DB {
             $select_fields = '';
             if (is_null($field_name)) {
                 $select_fields = '*';
-            } elseif ($field_name == 'count(*)') {
+            } elseif (str_starts_with($field_name, 'count(')) {
                 $select_fields = $field_name;
                 $field_name    = null; //reset to empty, so first field will be returned
             } elseif (preg_match('/^(\w+)\((\w+)\)$/', $field_name, $m)) {
@@ -812,10 +855,15 @@ class DB {
      * @param string $value id value
      * @param string $column optional, column name for value, default = 'id'
      * @param string|array $more_where additonal where for delete
-     * @return nothing
+     * @return void
      */
     public function delete($table, $value, $column = 'id', $more_where = '') {
-        $sql = 'DELETE FROM ' . $this->quote_ident($table) . ' WHERE ' . $this->quote_ident($column) . '=' . $this->quote($value) . ' ' . $this->build_where_str($more_where);
+        $where = $this->quote_ident($column) . (is_array($value) ? $this->insql($value) : '=' . $this->quote($value));
+        if ($more_where) {
+            $where .= ' AND ' . $this->build_where_str($more_where);
+        }
+
+        $sql = 'DELETE FROM ' . $this->quote_ident($table) . ' WHERE ' . $where;
         $this->exec($sql);
     }
 
@@ -910,11 +958,18 @@ class DB {
         if (is_array($key_id_or_where)) {
             //syntax 2
             list($sql_where, $params_where) = $this->quote_array_params($key_id_or_where, true);
-            $sql = 'UPDATE ' . $this->quote_ident($table) . ' SET ' . implode(', ', $sql_set) . ' WHERE ' . implode(' AND ', $sql_where);
+            $sql = 'UPDATE ' . $this->quote_ident($table) . ' SET ' . implode(', ', $sql_set);
+            if ($sql_where) {
+                #if we have non-empty where
+                $sql .= ' WHERE ' . implode(' AND ', $sql_where);
+            }
             $this->exec($sql, array_merge($params_set, $params_where));
         } else {
             //syntax 1
-            $sql = 'UPDATE ' . $this->quote_ident($table) . ' SET ' . implode(', ', $sql_set) . ' ' . $more_set . ' WHERE ' . $this->quote_ident($column) . '=' . $this->quote($key_id_or_where) . ' ' . $more_where;
+            $sql = 'UPDATE ' . $this->quote_ident($table) . ' SET ' . implode(', ', $sql_set) . ' ' . $more_set;
+            if (strlen($key_id_or_where) > 0) {
+                $sql .= ' WHERE ' . $this->quote_ident($column) . '=' . $this->quote($key_id_or_where) . ' ' . $more_where;
+            }
             $this->exec($sql, $params_set);
         }
     }
@@ -998,6 +1053,10 @@ class DB {
                     $quoted[] = $this->quote_ident($key) . '=NOW()';
                 } elseif (is_null($value)) {
                     $quoted[] = $this->quote_ident($key) . ($is_where ? ' IS NULL' : '=NULL');
+                } elseif ($value === DB::NOTNULL) {
+                    $quoted[] = $this->quote_ident($key) . ($is_where ? ' IS NOT NULL' : '!=NULL');
+                } elseif ($value === DB::MORE_THAN_ZERO) {
+                    $quoted[] = $this->quote_ident($key) . ' > 0';
                 } else {
                     $quoted[] = $this->quote_ident($key) . '=?';
                     $params[] = $value;
@@ -1039,6 +1098,14 @@ class DB {
                 if (is_null($value)) {
                     #special case for NULL values
                     $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' IS NULL';
+                } elseif ($value === DB::NOTNULL) {
+                    #special case for NULL values
+                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' IS NOT NULL';
+                } elseif ($value === DB::MORE_THAN_ZERO) {
+                    #special case for NULL values
+                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' > 0';
+                } elseif (is_array($value)) {
+                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . $this->insql($value);
                 } else {
                     $afields_sql[] = ($noident ? $key : $this->qident($key)) . '=' . $this->q($value);
                 }
@@ -1056,7 +1123,7 @@ class DB {
      * build parametrized SELECT sql query for given table/where/order/limit
      * @param string $table table name
      * @param string $select_fields comma separated fields to select or '*'
-     * @param string $where optional, where assoc array
+     * @param array $where optional, where assoc array
      * @param string $order_by optional, string to append to ORDER BY
      * @param string $limit optional, string to append to LIMIT
      * @return array of (sql, params)
@@ -1114,6 +1181,9 @@ class DB {
         } elseif (is_null($value)) {
             //null value
             $value = 'NULL';
+        } elseif ($value === DB::NOTNULL) {
+            //null value
+            throw new DBException("Impossible use of NOTNULL");
         } elseif ($value === DB::NOW) {
             $value = 'NOW()';
         } else {

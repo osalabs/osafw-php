@@ -7,10 +7,16 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 abstract class FwModel {
+    #standard statuses
+    const STATUS_ACTIVE   = 0;
+    const STATUS_INACTIVE = 10;
+    const STATUS_DELETED  = 127;
+
     public $fw; //current app/framework object
     public $table_name; //must be defined in inherited classes
 
     public $CACHE_PREFIX = 'fwmodel.one.'; #TODO - ability to cleanup all, but this model-only cache items
+    public $CACHE_PREFIX_BYICODE = 'fwmodel.oneByIcode.';
 
     public $field_id = 'id'; #default primary key name
     public $field_icode = 'icode';
@@ -23,11 +29,10 @@ abstract class FwModel {
 
     public $is_fwevents = true; #set to false to prevent fwevents logging
 
-    protected $db;
-
-    #preferred alternative of fw::model(Model)->method() is Model::i()->method()
+    protected ?DB $db;
 
     /**
+     * preferred alternative of fw::model(Model)->method() is Model::i()->method()
      * @return FwModel
      * @throws NoModelException
      */
@@ -45,6 +50,14 @@ abstract class FwModel {
     }
 
     /**
+     * return db instance
+     * @return DB db instance for the model
+     */
+    public function getDB() {
+        return $this->db;
+    }
+
+    /**
      * by default just return model's table name. Override if more sophisticated table name builder requires
      * @return string  main table name for a model
      */
@@ -52,30 +65,42 @@ abstract class FwModel {
         return $this->table_name;
     }
 
-    public function getDB() {
-        return $this->db;
-    }
-
     //cached, pass $is_force=true to force read from db
     // Note: use removeCache($id) if you need force re-read!
-    public function one($id) {
+    public function one($id): array {
         $cache_key = $this->CACHE_PREFIX . $this->getTable() . '*' . $id;
         $row       = FwCache::getValue($cache_key);
         if (is_null($row)) {
-            $row = $this->db->row("SELECT * from " . $this->getTable() . " WHERE " . $this->db->quote_ident($this->field_id) . "=" . $this->db->quote($id));
-            FwCache::setValue($cache_key, $row);
-        } else {
-            #logger('CACHE HIT!');
+            $row = $this->db->row($this->getTable(), [$this->field_id => $id]);
+            $this->saveCache($id, $row);
         }
+        #else logger('CACHE HIT!');
         return $row;
     }
 
-    public function oneByIname($iname) {
-        return $this->db->row($this->getTable(), [$this->field_iname => $iname]);
+    #return one specific field for the row, uncached
+    public function oneField($id, $field) {
+        return $this->db->value($this->getTable(), [$this->field_id => $id], $field);
+    }
+
+    public function oneByIname($iname): array {
+        $where = array(
+            $this->field_iname => $iname,
+        );
+        if ($this->field_status > '') {
+            $where[$this->field_status] = 0;
+        }
+        return $this->db->row($this->getTable(), $where);
     }
 
     public function oneByIcode($icode) {
-        return $this->db->row($this->getTable(), [$this->field_icode => $icode]);
+        $cache_key = $this->CACHE_PREFIX_BYICODE . $this->getTable() . '*' . $icode;
+        $row       = FwCache::getValue($cache_key);
+        if (is_null($row)) {
+            $row = $this->db->row($this->getTable(), [$this->field_icode => $icode]);
+            FwCache::setValue($cache_key, $row);
+        }
+        return $row;
     }
 
     public function listFields() {
@@ -89,16 +114,20 @@ abstract class FwModel {
         return $rows;
     }
 
+    # list multiple records by multiple ids
+    public function listMulti(array $ids): array {
+        return $this->db->arr("SELECT * from " . dbq_ident($this->getTable()) . " where " . $this->db->quote_ident($this->field_id) . $this->db->insql($ids));
+    }
+
     public function iname($id) {
         $row = $this->one($id);
         return $row[$this->field_iname];
     }
 
     public function getFullName($id) {
-        $id     += 0;
         $result = '';
 
-        if ($id) {
+        if (!empty($id)) {
             $item   = $this->one($id);
             $result = $item[$this->field_iname];
         }
@@ -185,16 +214,40 @@ abstract class FwModel {
         return true;
     }
 
+    //permanent delete of multiple records at once
+    public function deleteMulti($ids) {
+        $this->db->exec("DELETE from " . $this->db->quote_ident($this->getTable()) .
+            " where " . $this->db->quote_ident($this->field_id) . $this->db->insqli($ids));
+
+        foreach ($ids as $id) {
+            $this->removeCache($id);
+        }
+        return true;
+    }
+
+    public function saveCache($id, $row) {
+        $cache_key = $this->CACHE_PREFIX . $this->getTable() . '*' . $id;
+        FwCache::setValue($cache_key, $row);
+    }
+
     //remove from cache - can be called from outside model if model table updated
     public function removeCache($id) {
         $cache_key = $this->CACHE_PREFIX . $this->getTable() . '*' . $id;
         FwCache::remove($cache_key);
+
+        if ($this->field_icode > '') {
+            #we need to cleanup all cache keys which might be realted, so cleanup all cached icodes
+            FwCache::removeWithPrefix($this->CACHE_PREFIX_BYICODE . $this->getTable() . '*');
+        }
     }
 
     //remove all cached rows for the table
     public function removeCacheAll() {
-        $prefix = $this->CACHE_PREFIX . $this->getTable() . '*';
-        FwCache::removeWithPrefix($prefix);
+        FwCache::removeWithPrefix($this->CACHE_PREFIX . $this->getTable() . '*');
+
+        if ($this->field_icode > '') {
+            FwCache::removeWithPrefix($this->CACHE_PREFIX_BYICODE . $this->getTable() . '*');
+        }
     }
 
     //check if item exists for a given iname

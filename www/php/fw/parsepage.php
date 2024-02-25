@@ -195,7 +195,7 @@ function parse_page($basedir, $tpl_name, $hf, $out_filename = '') {
             return $page;
         } else { #screen mode
             print_header();
-            print $page;
+            print $page; #no XSS here intended to output html
         }
     }
 }
@@ -398,8 +398,9 @@ function print_header() {
     print header("Content-Type: text/html; charset=utf-8");
     #security headers - https://infosec.mozilla.org/guidelines/web_security
     print header("X-Content-Type-Options: nosniff");
-    print header("Content-Security-Policy: frame-ancestors 'none'");
+    print header("Content-Security-Policy: frame-ancestors 'self'");
     print header("X-Frame-Options: DENY");
+    #print header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
     print header("X-XSS-Protection: 1; mode=block");
     print header("X-Permitted-Cross-Domain-Policies: master-only");
 }
@@ -654,8 +655,15 @@ function tag_replace($page, $tag_full, $value, $attrs) {
             $value = urlencode($value);
         }
 
-        if (array_key_exists('var2js', $attrs)) {
-            $value = var2js($value);
+        if (array_key_exists('json', $attrs)) {
+            if ($attrs['json'] == 'pretty') {
+                $value = var2js($value, JSON_NUMERIC_CHECK | JSON_PRETTY_PRINT);
+            } else {
+                $value = var2js($value, JSON_NUMERIC_CHECK);
+            }
+            if (!array_key_exists('noescape', $attrs)) {
+                $value = htmlescape($value);
+            }
         }
     }
     return tag_replace_raw($page, $tag_full, $value, array_key_exists('inline', $attrs));
@@ -949,7 +957,7 @@ function parse_cache_template($page, $hf, $out_filename = '') {
         if ($out_filename == '') { #variable mode
             return $page;
         } else { #screen mode
-            print $page;
+            print $page; #no XSS here intended to output html
         }
     }
 }

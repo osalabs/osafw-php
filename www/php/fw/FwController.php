@@ -38,7 +38,7 @@ abstract class FwController {
     public $list_view; // table or view name to selecte from for the list screen
     public $list_orderby; // orderby for the list screen
     public $list_filter; // filter values for the list screen
-    public $list_where=' 1=1 ';         // where to use in list sql, default all (see setListSearch() )
+    public $list_where = ' 1=1 '; // where to use in list sql, default all (see setListSearch() )
     public $list_count; // count of list rows returned from db
     public $list_rows; // list rows returned from db (array of hashes)
     public $list_pager; // pager for the list from FormUtils::getPager
@@ -47,13 +47,13 @@ abstract class FwController {
     public $related_field_name; // if set and $related_id passed - list will be filtered on this field
 
     #support of dynamic controller and customizable view list
-    protected $is_dynamic_index     = false;    // true if controller has dynamic IndexAction, then define below:
-    protected $view_list_defaults   = '';       // qw list of default columns
-    protected $view_list_map        = array();  // list of all available columns fieldname|visiblename
-    protected $view_list_custom     = '';       // array or qw list of custom-formatted fields for the list_table
+    protected $is_dynamic_index = false;    // true if controller has dynamic IndexAction, then define below:
+    protected $view_list_defaults = '';       // qw list of default columns
+    protected $view_list_map = array();  // list of all available columns fieldname|visiblename
+    protected $view_list_custom = '';       // array or qw list of custom-formatted fields for the list_table
 
-    protected $is_dynamic_show      = false;    // true if controller has dynamic ShowAction, requires "show_fields" to be defined in config.json
-    protected $is_dynamic_showform  = false;    // true if controller has dynamic ShowFormAction, requires "showform_fields" to be defined in config.json
+    protected $is_dynamic_show = false;    // true if controller has dynamic ShowAction, requires "show_fields" to be defined in config.json
+    protected $is_dynamic_showform = false;    // true if controller has dynamic ShowFormAction, requires "showform_fields" to be defined in config.json
 
     protected $db;
 
@@ -69,13 +69,17 @@ abstract class FwController {
         }
     }
 
-    public function loadControllerConfig($config_filename='config.json') {
-        $conf_file0 = strtolower($this->base_url).'/'.$config_filename;
-        $conf_file = $this->fw->config->SITE_TEMPLATES.$conf_file0;
-        if (!file_exists($conf_file)) throw new ApplicationException("Controller Config file not found in templates: $conf_file");
+    public function loadControllerConfig($config_filename = 'config.json') {
+        $conf_file0 = strtolower($this->base_url) . '/' . $config_filename;
+        $conf_file  = $this->fw->config->SITE_TEMPLATES . $conf_file0;
+        if (!file_exists($conf_file)) {
+            throw new ApplicationException("Controller Config file not found in templates: $conf_file");
+        }
 
         $this->config = json_decode(file_get_contents($conf_file), true);
-        if (is_null($this->config) || !$this->config) throw new ApplicationException("Controller Config is invalid, check json in templates: $conf_file0");
+        if (is_null($this->config) || !$this->config) {
+            throw new ApplicationException("Controller Config is invalid, check json in templates: $conf_file0");
+        }
         #logger("loaded config:", $this->config);
 
         #fill up controller params
@@ -84,54 +88,61 @@ abstract class FwController {
         $this->required_fields = $this->config["required_fields"];
 
         #save_fields could be defined as qw string or array - check and convert
-        if (is_array($this->config["save_fields"])){
+        if (is_array($this->config["save_fields"])) {
             $this->save_fields = Utils::qwRevert($this->config["save_fields"]); #not optimal, but simplest for now
-        }else{
+        } else {
             $this->save_fields = $this->config["save_fields"];
         }
 
         #save_fields_checkboxes could be defined as qw string - check and convert
-        if (is_array($this->config["save_fields_checkboxes"])){
+        if (is_array($this->config["save_fields_checkboxes"])) {
             $this->save_fields_checkboxes = Utils::qhRevert($this->config["save_fields_checkboxes"]); #not optimal, but simplest for now
-        }else{
+        } else {
             $this->save_fields_checkboxes = $this->config["save_fields_checkboxes"];
         }
 
         #save_fields_nullable could be defined as qw string - check and convert
-        if (is_array($this->config["save_fields_nullable"])){
+        if (is_array($this->config["save_fields_nullable"])) {
             $this->save_fields_nullable = Utils::qwRevert($this->config["save_fields_nullable"]); #not optimal, but simplest for now
-        }else{
+        } else {
             $this->save_fields_nullable = $this->config["save_fields_nullable"];
         }
 
-        $this->search_fields = $this->config["search_fields"];
-        $this->list_sortdef = $this->config["list_sortdef"];
-        $this->list_sortmap = $this->config["list_sortmap"];
+        $this->search_fields      = $this->config["search_fields"];
+        $this->list_sortdef       = $this->config["list_sortdef"];
+        $this->list_sortmap       = $this->config["list_sortmap"];
         $this->related_field_name = $this->config["related_field_name"];
-        $this->list_view = $this->config["list_view"];
-        $this->is_dynamic_index = $this->config["is_dynamic_index"];
+        $this->list_view          = $this->config["list_view"];
+        $this->is_dynamic_index   = $this->config["is_dynamic_index"];
         if ($this->is_dynamic_index) {
             #Whoah! list view is dynamic
             $this->view_list_defaults = $this->config["view_list_defaults"];
 
             #save_fields_nullable could be defined as qw string - check and convert
-            if (is_array($this->config["view_list_map"])){
+            if (is_array($this->config["view_list_map"])) {
                 $this->view_list_map = $this->config["view_list_map"]; #not optimal, but simplest for now
-            }else{
+            } else {
                 $this->view_list_map = Utils::qh($this->config["view_list_map"]);
             }
 
             $this->view_list_custom = $this->config["view_list_custom"];
 
             $this->list_sortmap = $this->getViewListSortmap(); #just add all fields from view_list_map
-            if (!$this->search_fields) $this->search_fields = $this->getViewListUserFields(); #just search in all visible fields if no specific fields defined
+            if (!$this->search_fields) {
+                #just search in all visible fields if no specific fields defined
+                $this->search_fields = $this->getViewListUserFields();
+            }
         }
 
-        $this->is_dynamic_show      = $this->config["is_dynamic_show"];
-        $this->is_dynamic_showform  = $this->config["is_dynamic_showform"];
+        $this->is_dynamic_show     = $this->config["is_dynamic_show"];
+        $this->is_dynamic_showform = $this->config["is_dynamic_showform"];
     }
 
     ############### helpers - shortcuts from fw
+    public function checkXSS() {
+        $this->fw->checkXSS();
+    }
+
     public function routeRedirect($action, $controller = null, $args = null) {
         $this->fw->routeRedirect($action, $controller, $args);
     }
@@ -256,8 +267,8 @@ abstract class FwController {
             $this->list_where .= ' and (' . implode(' or ', $afields) . ')';
         }
 
-        if ($this->list_filter["userlist"]){
-            $this->list_where .= " and id IN (SELECT ti.item_id FROM ".$this->fw->model('UserLists')->table_items." ti WHERE ti.user_lists_id=".dbqi($this->list_filter["userlist"])." and ti.add_users_id=".Utils::me()." ) ";
+        if ($this->list_filter["userlist"]) {
+            $this->list_where .= " and id IN (SELECT ti.item_id FROM " . $this->fw->model('UserLists')->table_items . " ti WHERE ti.user_lists_id=" . dbqi($this->list_filter["userlist"]) . " and ti.add_users_id=" . Utils::me() . " ) ";
         }
 
         #if related id and field name set - filter on it
@@ -271,11 +282,11 @@ abstract class FwController {
     /**
      * set list_where based on search[] filter
      */
-    public function setListSearchAdvanced(){
+    public function setListSearchAdvanced() {
         $hsearch = reqh("search");
         foreach ($hsearch as $fieldname => $value) {
-            if ($value > '' && (!$this->is_dynamic_index || array_key_exists($fieldname, $this->view_list_map) ) ) {
-                $this->list_where .= " and ".dbq_ident($fieldname)." LIKE ".dbq("%".$value."%");
+            if ($value > '' && (!$this->is_dynamic_index || array_key_exists($fieldname, $this->view_list_map))) {
+                $this->list_where .= " and " . dbq_ident($fieldname) . " LIKE " . dbq("%" . $value . "%");
             }
         }
     }
@@ -286,14 +297,16 @@ abstract class FwController {
      * - if status set - filter by status, but if status=127 (deleted) only allow to see deleted by admins
      */
     public function setListSearchStatus() {
-        if ($this->model && strlen($this->model->field_status)){
-            if ($this->list_filter['status']>''){
-                $status = $this->list_filter['status']+0;
+        if ($this->model && strlen($this->model->field_status)) {
+            if ($this->list_filter['status'] > '') {
+                $status = $this->list_filter['status'] + 0;
                 #if want to see trashed and not admin - just show active
-                if ($status==127 && !$this->fw->model('Users')->isAccess(Users::ACL_ADMIN)) $status=0;
-                $this->list_where .= " and ".$this->db->quote_ident($this->model->field_status)."=".$this->db->quote($status);
-            }else{
-                $this->list_where .= " and ".$this->db->quote_ident($this->model->field_status)."<>127"; #by default - show all non-deleted
+                if ($status == 127 && !$this->fw->model('Users')->isAccess(Users::ACL_ADMIN)) {
+                    $status = 0;
+                }
+                $this->list_where .= " and " . $this->db->quote_ident($this->model->field_status) . "=" . $this->db->quote($status);
+            } else {
+                $this->list_where .= " and " . $this->db->quote_ident($this->model->field_status) . "<>127"; #by default - show all non-deleted
             }
         }
     }
@@ -488,34 +501,37 @@ abstract class FwController {
 
 
     ######################### dynamic controller support
+
     /**
      * as arraylist of hashtables {field_name=>, field_name_visible=> [, is_checked=>true]} in right order
-     * @param  string  $fields qw-string, if fields defined - show fields only
-     * @param  boolean $is_all if is_all true - then show all fields (not only from fields param)
+     * @param string $fields qw-string, if fields defined - show fields only
+     * @param boolean $is_all if is_all true - then show all fields (not only from fields param)
      * @return array           array of hashtables
      */
-    public function getViewListArr($fields='', $is_all=false){
+    public function getViewListArr($fields = '', $is_all = false) {
         $result = array();
 
         #if fields defined - first show these fields, then the rest
         $fields_added = array();
-        if ($fields>''){
+        if ($fields > '') {
             foreach (Utils::qw($fields) as $key => $fieldname) {
-                $result[]=array(
-                    'field_name' => $fieldname,
+                $result[]                 = array(
+                    'field_name'         => $fieldname,
                     'field_name_visible' => $this->view_list_map[$fieldname],
-                    'is_checked' => true,
+                    'is_checked'         => true,
                 );
                 $fields_added[$fieldname] = true;
             }
         }
 
-        if ($is_all){
+        if ($is_all) {
             #rest/all fields
             foreach ($this->view_list_map as $key => $value) {
-                if (array_key_exists($key, $fields_added)) continue;
-                $result[]=array(
-                    'field_name' => $key,
+                if (array_key_exists($key, $fields_added)) {
+                    continue;
+                }
+                $result[] = array(
+                    'field_name'         => $key,
                     'field_name_visible' => $this->view_list_map[$key],
                 );
             }
@@ -524,17 +540,17 @@ abstract class FwController {
         return $result;
     }
 
-    public function getViewListSortmap($value=''){
-        $result=array();
+    public function getViewListSortmap($value = '') {
+        $result = array();
         foreach ($this->view_list_map as $fieldname => $value) {
             $result[$fieldname] = $fieldname;
         }
         return $result;
     }
 
-    public function getViewListUserFields($value=''){
+    public function getViewListUserFields($value = '') {
         $item = fw::model('UserViews')->oneByScreen($this->base_url); #base_url is screen identifier
-        return $item['fields']>'' ? $item['fields'] : $this->view_list_defaults;
+        return $item['fields'] > '' ? $item['fields'] : $this->view_list_defaults;
     }
 
     /**
@@ -548,7 +564,7 @@ abstract class FwController {
      * @param [type] $ps      [description]
      * @param [type] $hsearch [description]
      */
-    public function setViewList(&$ps, $hsearch){
+    public function setViewList(&$ps, $hsearch) {
         $fields = $this->getViewListUserFields();
 
         $headers = $this->getViewListArr($fields);
@@ -557,7 +573,7 @@ abstract class FwController {
             $headers[$key]["search_value"] = $hsearch[$header["field_name"]];
         }
 
-        $ps["headers"] = $headers;
+        $ps["headers"]        = $headers;
         $ps["headers_search"] = $headers;
 
         $hcustom = Utils::qh($this->view_list_custom);
@@ -567,14 +583,14 @@ abstract class FwController {
         foreach ($ps["list_rows"] as $key => $row) {
             $cols = array();
             foreach ($fields_qw as $fieldname) {
-                $cols[]=array(
-                    'row' => $row,
+                $cols[] = array(
+                    'row'        => $row,
                     'field_name' => $fieldname,
-                    'data' => $row[$fieldname],
-                    'is_custom' => array_key_exists($fieldname, $hcustom),
+                    'data'       => $row[$fieldname],
+                    'is_custom'  => array_key_exists($fieldname, $hcustom),
                 );
             }
-            $ps["list_rows"][$key]['cols']=$cols;
+            $ps["list_rows"][$key]['cols'] = $cols;
         }
     }
 

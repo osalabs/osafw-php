@@ -16,6 +16,10 @@ class FwCache {
     static $storage = array();
     static $handler; #TODO - if this handler set, use it instead of $storage
 
+    public static function count() {
+        return count(self::$storage);
+    }
+
     /**
      * return value from the cache. If no value exists - returns NULL
      * @param  string $key key to lookup in cache
