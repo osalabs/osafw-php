@@ -344,7 +344,7 @@ class fw {
             $route = $this->route;
         }
 
-        if ($route->format == 'json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
+        if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) {
             return 1;
         } else {
             return 0;
@@ -358,9 +358,9 @@ class fw {
 
         $result = '';
 
-        if ($route->format == 'json' || preg_match('!application/json!', $_SERVER['HTTP_ACCEPT'])) {
+        if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) {
             $result = 'json';
-        } elseif ($route->format == 'pjax') {
+        } elseif ($route->format == 'pjax' || isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             $result = 'pjax';
         } else {
             $result = $route->format;

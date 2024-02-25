@@ -316,8 +316,7 @@ class FwDynamicController extends FwController {
     }
 
     ###################### support for customizable list screen
-    public function UserViewsAction($id) {
-        $id += 0;
+    public function UserViewsAction($form_id) {
 
         $ps = array(
             'rows' => $this->getViewListArr($this->getViewListUserFields(), true)
@@ -332,7 +331,7 @@ class FwDynamicController extends FwController {
 
         try {
             if (reqi("is_reset")) {
-                UserViews::i()->updateByScreen($this->base_url, $this->view_list_defaults);
+                UserViews::i()->updateByIcode($this->base_url, $this->view_list_defaults);
             } else {
                 #save fields
                 #order by value
@@ -345,7 +344,7 @@ class FwDynamicController extends FwController {
                     $anames[] = $key;
                 }
 
-                UserViews::i()->updateByScreen($this->base_url, implode(' ', $anames));
+                UserViews::i()->updateByIcode($this->base_url, implode(' ', $anames));
             }
 
         } catch (Exception $ex) {

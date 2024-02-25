@@ -549,7 +549,7 @@ abstract class FwController {
     }
 
     public function getViewListUserFields($value = '') {
-        $item = UserViews::i()->oneByScreen($this->base_url); #base_url is screen identifier
+        $item = UserViews::i()->oneByIcode($this->base_url); #base_url is screen identifier
         return $item['fields'] > '' ? $item['fields'] : $this->view_list_defaults;
     }
 

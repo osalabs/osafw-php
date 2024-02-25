@@ -15,23 +15,23 @@ class UserViews extends FwModel {
     }
 
     #return screen record for logged user
-    public function oneByScreen($screen) {
+    public function oneByIcode(string $icode): array {
         $where = array(
-            'add_users_id' => Utils::me(),
-            'screen'       => $screen,
+            'add_users_id' => Utils::me(), #TODO OR is_system=1
+            'icode'        => $icode,
         );
         return $this->db->row($this->table_name, $where);
     }
 
     /**
      * update screen fields for logged user
-     * @param string $screen screen name
+     * @param string $icode screen name
      * @param string $fields fields selected by user for this screen
      * @return integer         user_views.id
      */
-    public function updateByScreen($screen, $fields) {
+    public function updateByIcode($icode, $fields): int {
         $result = 0;
-        $item   = $this->oneByScreen($screen);
+        $item   = $this->oneByIcode($icode);
         if ($item) {
             #exists
             $result = $item['id'];
@@ -39,7 +39,7 @@ class UserViews extends FwModel {
         } else {
             #new
             $result = $this->add(array(
-                'screen'       => $screen,
+                'icode'        => $icode,
                 'fields'       => $fields,
                 'add_users_id' => Utils::me(),
             ));

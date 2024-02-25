@@ -25,7 +25,7 @@ abstract class FwModel {
     public $field_status = 'status';
     public $field_add_users_id = 'add_users_id'; #add_users_id
     public $field_upd_users_id = 'upd_users_id'; #upd_users_id
-    public $field_upd_time = 'upd_time'; #upd_time
+    public $field_upd_time = ''; #upd_time, usually no need as it's updated automatically by DB via "ON UPDATE CURRENT_TIMESTAMP"
 
     public $is_fwevents = true; #set to false to prevent fwevents logging
 
@@ -93,7 +93,7 @@ abstract class FwModel {
         return $this->db->row($this->getTable(), $where);
     }
 
-    public function oneByIcode($icode) {
+    public function oneByIcode(string $icode): array {
         $cache_key = $this->CACHE_PREFIX_BYICODE . $this->getTable() . '*' . $icode;
         $row       = FwCache::getValue($cache_key);
         if (is_null($row)) {
