@@ -41,11 +41,11 @@ class FormUtils {
      * $itemdb=FormUtils::filter($_POST, 'fname lname address');
      *
      * @param array $form array of fields from posted form (usually $_POST)
-     * @param string $names space separated field names
+     * @param string|array $names_str_or_arr space separated field names
      * @param boolean $is_exists (default true) only values actually exists in input hash returned
      * @return array              filtered fields, if value was array - converted to comma-separated string (for select multiple)
      */
-    public static function filter($form, $names, $is_exists = true) {
+    public static function filter($form, $names_str_or_arr, $is_exists = true) {
         $result = array();
         if (is_array($form)) {
             $anames = Utils::qw($names);
@@ -55,8 +55,9 @@ class FormUtils {
                 if (!$is_exists || array_key_exists($name, $form)) {
                     $v = $form[$name];
                     #if form contains array - convert to comma-separated string (it's from select multiple)
-                    if (is_array($v))
+                    if (is_array($v)) {
                         $v = implode(',', $v);
+                    }
                     $result[$name] = $v;
                 }
             }
@@ -93,8 +94,9 @@ class FormUtils {
 
     #RETURN: array of pages for pagination
     public static function getPager($count, $pagenum, $pagesize = NULL) {
-        if (is_null($pagesize))
+        if (is_null($pagesize)) {
             $pagesize = fw::i()->config->MAX_PAGE_ITEMS;
+        }
 
         $PAD_PAGES = 5; #show up to this number of pages before/after current page
 
@@ -103,12 +105,14 @@ class FormUtils {
             $page_count = ceil($count / $pagesize);
 
             $from_page = $pagenum - $PAD_PAGES;
-            if ($from_page < 0)
+            if ($from_page < 0) {
                 $from_page = 0;
+            }
 
             $to_page = $pagenum + $PAD_PAGES;
-            if ($to_page > $page_count - 1)
+            if ($to_page > $page_count - 1) {
                 $to_page = $page_count - 1;
+            }
 
             for ($i = $from_page; $i <= $to_page; $i++) {
                 $pg = array(
@@ -117,8 +121,9 @@ class FormUtils {
                     'is_cur_page'  => ($pagenum == $i) ? true : false,
                 );
                 if ($i == $from_page) {
-                    if ($pagenum > $PAD_PAGES)
+                    if ($pagenum > $PAD_PAGES) {
                         $pg['is_show_first'] = true;
+                    }
                     if ($pagenum > 0) {
                         $pg['is_show_prev'] = true;
                         $pg['pagenum_prev'] = $pagenum - 1;
@@ -146,8 +151,9 @@ class FormUtils {
      */
     public static function selectOptions($rows, $selected_id = NULL) {
         $result = '';
-        if (is_null($selected_id))
+        if (is_null($selected_id)) {
             $selected_id = '';
+        }
 
         $asel = explode(',', $selected_id);
         #trim all elements, so it would be simplier to compare
@@ -175,13 +181,15 @@ class FormUtils {
 
     public static function selectTplOptions($tpl_path, $sel_id, $is_multi = false) {
         $result = array();
-        if (!$sel_id)
+        if (!$sel_id) {
             $sel_id = '';
+        }
 
         $lines = file(fw::i()->config->SITE_TEMPLATES . $tpl_path);
         foreach ($lines as $line) {
-            if (strlen($line) < 2)
+            if (strlen($line) < 2) {
                 continue;
+            }
 
             list($value, $desc) = explode('|', $line, 2);
             #$desc = preg_replace("/`(.+?)`/", "", $desc);
@@ -210,8 +218,9 @@ class FormUtils {
 
         if ($day > 0 && $mon > 0 && $year > 0) {
             $result = strtotime("$year-$mon-$day");
-            if ($result === FALSE)
+            if ($result === FALSE) {
                 $result = null;
+            }
         }
 
         return $result;
@@ -237,16 +246,18 @@ class FormUtils {
     # many <input name="dict_link_multi[<~id>]"...>
     # itemdb("dict_link_multi") = FormUtils.multi2ids(fw.FORM("dict_link_multi"))
     public static function multi2ids($hitems) {
-        if (!is_array($hitems) || !count($hitems))
+        if (!is_array($hitems) || !count($hitems)) {
             return '';
+        }
 
         return implode(',', array_keys($hitems));
     }
 
     #similar to multi2ids, but uses array_values instead array_keys
     public static function multiv2ids($hitems) {
-        if (!is_array($hitems) || !count($hitems))
+        if (!is_array($hitems) || !count($hitems)) {
             return '';
+        }
 
         return implode(',', array_values($hitems));
     }

@@ -5,30 +5,30 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 class Utils {
-
     //just return logged user id
     public static function me() {
         return @$_SESSION['user_id'] + 0;
     }
 
-    public static function killMagicQuotes($value) {
-        $value = is_array($value) ?
-            array_map(array('Utils', 'killMagicQuotes'), $value) :
-            stripslashes($value);
-        return $value;
-    }
-
-    //split string by "whitespace characters" and return array
+    /**
+     * split string by "whitespace characters" and return array
+     * Example: $array = qw('one two three'); => array('one', 'two', 'three');
+     * @param string $str space-char separated words
+     * @return array      array of words or empty array
+     */
     public static function qw($str) {
-        if (is_array($str)) return $str; #if array passed - don't chagne it
-        $str=trim($str);
-        if ($str>""){
-            $arr=preg_split("/\s+/", $str);
+        if (is_array($str)) {
+            return $str; #if array passed - don't chagne it
+        }
+
+        $str = trim($str);
+        if ($str > "") {
+            $arr = preg_split("/\s+/", $str);
             foreach ($arr as $key => $value) {
-                $arr[$key]=str_replace('&nbsp;', ' ', $value);
+                $arr[$key] = str_replace('&nbsp;', ' ', $value);
             }
             return $arr;
-        }else{
+        } else {
             return array();
         }
     }
@@ -38,7 +38,7 @@ class Utils {
     public static function qwRevert($arr) {
         $result = '';
         foreach ($arr as $key => $value) {
-            $result.= str_replace(' ', '&nbsp;', $value).' ';
+            $result .= str_replace(' ', '&nbsp;', $value) . ' ';
         }
         return $result;
     }
@@ -53,9 +53,12 @@ class Utils {
 
     WARN! replaces all "&nbsp;" to spaces (after convert)
      */
-    public static function qh($str, $default_value=1) {
-        if (is_array($str)) return $str; #if array passed - don't chagne it
-        $result=array();
+    public static function qh($str, $default_value = 1) {
+        if (is_array($str)) {
+            return $str; #if array passed - don't chagne it
+        }
+
+        $result = array();
         foreach (static::qw($str) as $value) {
             $kv  = explode('|', $value, 2);
             $val = $default_value;
@@ -69,9 +72,9 @@ class Utils {
     }
 
     public static function qhRevert($sh) {
-        $result=array();
+        $result = array();
         foreach ($sh as $key => $value) {
-            $result[]=str_replace(' ', '&nbsp;', $key).'|'.$value;
+            $result[] = str_replace(' ', '&nbsp;', $key) . '|' . $value;
         }
         return implode(' ', $result);
     }
@@ -163,7 +166,7 @@ class Utils {
             }
             if (preg_match('/[",]/', $str)) {
                 //quote string
-                $str = '"' . str_replace('"', '""', self::n2br($str)) . '"';
+                $str = '"' . str_replace('"', '""', nl2br($str)) . '"';
             }
             $result .= (($result) ? "," : "") . $str;
         }
@@ -290,24 +293,24 @@ class Utils {
 
     /**
      * return path to tmp filename WITHOUT extension
-     * @param  string $prefix optional, default 'osafw_'
+     * @param string $prefix optional, default 'osafw_'
      * @return string         path
      */
-    public static function getTmpFilename($prefix='osafw_'){
-        return sys_get_temp_dir().DIRECTORY_SEPARATOR.$prefix.self::uuid();
+    public static function getTmpFilename($prefix = 'osafw_') {
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . $prefix . self::uuid();
     }
 
     /**
      * simple encrypt or decrypt a string with vector/key
-     * @param  string $action 'encrypt' or 'decrypt'
-     * @param  string $string string to encrypt or decrypt (base64 encoded)
-     * @param  string $v      vector string
-     * @param  string $k      key string
+     * @param string $action 'encrypt' or 'decrypt'
+     * @param string $string string to encrypt or decrypt (base64 encoded)
+     * @param string $v vector string
+     * @param string $k key string
      * @return string         encrypted (base64 encoded) or decrypted string or FALSE if wrong action
      * TODO: use https://github.com/defuse/php-encryption instead
      */
     public static function crypt($action, $string, $v, $k) {
-        $output = FALSE;
+        $output         = false;
         $encrypt_method = "AES-256-CBC";
 
         // hash
@@ -316,10 +319,10 @@ class Utils {
         // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
         $iv = substr(hash('sha256', $v), 0, 16);
 
-        if( $action == 'encrypt' ) {
+        if ($action == 'encrypt') {
             $output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
             $output = base64_encode($output);
-        }elseif( $action == 'decrypt' ){
+        } elseif ($action == 'decrypt') {
             $output = openssl_decrypt(base64_decode($string), $encrypt_method, $key, 0, $iv);
         }
 
@@ -327,18 +330,24 @@ class Utils {
     }
 
     #simple encrypt/decrypt pwd based on config keys
-    public static function encrypt($value){
+    public static function encrypt($value) {
         return Utils::crypt('encrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
-    public static function decrypt($value){
+
+    public static function decrypt($value) {
         return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
 
-    public static function jsonEncode($data){
+    public static function jsonEncode($data) {
         return json_encode($data);
     }
-    public static function jsonDecode($str){
-        return json_decode($str, true);
+
+    public static function jsonDecode($str) {
+        if (is_null($str)) {
+            return null; #Deprecated: json_decode(): Passing null to parameter #1 ($json) of type string is deprecated
+        } else {
+            return json_decode($str, true);
+        }
     }
 
     /**
@@ -346,10 +355,12 @@ class Utils {
      * @param string $url url to get info from
      * @param array $params optional, if set - post will be used, instead of get. Can be string or array
      * @param array $headers optional, add headers
-     * @param array $to_file optional, save response to file (for file downloads)
+     * @param string $to_file optional, save response to file (for file downloads)
+     * @param array $curlinfo optional, return misc curl info by ref
+     * @param bool $report_errors
      * @return string content received. FALSE if error
      */
-    public static function loadURL($url, $params = null, $headers = null, $to_file = '', &$curlinfo = array()) {
+    public static function loadURL($url, $params = null, $headers = null, $to_file = '', &$curlinfo = array(), $report_errors = true) {
         logger("CURL load from: [$url]", $params, $headers, $to_file);
         $cu = curl_init();
 
@@ -378,13 +389,15 @@ class Utils {
         ##curl_setopt($cu, CURLINFO_HEADER_OUT, 1);
 
         $result = curl_exec($cu);
-        logger('RESULT:', $result);
+        logger('TRACE', 'RESULT:', $result);
         $curlinfo = curl_getinfo($cu);
         #logger('TRACE', 'CURL INFO:', $curlinfo);
         if (curl_error($cu)) {
             $curlinfo['error'] = curl_error($cu);
-            logger('ERROR', 'CURL error: ' . curl_error($cu), $url);
-            $result = FALSE;
+            if ($report_errors) {
+                logger('ERROR', 'CURL error: ' . curl_error($cu));
+            }
+            $result = false;
         }
         curl_close($cu);
         #logger("CURL RESULT:", $result);
@@ -393,7 +406,7 @@ class Utils {
             fclose($fh_to_file);
             #if file download successfull - rename to destination
             #if failed - just remove tmp file
-            if ($result !== FALSE) {
+            if ($result !== false) {
                 rename($tmp_file, $to_file);
             } else {
                 unlink($tmp_file);
@@ -439,7 +452,7 @@ class Utils {
         #logger(curl_getinfo($cu));
         if (curl_error($cu)) {
             logger('ERORR', 'CURL error: ' . curl_error($cu));
-            $result = FALSE;
+            $result = false;
         }
         curl_close($cu);
         #logger("CURL RESULT:", $result);
@@ -454,20 +467,17 @@ class Utils {
      * @param array $to_file optional, save response to file (for file downloads)
      * @return array json data received. FALSE if error
      */
-    public static function postJson($url, $json, $to_file = '', $headers2 = []) {
+    public static function postJson($url, $json, $headers = [], $to_file = '') {
         $jsonstr = json_encode($json);
 
-        $headers = array(
+        $headers = array_merge(array(
             'Accept: application/json',
             'Content-Type: application/json',
             'Content-Length: ' . strlen($jsonstr),
-        );
-        if (is_array($headers2)) {
-            $headers = array_merge($headers, $headers2);
-        }
-        logger($url, $jsonstr, $headers);
+        ), $headers);
+
         $result = static::loadURL($url, $jsonstr, $headers, $to_file);
-        if ($result !== FALSE) {
+        if ($result !== false) {
             if ($to_file > '') {
                 #if it was file transfer, just construct successful response
                 $result = array(
@@ -489,7 +499,6 @@ class Utils {
      * @return array json data received. FALSE if error
      */
     public static function getJson($url, $to_file = '', $headers = null) {
-
         $headers2 = array(
             'Accept: application/json',
         );
@@ -498,7 +507,7 @@ class Utils {
         }
 
         $result = static::loadURL($url, null, $headers2, $to_file);
-        if ($result !== FALSE) {
+        if ($result !== false) {
             if ($to_file > '') {
                 #if it was file transfer, just construct successful response
                 $result = array(
@@ -521,4 +530,14 @@ class Utils {
         return json_decode($raw, true);
     }
 
+    /**
+     * split string by separator and returns exactly 2 values (if not enough values - empty strings added)
+     * usage: list($path1, $path2) = Utils::split2('/', $path)
+     * @param string $separator
+     * @param string $str
+     * @return array
+     */
+    public static function split2($separator, $str) {
+        return array_pad(explode($separator, $str, 2), 2, '');
+    }
 }

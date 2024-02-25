@@ -5,9 +5,11 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 class DateUtils {
-    public const MINUTE_SECONDS = 60; #seconds in one minute
-    public const HOUR_SECONDS   = 3600; #seconds in one hour
-    public const DAY_SECONDS    = 86400; #seconds in one day
+    public const MINUTE_SECONDS   = 60; #seconds in one minute
+    public const HALFHOUR_SECONDS = 1800; #seconds in 30 minutes
+    public const HOUR_SECONDS     = 3600; #seconds in one hour
+    public const DAY_SECONDS      = 86400; #seconds in one day
+    public const WEEK_SECONDS     = 604800; #seconds in one day
 
     public static $DATE_FORMAT = 1; //0 - DD/MM/YYYY (Europe), 1-MM/DD/YYYY (USA)
     public static $DATE_FORMAT_STR = 'MM/DD/YYYY'; #or DD/MM/YYYY
@@ -60,6 +62,9 @@ class DateUtils {
 
     ##### from YYYY-MM-DD to UNIX time (epoch seconds)
     public static function SQL2Unix($s) {
+        if (empty($s)) {
+            return 0;
+        }
         if (preg_match("/^\d+$/", $s)) {
             #all numbers - already in unix seconds
             return (int)$s;
@@ -246,6 +251,22 @@ class DateUtils {
         }
 
         return trim($string);
+    }
+
+    # return time difference in days between two datetimes (negative if $to is earlier than $from)
+    # to count diff for timestamps:
+    #    DateUtils::differenceDays(DateUtils::Unix2SQL($from_seconds), DateUtils::Unix2SQL($to_seconds))
+    # to count calendar difference convert to dates without time (returns 1 if dates are diff even time diff 1 sec like 23:59:59 and 00:00:00):
+    #    DateUtils::differenceDays(DateUtils::Unix2SQL($from_seconds, true), DateUtils::Unix2SQL($to_seconds, true))
+    public static function differenceDays($from, $to) {
+        $from     = new DateTime($from);
+        $to       = new DateTime($to);
+        $interval = $from->diff($to);
+        $result   = $interval->days;
+        if ($result && $interval->invert) {
+            $result = -$result;
+        }
+        return $result;
     }
 
 }
