@@ -10,7 +10,7 @@ require_once dirname(__FILE__) . "/../FwHooks.php";
 require_once dirname(__FILE__) . "/dispatcher.php";
 require_once dirname(__FILE__) . "/parsepage.php";
 require_once dirname(__FILE__) . "/db.php";
-#TODO require_once dirname(__FILE__) . '/../vendor/autoload.php';
+require_once dirname(__FILE__) . '/../vendor/autoload.php';
 require_once dirname(__FILE__) . "/../SiteUtils.php";
 
 class fw {
@@ -692,79 +692,71 @@ class fw {
             $is_html = true;
         }
 
-        #try to send using PHPMailer class
-        $file_phpmailer = dirname(__FILE__) . '/mail/class.phpmailer.php';
-        if (file_exists($file_phpmailer)) {
-            require_once $file_phpmailer;
-            $mail = new PHPMailer;
-
-            if ($MAIL['IS_SMTP']) {
-                require_once dirname(__FILE__) . '/mail/class.smtp.php';
-                $mail->isSMTP();
-            }
+        if ($MAIL['IS_SMTP']) {
+            #send using PHPMailer class
+            $mailer = new PHPMailer;
+            $mailer->isSMTP();
 
             try {
                 if ($this->config->LOG_LEVEL == 'TRACE') {
-                    $mail->SMTPDebug = 3; // Enable verbose debug output
+                    $mailer->SMTPDebug = 3; // Enable verbose debug output
                 }
-                $mail->SMTPAuth   = true;
-                $mail->SMTPSecure = $MAIL['SMTPSecure'];
-                $mail->Host       = $MAIL['SMTP_SERVER'];
+                $mailer->SMTPAuth   = true;
+                $mailer->SMTPSecure = $MAIL['SMTPSecure'];
+                $mailer->Host       = $MAIL['SMTP_SERVER'];
                 if ($MAIL['SMTP_PORT']) {
-                    $mail->Port = $MAIL['SMTP_PORT'];
+                    $mailer->Port = $MAIL['SMTP_PORT'];
                 }
 
-                $mail->Username = $MAIL['USER'];
-                $mail->Password = $MAIL['PWD'];
+                $mailer->Username = $MAIL['USER'];
+                $mailer->Password = $MAIL['PWD'];
 
                 foreach ($ToEmail as $k => $v) {
-                    $mail->addAddress($v);
+                    $mailer->addAddress($v);
                 }
 
                 #if from is in form: 'NAME <EMAIL>' - parse it
                 if (preg_match("/^(.+)\s+<(.+)>$/", $from, $m)) {
-                    $mail->setFrom($m[2], $m[1]);
+                    $mailer->setFrom($m[2], $m[1]);
                 } else {
                     #from is usual email address
-                    $mail->setFrom($from);
+                    $mailer->setFrom($from);
                 }
 
                 if ($options['reply']) {
-                    $mail->addReplyTo($options['reply']);
+                    $mailer->addReplyTo($options['reply']);
                 }
 
                 if ($options['cc']) {
-                    $mail->addCC($options['cc']);
+                    $mailer->addCC($options['cc']);
                 }
 
                 if ($options['bcc']) {
-                    $mail->addBCC($options['bcc']);
+                    $mailer->addBCC($options['bcc']);
                 }
 
-                $mail->Subject = $Subj;
-                $mail->Body    = $Message;
+                $mailer->Subject = $Subj;
+                $mailer->Body    = $Message;
                 if ($is_html) {
-                    $mail->isHTML(true);
-                    $mail->AltBody = 'To view the message, please use an HTML compatible email viewer!'; // optional - MsgHTML will create an alternate automatically
+                    $mailer->isHTML(true);
+                    $mailer->AltBody = 'To view the message, please use an HTML compatible email viewer!'; // optional - MsgHTML will create an alternate automatically
                 }
 
                 foreach ($files as $key => $filepath) {
-                    $mail->addAttachment($filepath, (intval($key) === $key ? '' : $key)); #if key is not a number - they key is filename
+                    $mailer->addAttachment($filepath, (intval($key) === $key ? '' : $key)); #if key is not a number - they key is filename
                 }
 
                 $result = true;
-                if (!$mail->send()) {
+                if (!$mailer->send()) {
                     $result = false;
-                    logger('WARN', 'Error sending email via PHPMailer: ' . $mail->ErrorInfo);
+                    logger('WARN', 'Error sending email via PHPMailer: ' . $mailer->ErrorInfo);
                 }
             } catch (Exception $e) {
                 logger('WARN', $e->getMessage());
                 $result = false;
             }
         } else {
-            if ($MAIL['IS_SMTP']) {
-                logger('ERROR', 'mail() cannot send via SMTP');
-            }
+            #send via standard mail()
 
             if ($is_html) {
                 logger('WARN', 'mail() cannot send html emails');
