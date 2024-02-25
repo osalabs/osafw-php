@@ -190,7 +190,7 @@ class FwAdminController extends FwController {
 
         if ($user_lists_id) {
             $user_lists = UserLists::i()->one($user_lists_id);
-            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) {
+            if (!$user_lists || $user_lists["add_users_id"] <> $this->fw->userId()) {
                 throw new ApplicationException("Wrong Request");
             }
         }

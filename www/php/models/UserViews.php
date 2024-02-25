@@ -17,7 +17,7 @@ class UserViews extends FwModel {
     #return screen record for logged user
     public function oneByIcode(string $icode): array {
         $where = array(
-            'add_users_id' => Utils::me(), #TODO OR is_system=1
+            'add_users_id' => $this->fw->userId(), #TODO OR is_system=1
             'icode'        => $icode,
         );
         return $this->db->row($this->table_name, $where);
@@ -41,7 +41,7 @@ class UserViews extends FwModel {
             $result = $this->add(array(
                 'icode'        => $icode,
                 'fields'       => $fields,
-                'add_users_id' => Utils::me(),
+                'add_users_id' => $this->fw->userId(),
             ));
         }
 

@@ -137,7 +137,7 @@ class Users extends FwModel {
 
     public function reloadSession($id = 0) {
         if (!$id) {
-            $id = Utils::me();
+            $id = $this->fw->userId();
         }
 
         $hU = $this->one($id);
@@ -268,7 +268,7 @@ class Users extends FwModel {
      * return sql for limiting access according to current user ACL
      * @param string $alias optional, add_users_id field alias with dot. Example: 'c.'. If not provided - no alias used
      * @param string $field optional, add_users_id field name
-     * @return string        sql query string like " and add_users_id=".Utils::me()
+     * @return string        sql query string like " and add_users_id=".$this->fw->userId()
      */
     public function sql_acl($alias = '', $field = '') {
         $result = '';
@@ -280,7 +280,7 @@ class Users extends FwModel {
                 $field = 'add_users_id';
             }
 
-            $result = ' and ' . $alias . $field . '=' . dbqi(Utils::me()) . ' ';
+            $result = ' and ' . $alias . $field . '=' . dbqi($this->fw->userId()) . ' ';
         }
         return $result;
     }

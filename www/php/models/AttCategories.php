@@ -11,7 +11,7 @@ class AttCategories extends FwModel {
         $this->table_name = 'att_categories';
     }
 
-    public function oneByIcode($icode) {
+    public function oneByIcode(string $icode): array {
         return $this->db->row($this->table_name, array('icode' => $icode));
     }
 }

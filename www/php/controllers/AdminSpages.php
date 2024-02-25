@@ -32,7 +32,7 @@ class AdminSpagesController extends FwAdminController {
 
     //override list rows
     public function getListRows() {
-        if ($this->list_filter['sortby'] == 'iname' && $this->list_filter['s'] == '') {
+        if ($this->list_filter['sortby'] == 'iname' && ($this->list_filter['s'] ?? '') == '') {
             $this->list_count = $this->db->value("select count(*) from " . $this->model->table_name . " where " . $this->list_where);
             if ($this->list_count > 0) {
                 #build pages tree

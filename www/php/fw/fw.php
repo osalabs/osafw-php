@@ -637,6 +637,14 @@ class fw {
         }
     }
 
+    /**
+     * shortcut for currently logged users.id
+     * @return int
+     */
+    public static function userId(): int {
+        return intval($_SESSION['user_id'] ?? 0);
+    }
+
     ########################## Email functions
 
     /**
@@ -907,7 +915,7 @@ function reqjson($name) {
 }
 
 ########################## for debug
-# IN: [logtype (ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
+# IN: [logtype (ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
 # OUT: none, just write to $site_error_log
 # If not ALL - limit output to 2048 chars per call
 # example: logger('DEBUG', 'hello there', $var);
@@ -927,7 +935,7 @@ function logger() {
     }
 
     $logtype = 'DEBUG'; #default log type
-    if (count($args) > 0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|STACK|DEBUG|INFO|WARN|ERROR|FATAL)$/", $args[0], $m)) {
+    if (count($args) > 0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL)$/", $args[0], $m)) {
         $logtype = $m[1];
         array_shift($args);
     }
@@ -974,11 +982,6 @@ function logger() {
             'message' => $strlog,
             'level'   => strtolower($logtype),
         ));
-    }
-
-    if ($logtype == 'STACK') {
-        $e = new Exception();
-        @error_log($e->getTraceAsString() . "\n", $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']);
     }
 }
 

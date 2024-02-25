@@ -27,9 +27,9 @@ class FwDynamicController extends FwController {
         $this->setListSearch();
         $this->setListSearchStatus();
         // set here non-standard search
-        if ($f["field"] > '') {
-            $this->list_where .= " and field=" . dbq($f["field"]);
-        }
+        #if (isset($f["field"])) {
+        #    $this->list_where .= " and field=" . dbq($f["field"]);
+        #}
 
         $this->getListRows();
         //add/modify rows from db if necessary
@@ -276,7 +276,7 @@ class FwDynamicController extends FwController {
 
         if ($user_lists_id) {
             $user_lists = UserLists::i()->one($user_lists_id);
-            if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) {
+            if (!$user_lists || $user_lists["add_users_id"] <> $this->fw->userId()) {
                 throw new ApplicationException("Wrong Request");
             }
         }

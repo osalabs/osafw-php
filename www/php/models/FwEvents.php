@@ -14,20 +14,22 @@ class FwEvents extends FwModel {
 
     //add new record - override FwModel because we don't need to log this
     public function add($item) {
-        if (!isset($item['add_users_id']))
-            $item['add_users_id'] = Utils::me();
+        if (!isset($item['add_users_id'])) {
+            $item['add_users_id'] = $this->fw->userId();
+        }
         $id = $this->db->insert($this->table_name, $item);
 
         return $id;
     }
 
-    public function oneByIcode($icode) {
+    public function oneByIcode(string $icode): array {
         return $this->db->row($this->table_name, array('icode' => $icode));
     }
 
     public function log($ev_icode, $item_id = 0, $item_id2 = 0, $iname = '', $records_affected = 0, $fields = null) {
-        if (!$this->fw->config->IS_LOG_FWEVENTS)
+        if (!$this->fw->config->IS_LOG_FWEVENTS) {
             return;
+        }
 
         $ev = $this->oneByIcode($ev_icode);
         if (!$ev) {
@@ -46,10 +48,11 @@ class FwEvents extends FwModel {
             'item_id2'         => $item_id2,
             'iname'            => $iname,
             'records_affected' => $records_affected,
-            'add_users_id'     => Utils::me(),
+            'add_users_id'     => $this->fw->userId(),
         );
-        if (!is_null($fields))
+        if (!is_null($fields)) {
             $tolog['fields'] = json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK);
+        }
         return $this->db->insert($this->log_table_name, $tolog);
     }
 

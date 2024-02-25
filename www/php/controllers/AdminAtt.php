@@ -34,7 +34,7 @@ class AdminAttController extends FwAdminController {
         $this->setListSearch();
 
         //other filters add to $this->list_where here
-        if ($this->list_filter['att_categories_id'] > 0) {
+        if (isset($this->list_filter['att_categories_id'])) {
             $this->list_where .= '  and att_categories_id=' . dbqi($this->list_filter['att_categories_id']);
         }
 

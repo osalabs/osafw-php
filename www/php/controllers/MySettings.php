@@ -1,7 +1,7 @@
 <?php
 
 class MySettingsController extends FwController {
-    const access_level = 0; #logged only
+    const access_level         = 0; #logged only
     const route_default_action = '';
     public $base_url = '/My/Settings';
     public $model_name = 'Users';
@@ -11,24 +11,23 @@ class MySettingsController extends FwController {
     }
 
     public function ShowFormAction() {
-        $id = Utils::me();
+        $id = $this->fw->userId();
 
-        if ($this->fw->isGetRequest()){
-            if ($id>0){
+        if ($this->fw->isGetRequest()) {
+            if ($id > 0) {
                 $item = $this->model->one($id);
-            }else{
+            } else {
                 #defaults
-                $item=array(
-                );
+                $item = array();
             }
-        }else{
+        } else {
             $itemdb = $this->model->one($id);
-            $item = array_merge($itemdb, reqh('item'));
+            $item   = array_merge($itemdb, reqh('item'));
         }
 
         $ps = array(
-            'id'    => $id,
-            'i'     => $item,
+            'id' => $id,
+            'i'  => $item,
         );
 
         return $ps;
@@ -37,10 +36,10 @@ class MySettingsController extends FwController {
     public function SaveAction() {
         $this->fw->checkXSS();
 
-        $id = Utils::me();
+        $id   = $this->fw->userId();
         $item = reqh('item');
 
-        try{
+        try {
             $this->Validate($id, $item);
 
             $vars = FormUtils::filter($item, 'email fname lname address1 address2 city state zip phone');
@@ -49,21 +48,21 @@ class MySettingsController extends FwController {
             $this->fw->flash("record_updated", true);
             fw::redirect($this->base_url);
 
-        }catch( ApplicationException $ex ){
+        } catch (ApplicationException $ex) {
             $this->setFormError($ex->getMessage());
             $this->routeRedirect("ShowForm");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validateRequired($item, "email");
+        $result = $this->validateRequired($item, "email");
 
-        if ($result){
-            if ($this->model->isExists( $item['email'], $id ) ){
+        if ($result) {
+            if ($this->model->isExists($item['email'], $id)) {
                 $this->setError('email', 'EXISTS');
             }
 
-            if (!FormUtils::isEmail( $item['email'] ) ){
+            if (!FormUtils::isEmail($item['email'])) {
                 $this->setError('email', 'WRONG');
             }
         }

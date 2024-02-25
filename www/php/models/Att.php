@@ -68,8 +68,9 @@ class Att extends FwModel {
             'ext'      => $ext,
             'status'   => 0, //switch from uploading status(1) to uploaded(0)
         );
-        if ($is_add)
-            $item['iname'] = $file['name']; //if adding new image set user name to same as file
+        if ($is_add) {
+            $item['iname'] = $file['name'];
+        } //if adding new image set user name to same as file
         $this->update($id, $item);
     }
 
@@ -99,17 +100,17 @@ class Att extends FwModel {
     }
 
     public function getAttLinks($table_name, $id) {
-        if (!$id || !$table_name)
+        if (!$id || !$table_name) {
             return array();
+        }
         return $this->db->arr('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name=' . $this->db->quote($table_name) . ' and atl.item_id=' . dbqi($id));
     }
 
     //add/update att_table_links
     public function updateAttLinks($table_name, $id, $form_att) {
-        if (!is_array($form_att))
+        if (!is_array($form_att)) {
             return;
-
-        $me_id = Utils::me();
+        }
 
         #1. set status=1 (under update)
         $fields              = array();
@@ -122,8 +123,9 @@ class Att extends FwModel {
         #2. add new items or update old to status =0
         foreach ($form_att as $att_id => $value) {
             $att_id += 0;
-            if (!$att_id)
+            if (!$att_id) {
                 continue;
+            }
 
             $where               = array();
             $where['table_name'] = $table_name;
@@ -144,7 +146,7 @@ class Att extends FwModel {
                 $fields['att_id']       = $att_id;
                 $fields['table_name']   = $table_name;
                 $fields['item_id']      = $id;
-                $fields['add_users_id'] = $me_id;
+                $fields['add_users_id'] = $this->fw->userId();
                 $this->db->insert($this->att_table_link, $fields);
             }
         }
@@ -155,8 +157,9 @@ class Att extends FwModel {
 
     //return correct url
     public function getUrl($id, $size = '') {
-        if (!$id)
+        if (!$id) {
             return '';
+        }
 
         #if /Att need to be on offline folder
         $result = $this->fw->GLOBAL['ROOT_URL'] . '/Att/' . $id;
@@ -177,11 +180,13 @@ class Att extends FwModel {
             return $this->getUploadUrl($id_or_item['id'], $id_or_item['ext'], $size);
 
         } else {
-            if (!$id_or_item)
+            if (!$id_or_item) {
                 return '';
+            }
             $item = $this->one($id_or_item);
-            if (!count($item))
+            if (!count($item)) {
                 return '';
+            }
             return $this->getUrlDirect($item, $size);
         }
     }
@@ -194,10 +199,12 @@ class Att extends FwModel {
     public function transmitFile($id, $size = '', $disposition = 'attachment', $is_private = false) {
         $item = $this->one($id);
         #validation
-        if (!count($item))
+        if (!count($item)) {
             throw new ApplicationException('No file specified');
-        if ($item['status'] <> 0)
+        }
+        if ($item['status'] <> 0) {
             throw new ApplicationException('Access Denied');
+        }
 
         $size = UploadUtils::checkSize($size);
 

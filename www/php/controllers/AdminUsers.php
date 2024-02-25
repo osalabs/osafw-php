@@ -29,7 +29,8 @@ class AdminUsersController extends FwAdminController {
 
     public function ShowFormAction($form_id) {
         $ps        = parent::ShowFormAction($form_id);
-        $ps['att'] = $ps['i']['att_id'] ? Att::i()->one($ps['i']['att_id']) : '';
+        $att_id    = $ps['i']['att_id'] ?? 0;
+        $ps['att'] = Att::i()->one($att_id);
         return $ps;
     }
 
@@ -52,7 +53,7 @@ class AdminUsersController extends FwAdminController {
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            if ($id == Utils::me()) {
+            if ($id == $this->fw->userId()) {
                 $this->model->reloadSession();
             }
 

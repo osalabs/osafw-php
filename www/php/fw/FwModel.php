@@ -68,6 +68,10 @@ abstract class FwModel {
     //cached, pass $is_force=true to force read from db
     // Note: use removeCache($id) if you need force re-read!
     public function one($id): array {
+        if (empty($id)) {
+            return []; #return empty array for empty id
+        }
+
         $cache_key = $this->CACHE_PREFIX . $this->getTable() . '*' . $id;
         $row       = FwCache::getValue($cache_key);
         if (is_null($row)) {
@@ -138,7 +142,7 @@ abstract class FwModel {
     //add new record
     public function add($item) {
         if (!empty($this->field_add_users_id) && !isset($item[$this->field_add_users_id])) {
-            $item[$this->field_add_users_id] = Utils::me();
+            $item[$this->field_add_users_id] = $this->fw->userId();
         }
 
         $id = $this->db->insert($this->getTable(), $item);
@@ -155,7 +159,7 @@ abstract class FwModel {
     //update record
     public function update($id, $item) {
         if (!empty($this->field_upd_users_id) && !isset($item[$this->field_upd_users_id])) {
-            $item[$this->field_upd_users_id] = Utils::me();
+            $item[$this->field_upd_users_id] = $this->fw->userId();
         }
 
         if (!empty($this->field_upd_time) && !isset($item[$this->field_upd_time])) {

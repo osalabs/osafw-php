@@ -32,7 +32,7 @@ class AdminDemoDictsController extends FwAdminController {
     public function setListSearch() {
         parent::setListSearch();
 
-        if ($this->list_filter['status'] > '') {
+        if (isset($this->list_filter['status'])) {
             $this->list_where .= ' and status=' . dbqi($this->list_filter['status']);
         }
     }

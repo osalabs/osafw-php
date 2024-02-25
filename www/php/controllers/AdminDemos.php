@@ -116,7 +116,7 @@ class AdminDemosController extends FwAdminController {
             'select_options_demo_dicts_id' => $this->model_related->listSelectOptions(),
             'dict_link_auto_id_iname'      => $item['dict_link_auto_id'] ? $this->model_related->iname($item['dict_link_auto_id']) : $item['dict_link_auto_id_iname'],
             'multi_datarow'                => $this->model_related->getMultiList($dict_link_multi),
-            'att'                          => Att::i()->one($item['att_id']),
+            'att'                          => Att::i()->one($item['att_id'] ?? 0),
             'att_links'                    => Att::i()->getAttLinks($this->model->table_name, $id),
         );
         if ($this->fw->GLOBAL['ERR']) {

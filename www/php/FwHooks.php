@@ -18,17 +18,16 @@ class FwHooks {
     public static function initRequest(FW $fw, string $uri): void {
 
         if (!$fw->isOffline()) {
-            $me_id = Utils::me();
 
             #permanent login support
-            if (!$me_id) {
+            if (!$fw->userId()) {
                 Users::i()->checkPermanentLogin();
-                $me_id = Utils::me();
             }
 
             #'also force set XSS code
-            if (!isset($_SESSION['XSS']))
+            if (!isset($_SESSION['XSS'])) {
                 $_SESSION['XSS'] = Utils::getRandStr(16);
+            }
         }
     }
 

@@ -11,7 +11,7 @@ class MyPasswordController extends FwController {
     }
 
     public function ShowFormAction() {
-        $id = Utils::me();
+        $id = $this->fw->userId();
 
         if ($this->fw->isGetRequest()) {
             if ($id > 0) {
@@ -36,7 +36,7 @@ class MyPasswordController extends FwController {
     public function SaveAction() {
         $this->fw->checkXSS();
 
-        $id   = Utils::me();
+        $id   = $this->fw->userId();
         $item = reqh('item');
 
         try {

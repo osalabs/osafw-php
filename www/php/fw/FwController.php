@@ -85,47 +85,47 @@ abstract class FwController {
         #fill up controller params
         $this->model = fw::model($this->config["model"]);
 
-        $this->required_fields = $this->config["required_fields"];
+        $this->required_fields = $this->config["required_fields"] ?? '';
 
         #save_fields could be defined as qw string or array - check and convert
         if (is_array($this->config["save_fields"])) {
             $this->save_fields = Utils::qwRevert($this->config["save_fields"]); #not optimal, but simplest for now
         } else {
-            $this->save_fields = $this->config["save_fields"];
+            $this->save_fields = $this->config["save_fields"] ?? '';
         }
 
         #save_fields_checkboxes could be defined as qw string - check and convert
         if (is_array($this->config["save_fields_checkboxes"])) {
             $this->save_fields_checkboxes = Utils::qhRevert($this->config["save_fields_checkboxes"]); #not optimal, but simplest for now
         } else {
-            $this->save_fields_checkboxes = $this->config["save_fields_checkboxes"];
+            $this->save_fields_checkboxes = $this->config["save_fields_checkboxes"] ?? '';
         }
 
         #save_fields_nullable could be defined as qw string - check and convert
         if (is_array($this->config["save_fields_nullable"])) {
             $this->save_fields_nullable = Utils::qwRevert($this->config["save_fields_nullable"]); #not optimal, but simplest for now
         } else {
-            $this->save_fields_nullable = $this->config["save_fields_nullable"];
+            $this->save_fields_nullable = $this->config["save_fields_nullable"] ?? '';
         }
 
-        $this->search_fields      = $this->config["search_fields"];
-        $this->list_sortdef       = $this->config["list_sortdef"];
-        $this->list_sortmap       = $this->config["list_sortmap"];
-        $this->related_field_name = $this->config["related_field_name"];
-        $this->list_view          = $this->config["list_view"];
-        $this->is_dynamic_index   = $this->config["is_dynamic_index"];
+        $this->search_fields      = $this->config["search_fields"] ?? '';
+        $this->list_sortdef       = $this->config["list_sortdef"] ?? '';
+        $this->list_sortmap       = $this->config["list_sortmap"] ?? '';
+        $this->related_field_name = $this->config["related_field_name"] ?? '';
+        $this->list_view          = $this->config["list_view"] ?? '';
+        $this->is_dynamic_index   = $this->config["is_dynamic_index"] ?? false;
         if ($this->is_dynamic_index) {
             #Whoah! list view is dynamic
-            $this->view_list_defaults = $this->config["view_list_defaults"];
+            $this->view_list_defaults = $this->config["view_list_defaults"] ?? '';
 
             #save_fields_nullable could be defined as qw string - check and convert
             if (is_array($this->config["view_list_map"])) {
                 $this->view_list_map = $this->config["view_list_map"]; #not optimal, but simplest for now
             } else {
-                $this->view_list_map = Utils::qh($this->config["view_list_map"]);
+                $this->view_list_map = Utils::qh($this->config["view_list_map"] ?? '');
             }
 
-            $this->view_list_custom = $this->config["view_list_custom"];
+            $this->view_list_custom = $this->config["view_list_custom"] ?? '';
 
             $this->list_sortmap = $this->getViewListSortmap(); #just add all fields from view_list_map
             if (!$this->search_fields) {
@@ -134,8 +134,8 @@ abstract class FwController {
             }
         }
 
-        $this->is_dynamic_show     = $this->config["is_dynamic_show"];
-        $this->is_dynamic_showform = $this->config["is_dynamic_showform"];
+        $this->is_dynamic_show     = $this->config["is_dynamic_show"] ?? false;
+        $this->is_dynamic_showform = $this->config["is_dynamic_showform"] ?? false;
     }
 
     ############### helpers - shortcuts from fw
@@ -159,10 +159,7 @@ abstract class FwController {
     public function initFilter() {
         #each filter remembered in session linking to controller.action
         $session_key = '_filter_' . $this->fw->GLOBAL['controller.action'];
-        $sfilter     = $_SESSION[$session_key];
-        if (!is_array($sfilter)) {
-            $sfilter = array();
-        }
+        $sfilter     = $_SESSION[$session_key] ?? [];
 
         $f = req('f');
         if (!is_array($f)) {
@@ -175,11 +172,11 @@ abstract class FwController {
         }
 
         #paging
-        if (!preg_match("/^\d+$/", $f['pagenum'])) {
+        if (!preg_match("/^\d+$/", $f['pagenum'] ?? '')) {
             $f['pagenum'] = 0;
         }
 
-        if (!preg_match("/^\d+$/", $f['pagesize'])) {
+        if (!preg_match("/^\d+$/", $f['pagesize'] ?? '')) {
             $f['pagesize'] = $this->fw->config->MAX_PAGE_ITEMS;
         }
 
@@ -267,8 +264,8 @@ abstract class FwController {
             $this->list_where .= ' and (' . implode(' or ', $afields) . ')';
         }
 
-        if ($this->list_filter["userlist"]) {
-            $this->list_where .= " and id IN (SELECT ti.item_id FROM " . UserLists::i()->table_items . " ti WHERE ti.user_lists_id=" . dbqi($this->list_filter["userlist"]) . " and ti.add_users_id=" . Utils::me() . " ) ";
+        if (isset($this->list_filter["userlist"])) {
+            $this->list_where .= " and id IN (SELECT ti.item_id FROM " . UserLists::i()->table_items . " ti WHERE ti.user_lists_id=" . dbqi($this->list_filter["userlist"]) . " and ti.add_users_id=" . $this->fw->userId() . " ) ";
         }
 
         #if related id and field name set - filter on it
@@ -298,7 +295,7 @@ abstract class FwController {
      */
     public function setListSearchStatus() {
         if ($this->model && strlen($this->model->field_status)) {
-            if ($this->list_filter['status'] > '') {
+            if (isset($this->list_filter['status'])) {
                 $status = intval($this->list_filter['status']);
                 #if want to see trashed and not admin - just show active
                 if ($status == 127 && !Users::i()->isAccess(Users::ACL_ADMIN)) {
@@ -570,7 +567,7 @@ abstract class FwController {
         $headers = $this->getViewListArr($fields);
         #add search from user's submit
         foreach ($headers as $key => $header) {
-            $headers[$key]["search_value"] = $hsearch[$header["field_name"]];
+            $headers[$key]["search_value"] = $hsearch[$header["field_name"]] ?? '';
         }
 
         $ps["headers"]        = $headers;
