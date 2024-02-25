@@ -83,8 +83,9 @@ class Users extends FwModel {
     }
 
     public function update($id, $item) {
-        if (array_key_exists('pwd', $item))
+        if (array_key_exists('pwd', $item)) {
             $item['pwd'] = $this->hashPwd($item['pwd']);
+        }
         return parent::update($id, $item);
     }
 
@@ -125,7 +126,7 @@ class Users extends FwModel {
         $_SESSION['is_just_registered'] = $is_just_registered;
         session_write_close();
 
-        $this->fw->model('FwEvents')->log('login', $id);
+        FwEvents::i()->log('login', $id);
 
         //set permanent login if requested
         //if ($_REQUEST['is_remember']) createPermCookie($id);

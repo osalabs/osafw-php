@@ -36,7 +36,7 @@ class AdminDemosController extends FwAdminController {
     public function __construct() {
         parent::__construct();
 
-        $this->model_related = fw::model('DemoDicts');
+        $this->model_related = DemoDicts::i();
     }
 
     //override due to custom search filter on status
@@ -73,8 +73,8 @@ class AdminDemosController extends FwAdminController {
             'demo_dicts'     => $this->model_related->one($item['demo_dicts_id']),
             'dict_link_auto' => $this->model_related->one($item['dict_link_auto_id']),
             'multi_datarow'  => $this->model_related->getMultiList($dict_link_multi),
-            'att'            => fw::model('Att')->one($item['att_id']),
-            'att_links'      => fw::model('Att')->getAttLinks($this->model->table_name, $id),
+            'att'            => Att::i()->one($item['att_id']),
+            'att_links'      => Att::i()->getAttLinks($this->model->table_name, $id),
         ));
 
         return $ps;
@@ -106,8 +106,8 @@ class AdminDemosController extends FwAdminController {
         $ps = array(
             'id'                           => $id,
             'i'                            => $item,
-            'add_users_id_name'            => fw::model('Users')->getFullName($item['add_users_id']),
-            'upd_users_id_name'            => fw::model('Users')->getFullName($item['upd_users_id']),
+            'add_users_id_name'            => Users::i()->getFullName($item['add_users_id']),
+            'upd_users_id_name'            => Users::i()->getFullName($item['upd_users_id']),
             'return_url'                   => $this->return_url,
             'related_id'                   => $this->related_id,
 
@@ -116,8 +116,8 @@ class AdminDemosController extends FwAdminController {
             'select_options_demo_dicts_id' => $this->model_related->listSelectOptions(),
             'dict_link_auto_id_iname'      => $item['dict_link_auto_id'] ? $this->model_related->iname($item['dict_link_auto_id']) : $item['dict_link_auto_id_iname'],
             'multi_datarow'                => $this->model_related->getMultiList($dict_link_multi),
-            'att'                          => fw::model('Att')->one($item['att_id']),
-            'att_links'                    => fw::model('Att')->getAttLinks($this->model->table_name, $id),
+            'att'                          => Att::i()->one($item['att_id']),
+            'att_links'                    => Att::i()->getAttLinks($this->model->table_name, $id),
         );
         if ($this->fw->GLOBAL['ERR']) {
             logger($this->fw->GLOBAL['ERR']);
@@ -148,7 +148,7 @@ class AdminDemosController extends FwAdminController {
     public function modelAddOrUpdate($id, $fields) {
         $id = parent::modelAddOrUpdate($id, $fields);
 
-        fw::model('Att')->updateAttLinks($this->model->table_name, $id, reqh('att'));
+        Att::i()->updateAttLinks($this->model->table_name, $id, reqh('att'));
 
         return $id;
     }

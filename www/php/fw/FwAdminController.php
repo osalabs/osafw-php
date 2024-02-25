@@ -57,8 +57,8 @@ class FwAdminController extends FwController {
         );
 
         #optional userlists support
-        $ps["select_userlists"] = fw::model('UserLists')->listSelectByEntity($this->list_view);
-        $ps["mylists"]          = fw::model('UserLists')->listForItem($this->list_view, 0);
+        $ps["select_userlists"] = UserLists::i()->listSelectByEntity($this->list_view);
+        $ps["mylists"]          = UserLists::i()->listForItem($this->list_view, 0);
         $ps["list_view"]        = $this->list_view;
 
         return $ps;
@@ -82,7 +82,7 @@ class FwAdminController extends FwController {
 
         #userlists support
         $ps["list_view"] = $this->list_view ? $this->list_view : $this->model->table_name;
-        $ps["mylists"]   = fw::model('UserLists')->listForItem($ps["list_view"], $id);
+        $ps["mylists"]   = UserLists::i()->listForItem($ps["list_view"], $id);
 
         return $ps;
     }
@@ -189,7 +189,7 @@ class FwAdminController extends FwController {
         $remove_user_lists_id = reqi("removefromlist");
 
         if ($user_lists_id) {
-            $user_lists = fw::model('UserLists')->one($user_lists_id);
+            $user_lists = UserLists::i()->one($user_lists_id);
             if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) {
                 throw new ApplicationException("Wrong Request");
             }
@@ -201,10 +201,10 @@ class FwAdminController extends FwController {
                 $this->model->delete($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
-                fw::model('UserLists')->addItemList($user_lists_id, $id);
+                UserLists::i()->addItemList($user_lists_id, $id);
                 $ctr += 1;
             } elseif ($remove_user_lists_id) {
-                fw::model('UserLists')->delItemList($remove_user_lists_id, $id);
+                UserLists::i()->delItemList($remove_user_lists_id, $id);
                 $ctr += 1;
             }
         }

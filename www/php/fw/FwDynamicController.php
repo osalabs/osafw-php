@@ -16,7 +16,7 @@ class FwDynamicController extends FwController {
         //uncomment in the interited controller
         //$this->base_url='/Admin/DemosDynamic'; #base url must be defined for loadControllerConfig
         //$this->loadControllerConfig();
-        //$this->model_related = fw::model('DemoDicts');
+        //$this->model_related = DemoDicts::i();
     }
 
     public function IndexAction() {
@@ -48,8 +48,8 @@ class FwDynamicController extends FwController {
         );
 
         #optional userlists support
-        $ps["select_userlists"] = fw::model('UserLists')->listSelectByEntity($this->list_view);
-        $ps["mylists"]          = fw::model('UserLists')->listForItem($this->list_view, 0);
+        $ps["select_userlists"] = UserLists::i()->listSelectByEntity($this->list_view);
+        $ps["mylists"]          = UserLists::i()->listForItem($this->list_view, 0);
         $ps["list_view"]        = $this->list_view;
 
         if ($this->is_dynamic_index) {
@@ -71,8 +71,8 @@ class FwDynamicController extends FwController {
             'id'                => $id,
             'i'                 => $item,
             #added/updated should be filled before dynamic fields
-            'add_users_id_name' => fw::model('Users')->getFullName($item['add_users_id']),
-            'upd_users_id_name' => fw::model('Users')->getFullName($item['upd_users_id']),
+            'add_users_id_name' => Users::i()->getFullName($item['add_users_id']),
+            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
@@ -84,7 +84,7 @@ class FwDynamicController extends FwController {
 
         #optional userlists support
         $ps["list_view"] = $this->list_view ? $this->model->table_name : $this->list_view;
-        $ps["mylists"]   = fw::model('UserLists')->listForItem($ps["list_view"], $id);
+        $ps["mylists"]   = UserLists::i()->listForItem($ps["list_view"], $id);
 
         return $ps;
     }
@@ -111,10 +111,10 @@ class FwDynamicController extends FwController {
             'related_id' => $this->related_id,
         );
         if ($this->model->field_add_users_id) {
-            $ps['add_users_id_name'] = fw::model('Users')->getFullName($item['add_users_id']);
+            $ps['add_users_id_name'] = Users::i()->getFullName($item['add_users_id']);
         }
         if ($this->model->field_upd_users_id) {
-            $ps['upd_users_id_name'] = fw::model('Users')->getFullName($item['upd_users_id']);
+            $ps['upd_users_id_name'] = Users::i()->getFullName($item['upd_users_id']);
         }
 
         if ($this->is_dynamic_showform) {
@@ -275,7 +275,7 @@ class FwDynamicController extends FwController {
         $remove_user_lists_id = reqi("removefromlist");
 
         if ($user_lists_id) {
-            $user_lists = fw::model('UserLists')->one($user_lists_id);
+            $user_lists = UserLists::i()->one($user_lists_id);
             if (!$user_lists || $user_lists["add_users_id"] <> Utils::me()) {
                 throw new ApplicationException("Wrong Request");
             }
@@ -287,10 +287,10 @@ class FwDynamicController extends FwController {
                 $this->model->delete($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
-                fw::model('UserLists')->addItemList($user_lists_id, $id);
+                UserLists::i()->addItemList($user_lists_id, $id);
                 $ctr += 1;
             } elseif ($remove_user_lists_id) {
-                fw::model('UserLists')->delItemList($remove_user_lists_id, $id);
+                UserLists::i()->delItemList($remove_user_lists_id, $id);
                 $ctr += 1;
             }
         }
@@ -332,7 +332,7 @@ class FwDynamicController extends FwController {
 
         try {
             if (reqi("is_reset")) {
-                fw::model('UserViews')->updateByScreen($this->base_url, $this->view_list_defaults);
+                UserViews::i()->updateByScreen($this->base_url, $this->view_list_defaults);
             } else {
                 #save fields
                 #order by value
@@ -345,7 +345,7 @@ class FwDynamicController extends FwController {
                     $anames[] = $key;
                 }
 
-                fw::model('UserViews')->updateByScreen($this->base_url, implode(' ', $anames));
+                UserViews::i()->updateByScreen($this->base_url, implode(' ', $anames));
             }
 
         } catch (Exception $ex) {
@@ -385,10 +385,10 @@ class FwDynamicController extends FwController {
                 $def["multi_datarow"] = fw::model($def["lookup_model"])->getMultiList($item[$field], $def["lookup_params"]);
 
             } elseif ($dtype == "att") {
-                $def["att"] = fw::model('Att')->one($item[$field]);
+                $def["att"] = Att::i()->one($item[$field]);
 
             } elseif ($dtype == "att_links") {
-                $def["att_links"] = fw::model('Att')->getAllLinked($this->model->table_name, $id);
+                $def["att_links"] = Att::i()->getAllLinked($this->model->table_name, $id);
 
             } else {
                 #single values
@@ -471,11 +471,11 @@ class FwDynamicController extends FwController {
                 unset($row);
 
             } elseif ($dtype == "att_edit") {
-                $def["att"]   = fw::model('Att')->one($item[$field]);
+                $def["att"]   = Att::i()->one($item[$field]);
                 $def["value"] = $item[$field];
 
             } elseif ($dtype == "att_links_edit") {
-                $def["att_links"] = fw::model('Att')->getAllLinked($this->model->table_name, $id);
+                $def["att_links"] = Att::i()->getAllLinked($this->model->table_name, $id);
 
             } else {
                 #single values
@@ -566,7 +566,7 @@ class FwDynamicController extends FwController {
         #for now we just look if we have att_links_edit field and update att links
         foreach ($this->config['showform_fields'] as $def) {
             if ($def['type'] == 'att_links_edit') {
-                fw::model('Att')->updateAttLinks($this->model->table_name, $id, reqh("att")); #TODO make att configurable
+                Att::i()->updateAttLinks($this->model->table_name, $id, reqh("att")); #TODO make att configurable
             }
         }
     }

@@ -14,7 +14,7 @@ class AdminDemosDynamicController extends FwDynamicController {
 
         $this->base_url = '/Admin/DemosDynamic';
         $this->loadControllerConfig();
-        $this->model_related = fw::model('DemoDicts');
+        $this->model_related = DemoDicts::i();
     }
 
     //override if necessary: IndexAction, ShowAction, ShowFormAction, Validate, DeleteAction, Export, SaveMultiAction

@@ -146,7 +146,7 @@ abstract class FwModel {
         $this->removeCache($id);
 
         if ($this->is_fwevents) {
-            $this->fw->model('FwEvents')->logFields($this->getTable() . '_add', $id, $item);
+            FwEvents::i()->logFields($this->getTable() . '_add', $id, $item);
         }
 
         return $id;
@@ -167,7 +167,7 @@ abstract class FwModel {
         $this->removeCache($id);
 
         if ($this->is_fwevents) {
-            $this->fw->model('FwEvents')->logFields($this->getTable() . '_upd', $id, $item);
+            FwEvents::i()->logFields($this->getTable() . '_upd', $id, $item);
         }
         return $id;
     }
@@ -201,7 +201,7 @@ abstract class FwModel {
         if ($is_perm || !strlen($this->field_status)) {
             $this->db->delete($this->getTable(), $id, $this->field_id);
             if ($this->is_fwevents) {
-                $this->fw->model('FwEvents')->log($this->getTable() . '_del', $id);
+                FwEvents::i()->log($this->getTable() . '_del', $id);
             }
         } else {
             $vars = array(

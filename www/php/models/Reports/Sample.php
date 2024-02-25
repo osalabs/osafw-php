@@ -15,7 +15,7 @@ class ReportSample extends Reports {
     public function getReportFilters() {
         $this->f = array_merge($this->f, array(
             #add there data for custom filters
-            #'select_users' => fw::model('Users')->listSelectOptions(),
+            #'select_users' => Users::i()->listSelectOptions(),
             'is_dates' => $this->f['from_date'] || $this->f['to_date'] ? 1 : 0
         ));
         return $this->f;
@@ -34,7 +34,7 @@ class ReportSample extends Reports {
         }
 
         #define query
-        $evmodel     = fw::model('FwEvents');
+        $evmodel     = FwEvents::i();
         $sql         = "SELECT el.*, e.iname as event_name, u.fname, u.lname, 1 as ctr
                   FROM $evmodel->table_name e, $evmodel->log_table_name el
                        LEFT OUTER JOIN users u ON (u.id=el.add_users_id)

@@ -46,7 +46,7 @@ class UserLists extends FwModel {
 
     public function deleteItems($id) {
         $this->db->delete($this->table_items, $id);
-        $this->fw->model('FwEvents')->log($this->table_items . '_del', $id);
+        FwEvents::i()->log($this->table_items . '_del', $id);
     }
 
     #add new record and return new record id
@@ -57,7 +57,7 @@ class UserLists extends FwModel {
             "add_users_id"  => Utils::me()
         );
         $id   = $this->db->insert($this->table_items, $item);
-        $this->fw->model('FwEvents')->log($this->table_items . '_add', $id);
+        FwEvents::i()->log($this->table_items . '_add', $id);
         return $id;
     }
 

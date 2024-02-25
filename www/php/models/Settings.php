@@ -14,19 +14,19 @@ class Settings extends FwModel {
     */
 
     public static function read($icode) {
-        return fw::model('Settings')->getValue($icode);
+        return Settings::i()->getValue($icode);
     }
 
     public static function readi($icode) {
-        return intval(fw::model('Settings')->getValue($icode));
+        return intval(Settings::i()->getValue($icode));
     }
 
     public static function readd($icode) {
-        return Utils::f2date(fw::model('Settings')->getValue($icode));
+        return Utils::f2date(Settings::i()->getValue($icode));
     }
 
     public static function write($icode, $value) {
-        return fw::model('Settings')->setValue($icode, $value);
+        return Settings::i()->setValue($icode, $value);
     }
 
     public function __construct() {

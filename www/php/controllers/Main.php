@@ -18,28 +18,28 @@ class MainController extends FwController {
         $one["type"]     = "bignum";
         $one["title"]    = "Pages";
         $one["url"]      = "/Admin/Spages";
-        $one["value"]    = $this->fw->model('Spages')->getCount();
+        $one["value"]    = Spages::i()->getCount();
         $panes['plate1'] = $one;
 
         $one             = array();
         $one["type"]     = "bignum";
         $one["title"]    = "Uploads";
         $one["url"]      = "/Admin/Att";
-        $one["value"]    = $this->fw->model('Att')->getCount();
+        $one["value"]    = Att::i()->getCount();
         $panes['plate2'] = $one;
 
         $one             = array();
         $one["type"]     = "bignum";
         $one["title"]    = "Users";
         $one["url"]      = "/Admin/Users";
-        $one["value"]    = $this->fw->model('Users')->getCount();
+        $one["value"]    = Users::i()->getCount();
         $panes['plate3'] = $one;
 
         $one             = array();
         $one["type"]     = "bignum";
         $one["title"]    = "Demo items";
         $one["url"]      = "/Admin/DemosDynamic";
-        $one["value"]    = $this->fw->model('Demos')->getCount();
+        $one["value"]    = Demos::i()->getCount();
         $panes['plate4'] = $one;
 
         $one          = array();

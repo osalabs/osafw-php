@@ -64,8 +64,9 @@ class LoginController extends FwController {
 
             $user = Users::i()->oneByEmail($login);
             if (!$is_dev_login) {
-                if (!$user || $user['status'] != 0 || !$this->model->checkPwd($pwd, $user['pwd']))
+                if (!$user || $user['status'] != 0 || !$this->model->checkPwd($pwd, $user['pwd'])) {
                     throw new ApplicationException(lng("User Authentication Error"));
+                }
             }
 
             $this->model->doLogin($user['id']);
@@ -87,8 +88,9 @@ class LoginController extends FwController {
 
         $item = FormUtils::filter($_REQUEST, 'access_token id email first_name last_name name username gender link locale timezone verified');
         #TODO better validate
-        if (!$item['access_token'] || !$item['id'])
+        if (!$item['access_token'] || !$item['id']) {
             throw new ApplicationException("Wrong facebook data", 1);
+        }
 
         /*
         $fb = new Facebook(array(
@@ -111,15 +113,17 @@ class LoginController extends FwController {
         if (!$users_id) {
             #now check by facebook email
             $hU = $this->db->row("select * from users where fb_email=" . $this->db->quote($item['email']));
-            if ($hU['id'])
+            if ($hU['id']) {
                 $users_id = $hU['id'];
+            }
         }
 
         if (!$users_id) {
             #now check by facebook id
             $hU = $this->db->row("select * from users where fb_id=" . $this->db->quote($item['id']));
-            if ($hU['id'])
+            if ($hU['id']) {
                 $users_id = $hU['id'];
+            }
         }
 
         if ($users_id) {
@@ -128,31 +132,43 @@ class LoginController extends FwController {
                 'fb_access_token' => $item['access_token'],
             );
 
-            if ($hU['sex'] != ($item['gender'] == 'male' ? 1 : 0))
+            if ($hU['sex'] != ($item['gender'] == 'male' ? 1 : 0)) {
                 $vars['sex'] = $item['gender'] == 'male' ? 1 : 0;
-            if (!$hU['fname'])
+            }
+            if (!$hU['fname']) {
                 $vars['fname'] = $item['first_name'];
-            if (!$hU['lname'])
+            }
+            if (!$hU['lname']) {
                 $vars['lname'] = $item['last_name'];
-            if ($hU['fb_email'] != $item['email'] && $item['email'])
+            }
+            if ($hU['fb_email'] != $item['email'] && $item['email']) {
                 $vars['fb_email'] = $item['email'];
+            }
 
-            if (!$hU['fb_id'])
+            if (!$hU['fb_id']) {
                 $vars['fb_id'] = $item['id'];
-            if (!$hU['fb_link'])
+            }
+            if (!$hU['fb_link']) {
                 $vars['fb_link'] = $item['link'];
-            if (!$hU['fb_locale'])
+            }
+            if (!$hU['fb_locale']) {
                 $vars['fb_locale'] = $item['locale'];
-            if (!$hU['fb_name'])
+            }
+            if (!$hU['fb_name']) {
                 $vars['fb_name'] = $item['name'];
-            if (!$hU['fb_timezone'])
+            }
+            if (!$hU['fb_timezone']) {
                 $vars['fb_timezone'] = $item['timezone'];
-            if (!$hU['fb_username'])
+            }
+            if (!$hU['fb_username']) {
                 $vars['fb_username'] = $item['username'];
-            if (!$hU['fb_verified'])
+            }
+            if (!$hU['fb_verified']) {
                 $vars['fb_verified'] = $item['verified'] == 'true' ? 1 : 0;
-            if (!$hU['fb_picture_url'])
+            }
+            if (!$hU['fb_picture_url']) {
                 $vars['fb_picture_url'] = 'http://graph.facebook.com/' . $item['username'] . '/picture';
+            }
 
             $this->db->update('users', $vars, $users_id);
 
@@ -190,7 +206,7 @@ class LoginController extends FwController {
     }
 
     public function LogoffAction() {
-        $this->fw->model('FwEvents')->log('logoff', Utils::me());
+        FwEvents::i()->log('logoff', Utils::me());
 
         @session_start();
         //delete session

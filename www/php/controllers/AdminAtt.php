@@ -40,7 +40,7 @@ class AdminAttController extends FwAdminController {
 
         $this->getListRows();
         //add/modify rows from db
-        $AttCat = $this->fw->model('AttCategories');
+        $AttCat = AttCategories::i();
         foreach ($this->list_rows as $k => $row) {
             $this->list_rows[$k]['field']       = 'value';
             $this->list_rows[$k]['cat']         = $AttCat->one($row['att_categories_id']);
@@ -79,14 +79,14 @@ class AdminAttController extends FwAdminController {
         $ps = array(
             'id'                => $id,
             'i'                 => $item,
-            'add_users_id_name' => fw::model('Users')->getFullName($item['add_users_id']),
-            'upd_users_id_name' => fw::model('Users')->getFullName($item['upd_users_id']),
+            'add_users_id_name' => Users::i()->getFullName($item['add_users_id']),
+            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id']),
 
             'fsize_human' => Utils::bytes2str($item['fsize']),
             'url'         => $this->model->getUrl($id),
             'url_m'       => ($item['is_image'] ? $this->model->getUrl($id, 'm') : ''),
 
-            'select_options_att_categories_id' => fw::model('AttCategories')->listSelectOptions($item['att_categories_id']),
+            'select_options_att_categories_id' => AttCategories::i()->listSelectOptions($item['att_categories_id']),
         );
 
         return $ps;
@@ -171,7 +171,7 @@ class AdminAttController extends FwAdminController {
     public function SelectAction() {
         $category_icode    = reqs("category");
         $att_categories_id = reqi("att_categories_id");
-        $AttCat            = $this->fw->model('AttCategories');
+        $AttCat            = AttCategories::i();
 
         if ($category_icode > '') {
             $att_cat = $AttCat->oneByIcode($category_icode);

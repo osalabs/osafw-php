@@ -44,7 +44,7 @@ class HomeController extends FwController {
 
     #called if fw dispatcher can't find controller
     public function NotFoundAction() {
-        $this->fw->model('Spages')->showPageByFullUrl($this->fw->request_url);
+        Spages::i()->showPageByFullUrl($this->fw->request_url);
     }
 
 }

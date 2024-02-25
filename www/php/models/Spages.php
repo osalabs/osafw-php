@@ -63,7 +63,7 @@ class Spages extends FwModel {
         #item now contains page data for the url
         if ($item) {
             if ($item["head_att_id"] > '') {
-                $item["head_att_id_url"] = $this->fw->model('Att')->getUrlDirect($item["head_att_id"]);
+                $item["head_att_id_url"] = Att::i()->getUrlDirect($item["head_att_id"]);
             }
         }
 

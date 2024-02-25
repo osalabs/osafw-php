@@ -29,7 +29,7 @@ class AdminUsersController extends FwAdminController {
 
     public function ShowFormAction($form_id) {
         $ps        = parent::ShowFormAction($form_id);
-        $ps['att'] = $ps['i']['att_id'] ? fw::model('Att')->one($ps['i']['att_id']) : '';
+        $ps['att'] = $ps['i']['att_id'] ? Att::i()->one($ps['i']['att_id']) : '';
         return $ps;
     }
 

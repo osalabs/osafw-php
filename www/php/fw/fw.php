@@ -151,7 +151,7 @@ class fw {
 
     /**
      * return model object
-     * usage: $model = fw::model('Users');
+     * usage: $model = Users::i();
      * Note: uses model singleton, i.e. equivalent to Users::i() call
      * @param string $model_class model class name
      * @return FwModel             instance of FwModel object

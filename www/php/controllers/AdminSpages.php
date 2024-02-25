@@ -92,7 +92,7 @@ class AdminSpagesController extends FwAdminController {
         $ps["parent"] = $this->model->one($item["parent_id"]);
 
         if ($item["head_att_id"]) {
-            $ps["head_att_id_url_s"] = $this->fw->model('Att')->getUrlDirect($item["head_att_id"], "s");
+            $ps["head_att_id_url_s"] = Att::i()->getUrlDirect($item["head_att_id"], "s");
         }
 
         if ($id) {

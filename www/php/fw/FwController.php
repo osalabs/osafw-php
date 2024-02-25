@@ -268,7 +268,7 @@ abstract class FwController {
         }
 
         if ($this->list_filter["userlist"]) {
-            $this->list_where .= " and id IN (SELECT ti.item_id FROM " . $this->fw->model('UserLists')->table_items . " ti WHERE ti.user_lists_id=" . dbqi($this->list_filter["userlist"]) . " and ti.add_users_id=" . Utils::me() . " ) ";
+            $this->list_where .= " and id IN (SELECT ti.item_id FROM " . UserLists::i()->table_items . " ti WHERE ti.user_lists_id=" . dbqi($this->list_filter["userlist"]) . " and ti.add_users_id=" . Utils::me() . " ) ";
         }
 
         #if related id and field name set - filter on it
@@ -301,7 +301,7 @@ abstract class FwController {
             if ($this->list_filter['status'] > '') {
                 $status = intval($this->list_filter['status']);
                 #if want to see trashed and not admin - just show active
-                if ($status == 127 && !$this->fw->model('Users')->isAccess(Users::ACL_ADMIN)) {
+                if ($status == 127 && !Users::i()->isAccess(Users::ACL_ADMIN)) {
                     $status = 0;
                 }
                 $this->list_where .= " and " . $this->db->quote_ident($this->model->field_status) . "=" . $this->db->quote($status);
@@ -549,7 +549,7 @@ abstract class FwController {
     }
 
     public function getViewListUserFields($value = '') {
-        $item = fw::model('UserViews')->oneByScreen($this->base_url); #base_url is screen identifier
+        $item = UserViews::i()->oneByScreen($this->base_url); #base_url is screen identifier
         return $item['fields'] > '' ? $item['fields'] : $this->view_list_defaults;
     }
 
