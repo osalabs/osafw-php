@@ -28,25 +28,23 @@ class HomeController extends FwController {
         */
 
         $ps = array(
-            'hide_sidebar'  => true,
+            'hide_sidebar' => true,
         );
         return $ps;
     }
 
     #show home subpage page from hardcoded template
-    public function ShowAction($id='') {
+    public function ShowAction($id = '') {
         $ps = array(
-            'hide_sidebar'  => true,
+            'hide_sidebar' => true,
         );
 
-        $this->fw->parser('/home/'.Dispatcher::RouteFixChars(strtolower($id)), $ps);
-        return false;
+        $this->fw->parser('/home/' . Dispatcher::RouteFixChars(strtolower($id)), $ps);
     }
 
     #called if fw dispatcher can't find controller
-    public function NotFoundAction(){
+    public function NotFoundAction() {
         $this->fw->model('Spages')->showPageByFullUrl($this->fw->request_url);
     }
 
 }
-?>

@@ -12,6 +12,8 @@ class ContactController extends FwController {
     public function __construct() {
         parent::__construct();
 
+        $this->base_url = '/Contact';
+
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
     }
@@ -19,7 +21,9 @@ class ContactController extends FwController {
     public function IndexAction() {
         $ps = array();
 
-        #TODO - get item from Spages and for /Sent too
+        $page               = Spages::i()->oneByFullUrl($this->base_url);
+        $ps["page"]         = $page;
+        $ps['hide_sidebar'] = true;
         return $ps;
     }
 

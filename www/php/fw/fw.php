@@ -14,15 +14,15 @@ require_once dirname(__FILE__) . "/db.php";
 require_once dirname(__FILE__) . "/../SiteUtils.php";
 
 class fw {
-    public static $instance;
-    public static $start_time;
+    public static ?self $instance = null;
+    public static float $start_time;
 
-    public $dispatcher;
-    public $db;
+    public Dispatcher $dispatcher;
+    public DB $db;
 
     public $request_url; #current request url (relative to application url)
     public stdClass $route; #current request route data, stdClass
-    public $ROUTES = array();
+
     public $GLOBAL = array(); #"global" vars, initialized with $CONFIG
     public $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
     public $models_cache = array(); #cached model instances
@@ -177,9 +177,10 @@ class fw {
         global $CONFIG;
         spl_autoload_register(array($this, 'autoload'));
 
-        $this->GLOBAL        = $CONFIG;
-        $this->GLOBAL['ERR'] = []; #store form errors
-        $CONFIG['LANG']      = $CONFIG['LANG_DEF']; #use default language
+        $this->GLOBAL                 = $CONFIG;
+        $this->GLOBAL['ERR']          = []; #store form errors
+        $this->GLOBAL['current_time'] = time(); #current time for the request
+        $CONFIG['LANG']               = $CONFIG['LANG_DEF']; #use default language
 
         # fw vairables
         $this->config      = (object)$CONFIG; #set fw config
@@ -517,7 +518,7 @@ class fw {
                 $ps['xss'] = $_SESSION["XSS"];
             }
 
-            if ($this->GLOBAL['LOG_LEVEL'] == 'DEBUG' && $_SESSION['access_level'] == Users::ACL_SITE_ADMIN) {
+            if ($this->GLOBAL['LOG_LEVEL'] == 'DEBUG' && ($_SESSION['access_level'] ?? 0) == Users::ACL_SITE_ADMIN) {
                 #for site admins - show additional details
                 $ps['is_dump'] = true;
                 if (!is_null($ex)) {
@@ -613,8 +614,6 @@ class fw {
             if (!array_key_exists('ERR', $ps)) {
                 $ps["ERR"] = $this->GLOBAL['ERR']; #add errors if any
             }
-
-            $ps['current_time'] = time(); #TODO move to GLOBAL[current_time]?
 
             logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
             return parse_page($basedir, $layout, $ps, $out_filename);
@@ -877,7 +876,7 @@ function req($name) {
 
 //return hash/array from request (if no such param or not array - returns empty array)
 function reqh($name) {
-    $h = $_REQUEST[$name];
+    $h = $_REQUEST[$name] ?? [];
     if (!is_array($h)) {
         $h = array();
     }

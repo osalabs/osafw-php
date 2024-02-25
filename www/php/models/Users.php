@@ -18,11 +18,6 @@ class Users extends FwModel {
     public static $PERM_COOKIE_DAYS = 356;
     public static $order_by = 'fname, lname';
 
-    /** @return FwModel|Users */
-    public static function i() {
-        return parent::i();
-    }
-
     public function __construct() {
         parent::__construct();
 

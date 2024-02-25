@@ -26,8 +26,12 @@ abstract class FwModel {
     protected $db;
 
     #preferred alternative of fw::model(Model)->method() is Model::i()->method()
-    /** @return FwModel */
-    public static function i() {
+
+    /**
+     * @return FwModel
+     * @throws NoModelException
+     */
+    public static function i(): static {
         return fw::model(get_called_class());
     }
 
@@ -271,7 +275,7 @@ abstract class FwModel {
     //****************** Item Upload Utils
 
     //simple upload of the file related to item
-    public function uploadFile($id, $file){
+    public function uploadFile($id, $file) {
         $filepath = UploadUtils::uploadFile($id, $this->getUploadBaseDir(), $file);
         logger('DEBUG', "file uploaded to [$filepath]");
 
@@ -279,27 +283,28 @@ abstract class FwModel {
         return $filepath;
     }
 
-    public function getUploadBaseDir(){
-        return UploadUtils::getUploadBaseDir().'/'.$this->table_name;
+    public function getUploadBaseDir() {
+        return UploadUtils::getUploadBaseDir() . '/' . $this->table_name;
     }
-    public function getUploadBaseUrl(){
-        return UploadUtils::getUploadBaseUrl().'/'.$this->table_name;
+
+    public function getUploadBaseUrl() {
+        return UploadUtils::getUploadBaseUrl() . '/' . $this->table_name;
     }
 
 
-    public function getUploadDir($id){
+    public function getUploadDir($id) {
         return UploadUtils::getUploadDir($id, $this->getUploadBaseDir());
     }
 
-    public function getUploadPath($id, $ext, $size=''){
+    public function getUploadPath($id, $ext, $size = '') {
         return UploadUtils::getUploadPath($id, $this->getUploadBaseDir(), $ext, $size);
     }
 
-    public function getUploadUrl($id, $ext, $size=''){
+    public function getUploadUrl($id, $ext, $size = '') {
         return UploadUtils::getUploadUrl($id, $this->getUploadBaseDir(), $this->getUploadBaseUrl(), $ext, $size);
     }
 
-    public function removeUpload($id, $ext){
+    public function removeUpload($id, $ext) {
         UploadUtils::cleanupUpload($id, $this->getUploadBaseDir(), $ext);
     }
 

@@ -43,7 +43,7 @@ class LoginController extends FwController {
         try {
             $login = trim($item['login']);
             $pwd   = $item['pwdh'];
-            if ($_REQUEST["item"]["chpwd"] == "1") {
+            if (($item["chpwd"] ?? '') == "1") {
                 $pwd = $item['pwd'];
             }
             $pwd   = substr(trim($pwd), 0, 64);
