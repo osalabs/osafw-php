@@ -20,17 +20,17 @@ class fw {
     public Dispatcher $dispatcher;
     public DB $db;
 
-    public $request_url; #current request url (relative to application url)
+    public string $request_url; #current request url (relative to application url)
     public stdClass $route; #current request route data, stdClass
 
-    public $GLOBAL = array(); #"global" vars, initialized with $CONFIG
-    public $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
-    public $models_cache = array(); #cached model instances
+    public array $GLOBAL = array(); #"global" vars, initialized with $CONFIG
+    public object $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
+    public array $models_cache = array(); #cached model instances
 
-    public $page_layout;
-    public $is_session = true; #if use session, can be set to false in initRequest to abort session use
+    public string $page_layout;
+    public bool $is_session = true; #if use session, can be set to false in initRequest to abort session use
 
-    public static $LOG_LEVELS = array(
+    public static array $LOG_LEVELS = array(
         'OFF'    => 0, #no logging occurs
         'FATAL'  => 10, #severe error, current request (or even whole application) aborted (notify admin)
         'ERROR'  => 20, #error happened, but current request might still continue (notify admin)
@@ -84,7 +84,7 @@ class fw {
     }
 
     # initialization code for offline scripts
-    public static function initOffline($caller = "") {
+    public static function initOffline($caller = ""): void {
         self::$start_time = microtime(true);
 
         $fw = fw::i(); #get fw instance
@@ -99,7 +99,7 @@ class fw {
         FwHooks::initRequest($fw, $caller); #additional initializations
     }
 
-    public static function endRequest($fw = null) {
+    public static function endRequest($fw = null): void {
         #logger("NOTICE", "fw endRequest");
         if (is_null($fw)) {
             $fw = fw::i(); #get fw instance
@@ -166,7 +166,7 @@ class fw {
         #logger("MODEL CACHE MISS:" . $model_class);
         try {
             $object = new $model_class($fw);
-        } catch (NoClassException $ex) {
+        } catch (NoClassException) {
             throw new NoModelException("Model class not found: $model_class");
         }
         $fw->models_cache[$cache_key] = $object;
@@ -191,11 +191,11 @@ class fw {
     }
 
     //autoload controller/model classes
-    public function autoload($class_name) {
+    public function autoload($class_name): void {
         $dirs          = array();
         $bdir          = dirname(__FILE__) . '/';
         $is_controller = false;
-        if (preg_match('/Controller$/', $class_name)) {
+        if (str_ends_with($class_name, 'Controller')) {
             $is_controller = true;
             $dirs[]        = $bdir . '../controllers/';
             if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController' && $class_name !== 'FwApiController') {
@@ -240,7 +240,7 @@ class fw {
         }
     }
 
-    public function runRoute() {
+    public function runRoute(): void {
         try {
             $this->auth($this->route);
             $this->renderRoute($this->route);
@@ -256,7 +256,7 @@ class fw {
 
             try {
                 $this->renderRoute($this->route);
-            } catch (NoClassMethodException $ex2) {
+            } catch (NoClassMethodException) {
                 logger('WARN', "No HomeController->NotFoundAction() found");
                 $this->handlePageError(404, $ex->getMessage(), $ex);
                 return;
@@ -265,7 +265,7 @@ class fw {
             #if can't call class - this is server error
             $this->handlePageError(500, $ex->getMessage(), $ex);
             return;
-        } catch (NoClassMethodException $ex) {
+        } catch (NoClassMethodException) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
 
@@ -286,24 +286,22 @@ class fw {
 
             try {
                 $this->renderRoute($this->route);
-            } catch (NoClassMethodException $ex2) {
+            } catch (NoClassMethodException) {
                 #if no method - just call parser() - show template from /cur_controller/cur_action dir
                 logger('WARN', "Default parser");
                 $this->parser();
             }
-        } catch (ExitException $ex) {
+        } catch (ExitException) {
             #not a problem - just graceful exit
             logger('TRACE', "Exit Exception (normal behaviour, usually due to redirect)");
-        } catch (BadAccessException $ex) {
-            $this->handlePageError(401, $ex->getMessage(), $ex);
         } catch (ApplicationException $ex) {
-            $this->handlePageError(($ex->getCode() ? $ex->getCode() : 500), $ex->getMessage(), $ex);
+            $this->handlePageError(($ex->getCode() ?: 500), $ex->getMessage(), $ex);
         } catch (Exception $ex) {
             $this->handlePageError(500, $ex->getMessage(), $ex);
         }
     }
 
-    public function renderRoute(stdClass $route) {
+    public function renderRoute(stdClass $route): void {
         FwHooks::beforeRenderRoute($route);
 
         #remember in G for rendering
@@ -326,7 +324,7 @@ class fw {
      * return true if current request is GET request
      * @return boolean
      */
-    public function isGetRequest() {
+    public function isGetRequest(): bool {
         return $this->route->method == 'GET';
     }
 
@@ -334,12 +332,12 @@ class fw {
      * return true if script runs not under web server (i.e. cron script)
      * @return boolean
      */
-    public function isOffline() {
+    public function isOffline(): bool {
         return (PHP_SAPI === 'cli');
     }
 
     #return 1 if client expects json response (based on passed route or _SERVER[HTTP_ACCEPT]) header
-    public function isJsonExpected($route = null) {
+    public function isJsonExpected($route = null): int {
         if (!is_object($route)) {
             $route = $this->route;
         }
@@ -356,8 +354,6 @@ class fw {
             $route = $this->route;
         }
 
-        $result = '';
-
         if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) {
             $result = 'json';
         } elseif ($route->format == 'pjax' || isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
@@ -370,7 +366,7 @@ class fw {
     }
 
     # TODO $args
-    public function routeRedirect($action, $controller = null, $params = null) {
+    public function routeRedirect(string $action, ?string $controller = null, ?array $params = null): void {
         $this->route->action = $action;
         if (!is_null($controller)) {
             $this->route->controller = $controller;
@@ -384,7 +380,7 @@ class fw {
     }
 
     #throw AuthException if request XSS is not passed or not equal to session's value
-    public function checkXSS($is_die = true) {
+    public function checkXSS(bool $is_die = true): bool {
         if ($_SESSION["XSS"] != reqs("XSS")) {
             #logger("WARN", "XSS CHECK FAIL"); #too excessive logging
             if ($is_die) {
@@ -399,21 +395,21 @@ class fw {
     # also check for XSS in $_SESSION
     # IN: route hash
     # OUT: return TRUE throw AuthException if not authorized to view the page
-    private function auth($route) {
-        $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS, CASE_LOWER);
+    private function auth(stdClass $route): void {
+        $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS);
         #XSS check for all requests that modify data
         $request_xss = reqs("XSS");
         $session_xss = $_SESSION["XSS"] ?? '';
-        if (($request_xss || $this->route->method == "POST" || $this->route->method == "PUT" || $this->route->method == "DELETE")
+        if (($request_xss || $route->method == "POST" || $route->method == "PUT" || $route->method == "DELETE")
             && $session_xss > "" && $session_xss != $request_xss
-            && !in_array($this->route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
+            && !in_array($route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
             throw new AuthException("XSS Error");
         }
 
         #access level check
-        $path  = strtolower('/' . $this->route->controller . '/' . $this->route->action);
-        $path2 = strtolower('/' . $this->route->controller);
+        $path  = strtolower('/' . $route->controller . '/' . $route->action);
+        $path2 = strtolower('/' . $route->controller);
 
         $current_level = self::userAccessLevel();
 
@@ -426,7 +422,7 @@ class fw {
 
         if (is_null($rule_level)) {
             #rule not found in config - try Controller.access_level
-            $rule_level = $this->dispatcher->getRouteAccessLevel($this->route->controller);
+            $rule_level = $this->dispatcher->getRouteAccessLevel($route->controller);
         }
 
         if (is_null($rule_level)) {
@@ -438,7 +434,6 @@ class fw {
             throw new AuthException("Access Denied");
         }
 
-        return true;
     }
 
     /**
@@ -500,7 +495,7 @@ class fw {
 
             header("HTTP/1.0 $error_code $err_code_desc", true, $error_code);
 
-            $err_msg = $error_message ? $error_message : ($err_code_desc ? $err_code_desc : "PAGE NOT YET IMPLEMENTED [$uri]");
+            $err_msg = $error_message ?: ($err_code_desc ?: "PAGE NOT YET IMPLEMENTED [$uri]");
 
             $ps = array(
                 '_json'    => true, #also allow return urls by json
@@ -546,7 +541,7 @@ class fw {
     #
     # TODO: (not for json) to perform routeRedirect - set ps("_route_redirect"), ps("_route_redirect_controller"), ps("_route_redirect_args")
     # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
-    public function parser() {
+    public function parser(): ?string {
         $args       = func_get_args();
         $basedir    = '';
         $controller = $this->route->controller;
@@ -561,7 +556,7 @@ class fw {
         $out_filename = '';
 
         if (!count($args)) {
-            $ps = array();
+            #no args - use default
         } elseif (count($args) == 1 && is_array($args[0])) {
             $ps = &$args[0];
         } elseif (count($args) == 2 && is_string($args[0]) && is_array($args[1])) {
@@ -619,6 +614,8 @@ class fw {
             logger('TRACE', "export $out_format using " . $this->route->controller . "Controller.Export()");
             $this->dispatcher->callClassMethod($this->route->controller . 'Controller', 'Export', array($ps, $out_format));
         }
+
+        return null;
     }
 
     //flash - read/store flash data (available on the next request and only on it)
@@ -631,6 +628,7 @@ class fw {
             #@session_start();
             $_SESSION['_flash'][$name] = $value;
             #@session_write_close();
+            return null;
         }
     }
 
@@ -654,7 +652,7 @@ class fw {
 
     /**
      * Send email in UTF-8 via PHPMailer (default) or mail() (but mail() can't do SMTP or html or file attachments)
-     * @param string|array $ToEmail one string or array of email addresses
+     * @param array|string $ToEmail one string or array of email addresses
      * @param string $Subj subject
      * @param string $Message message body
      * @param array $options misc options:
@@ -665,7 +663,7 @@ class fw {
      *                          files => array(filepath, filepath, ...) or array(filename => filepath)
      * @return bool   true if message sent successfully
      */
-    public function sendEmail($ToEmail, $Subj, $Message, $options = array()) {
+    public function sendEmail(array|string $ToEmail, string $Subj, string $Message, array $options = array()): bool {
         $MAIL   = $this->config->MAIL;
         $result = true;
 
@@ -694,7 +692,7 @@ class fw {
 
         if ($MAIL['IS_SMTP']) {
             #send using PHPMailer class
-            $mailer = new PHPMailer;
+            $mailer = new PHPMailer\PHPMailer\PHPMailer;
             $mailer->isSMTP();
 
             try {
@@ -711,7 +709,7 @@ class fw {
                 $mailer->Username = $MAIL['USER'];
                 $mailer->Password = $MAIL['PWD'];
 
-                foreach ($ToEmail as $k => $v) {
+                foreach ($ToEmail as $v) {
                     $mailer->addAddress($v);
                 }
 
@@ -723,22 +721,29 @@ class fw {
                     $mailer->setFrom($from);
                 }
 
-                if ($options['reply']) {
+                if (isset($options['reply'])) {
                     $mailer->addReplyTo($options['reply']);
                 }
 
-                if ($options['cc']) {
-                    $mailer->addCC($options['cc']);
+                if (isset($options['cc'])) {
+                    if (is_array($options['cc'])) {
+                        foreach ($options['cc'] as $v) {
+                            $mailer->addCC($v);
+                        }
+                    } else {
+                        #if cc is string (not array) - assume it's comma separated list
+                        $mailer->addCC($options['cc']);
+                    }
                 }
 
-                if ($options['bcc']) {
+                if (isset($options['bcc'])) {
                     $mailer->addBCC($options['bcc']);
                 }
 
                 $mailer->Subject = $Subj;
                 $mailer->Body    = $Message;
                 if ($is_html) {
-                    $mailer->isHTML(true);
+                    $mailer->isHTML();
                     $mailer->AltBody = 'To view the message, please use an HTML compatible email viewer!'; // optional - MsgHTML will create an alternate automatically
                 }
 
@@ -746,7 +751,6 @@ class fw {
                     $mailer->addAttachment($filepath, (intval($key) === $key ? '' : $key)); #if key is not a number - they key is filename
                 }
 
-                $result = true;
                 if (!$mailer->send()) {
                     $result = false;
                     logger('WARN', 'Error sending email via PHPMailer: ' . $mailer->ErrorInfo);
@@ -772,15 +776,20 @@ class fw {
                 $more .= "From: $from\n";
             }
 
-            if ($options['reply']) {
+            if (isset($options['reply'])) {
                 $more .= "Reply-to: " . $options['reply'] . "\n";
             }
 
-            if ($options['cc']) {
-                $more .= "Cc: " . explode(',', $options['cc']) . "\n";
+            if (isset($options['cc'])) {
+                if (is_array($options['cc'])) {
+                    $more .= "Cc: " . implode(',', $options['cc']) . "\n";
+                } else {
+                    #if cc is string (not array) - assume it's comma separated list
+                    $more .= "Cc: " . $options['cc'] . "\n";
+                }
             }
 
-            if ($options['bcc']) {
+            if (isset($options['bcc'])) {
                 $more .= "Bcc: " . $options['bcc'] . "\n";
             }
 
@@ -788,7 +797,7 @@ class fw {
                 $Subj = "=?utf-8?B?" . base64_encode($Subj) . "?=";
             }
 
-            foreach ($ToEmail as $k => $v) {
+            foreach ($ToEmail as $v) {
                 $res = mail($v, $Subj, $Message, $more);
                 if ($res === false) {
                     logger('WARN', 'Error sending email via mail(): ' . error_get_last()['message']);
@@ -804,18 +813,18 @@ class fw {
      * Send email from text or html template in /template/emails
      * FIRST LINE IN TEMPLATE FILE - Subject
      * SECOND AND FURTHER LINES - Message body
-     * @param  [type] $to_email [description]
-     * @param  [type] $tpl      [description]
-     * @param  [type] $ps       [description]
-     * @param  [type] $options  [description]
-     * @return [type]           [description]
+     * @param string|array $to_email
+     * @param string $tpl
+     * @param array $ps
+     * @param array $options
+     * @return bool [type]           [description]
      * Usage:
      *   $ps=array(
      *       'user' => $hU,
      *   );
      *   sendEmailTpl( $hU['email'], 'email_invite.txt', $ps);
      */
-    public function sendEmailTpl($to_email, $tpl, $ps, $options = array()) {
+    public function sendEmailTpl(string|array $to_email, string $tpl, array $ps, array $options = array()): bool {
         $msg_body = parse_page('/emails', $tpl, $ps, 'v');
         list($msg_subj, $msg_body) = preg_split("/\n/", $msg_body, 2);
 
@@ -825,8 +834,7 @@ class fw {
     ##########################  STATIC methods
 
     // redirect to relative or absolute url using header
-    public static function redirect($url, $noexit = false) {
-        global $CONFIG;
+    public static function redirect(string $url, bool $noexit = false): void {
         $url = fw::url2abs($url);
 
         logger("REDIRECT to [$url]");
@@ -839,9 +847,9 @@ class fw {
     #make url absolute
     # if url start with "/" - it's redirect to url relative to current host
     # /some_site_url?aaaa => http://root_domain/ROOT_URL/some_site_url?aaaa
-    public static function url2abs($url) {
+    public static function url2abs(string $url): string {
         global $CONFIG;
-        if (substr($url, 0, 1) == '/') {
+        if (str_starts_with($url, '/')) {
             $url = $CONFIG['ROOT_DOMAIN'] . $CONFIG['ROOT_URL'] . $url;
         }
 
@@ -853,7 +861,7 @@ class fw {
 
 //get some value from $_REQUEST
 //TODO? make support of infinite []
-function _req($name) {
+function _req(string $name) {
     if (preg_match('/^(.+?)\[(.+?)]/', $name, $m)) {
         return $_REQUEST[$m[1]][$m[2]] ?? '';
     } else {
@@ -863,24 +871,24 @@ function _req($name) {
 
 //get integer value from $_REQUEST
 //return 0
-function reqi($name) {
+function reqi(string $name): int {
     return intval(_req($name));
 }
 
 //get string value from $_REQUEST
 //return 0
-function reqs($name) {
+function reqs(string $name): string {
     return _req($name) . '';
 }
 
 //shortcut to $_REQUEST[$name]
 //return value from request
-function req($name) {
+function req(string $name) {
     return @$_REQUEST[$name];
 }
 
 //return hash/array from request (if no such param or not array - returns empty array)
-function reqh($name) {
+function reqh(string $name) {
     $h = $_REQUEST[$name] ?? [];
     if (!is_array($h)) {
         $h = array();
@@ -892,7 +900,7 @@ function reqh($name) {
 //get bool value from $_REQUEST
 // true only if "true" or 1 passed
 //return bool
-function reqb($name) {
+function reqb($name): bool {
     $value = reqs($name);
     if ($value == "true" || $value == 1) {
         return true;
@@ -916,7 +924,7 @@ function reqjson($name) {
 # OUT: none, just write to $site_error_log
 # If not ALL - limit output to 2048 chars per call
 # example: logger('DEBUG', 'hello there', $var);
-function logger() {
+function logger(): void {
     $args = func_get_args();
     if (FwHooks::logger($args)) {
         #if logger overridden - don't use standard logger
@@ -942,8 +950,8 @@ function logger() {
     }
 
     $arr      = debug_backtrace(); #0-logger(),1-func called logger,...
-    $func     = (isset($arr[1]) ? $arr[1] : '');
-    $function = isset($func['function']) ? $func['function'] : '';
+    $func     = ($arr[1] ?? '');
+    $function = $func['function'] ?? '';
     $line     = $arr[1]['line'];
 
     //remove unnecessary site_root_offline path
@@ -983,7 +991,7 @@ function logger() {
 }
 
 ########################### for debugging with output right into the browser or console
-function rw($var) {
+function rw($var): void {
     $is_html = $_SERVER['HTTP_HOST'] ? 1 : 0;
     if (!is_scalar($var)) {
         $var = print_r($var, true);
@@ -996,7 +1004,7 @@ function rw($var) {
 }
 
 ########################### same
-function rwe($var) {
+function rwe($var): void {
     rw($var);
     die;
 }

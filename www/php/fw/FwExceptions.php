@@ -15,9 +15,6 @@ class ValidationException extends UserException {
 class ExitException extends Exception {
 }
 
-class BadAccessException extends Exception {
-}
-
 class AuthException extends Exception {
 }
 
