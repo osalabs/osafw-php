@@ -104,13 +104,13 @@ CREATE TABLE users
     id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 
     email          VARCHAR(128) NOT NULL DEFAULT '',
-    pwd            VARCHAR(255) NOT NULL DEFAULT '',   -- hashed password
-    access_level   TINYINT      NOT NULL, /*0 - visitor, 1 - usual user, 80 - moderator, 100 - admin*/
-    is_readonly    TINYINT      NOT NULL DEFAULT 0,    -- 1 if user is readonly
+    pwd            VARCHAR(255) NOT NULL DEFAULT '',            -- hashed password
+    access_level   TINYINT      NOT NULL,                       -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
+    is_readonly    TINYINT      NOT NULL DEFAULT 0,             -- 1 if user is readonly
 
     fname          VARCHAR(32)  NOT NULL DEFAULT '',
     lname          VARCHAR(32)  NOT NULL DEFAULT '',
-    -- TODO iname          VARCHAR(128) AS CONCAT(fname, ' ', lname) -- calculated column
+    iname          VARCHAR(128) AS (CONCAT(fname, ' ', lname)), -- calculated column
 
     title          VARCHAR(128) NOT NULL DEFAULT '',
 
@@ -121,19 +121,19 @@ CREATE TABLE users
     zip            VARCHAR(16)  NOT NULL DEFAULT '',
     phone          VARCHAR(16)  NOT NULL DEFAULT '',
 
-    lang           VARCHAR(16)  NOT NULL DEFAULT 'en', -- user interface language
-    ui_theme       TINYINT      NOT NULL DEFAULT 0,    -- 0--default theme
-    ui_mode        TINYINT      NOT NULL DEFAULT 0,    -- 0--auto, 10-light, 20-dark
+    lang           VARCHAR(16)  NOT NULL DEFAULT 'en',          -- user interface language
+    ui_theme       TINYINT      NOT NULL DEFAULT 0,             -- 0--default theme
+    ui_mode        TINYINT      NOT NULL DEFAULT 0,             -- 0--auto, 10-light, 20-dark
 
     idesc          TEXT,
-    att_id         INT UNSIGNED,                       -- avatar
+    att_id         INT UNSIGNED,                                -- avatar
 
     login_time     DATETIME,
     pwd_reset      VARCHAR(255) NULL,
     pwd_reset_time DATETIME     NULL,
-    mfa_secret     VARCHAR(64),                        -- mfa secret code, if empty - no mfa for the user configured
-    mfa_recovery   VARCHAR(1024),                      -- mfa recovery hashed codes, space-separated
-    mfa_added      DATETIME,                           -- last datetime when mfa setup or resynced
+    mfa_secret     VARCHAR(64),                                 -- mfa secret code, if empty - no mfa for the user configured
+    mfa_recovery   VARCHAR(1024),                               -- mfa recovery hashed codes, space-separated
+    mfa_added      DATETIME,                                    -- last datetime when mfa setup or resynced
 
     status         TINYINT      NOT NULL DEFAULT 0, /*0-ok, 127-deleted*/
     add_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
