@@ -15,14 +15,16 @@ class Spages extends FwModel {
      * delete record, but don't allow to delete home page
      * @param int $id page id
      * @param bool $is_perm if true - permanently delete from db
-     * @return none
+     * @return bool
      */
-    public function delete($id, $is_perm = NULL) {
+    public function delete($id, $is_perm = NULL): bool {
         $item = $this->one($id);
         # home page cannot be deleted
         if ($item['is_home'] != 1) {
             parent::delete($id, $is_perm);
+            return true;
         }
+        return false;
     }
 
     /**

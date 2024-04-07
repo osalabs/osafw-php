@@ -16,14 +16,14 @@ class Att extends FwModel {
         $this->table_name = 'att';
     }
 
-    public function delete($id, $is_perm = NULL) {
+    public function delete($id, $is_perm = NULL): bool {
         if ($is_perm) {
             //first, remove files
             $item = $this->one($id);
             $this->removeUpload($id, $item['ext']);
         }
 
-        parent::delete($id, $is_perm);
+        return parent::delete($id, $is_perm);
     }
 
     #return list of records for the att category where status=0 order by add_time desc

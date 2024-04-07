@@ -74,8 +74,8 @@ class FwAdminController extends FwController {
         $ps = array(
             'id'                => $id,
             'i'                 => $item,
-            'add_users_id_name' => Users::i()->getFullName($item['add_users_id'] ?? 0),
-            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id'] ?? 0),
+            'add_users_id_name' => Users::i()->iname($item['add_users_id'] ?? 0),
+            'upd_users_id_name' => Users::i()->iname($item['upd_users_id'] ?? 0),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
@@ -105,8 +105,8 @@ class FwAdminController extends FwController {
         $ps = array(
             'id'                => $id,
             'i'                 => $item,
-            'add_users_id_name' => Users::i()->getFullName($item['add_users_id'] ?? 0),
-            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id'] ?? 0),
+            'add_users_id_name' => Users::i()->iname($item['add_users_id'] ?? 0),
+            'upd_users_id_name' => Users::i()->iname($item['upd_users_id'] ?? 0),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );

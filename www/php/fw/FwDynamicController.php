@@ -71,8 +71,8 @@ class FwDynamicController extends FwController {
             'id'                => $id,
             'i'                 => $item,
             #added/updated should be filled before dynamic fields
-            'add_users_id_name' => Users::i()->getFullName($item['add_users_id']),
-            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id']),
+            'add_users_id_name' => Users::i()->iname($item['add_users_id']),
+            'upd_users_id_name' => Users::i()->iname($item['upd_users_id']),
             'return_url'        => $this->return_url,
             'related_id'        => $this->related_id,
         );
@@ -111,10 +111,10 @@ class FwDynamicController extends FwController {
             'related_id' => $this->related_id,
         );
         if ($this->model->field_add_users_id) {
-            $ps['add_users_id_name'] = Users::i()->getFullName($item['add_users_id']);
+            $ps['add_users_id_name'] = Users::i()->iname($item['add_users_id']);
         }
         if ($this->model->field_upd_users_id) {
-            $ps['upd_users_id_name'] = Users::i()->getFullName($item['upd_users_id']);
+            $ps['upd_users_id_name'] = Users::i()->iname($item['upd_users_id']);
         }
 
         if ($this->is_dynamic_showform) {
@@ -381,7 +381,7 @@ class FwDynamicController extends FwController {
 
             } elseif ($dtype == "multi") {
                 #complex field
-                $def["multi_datarow"] = fw::model($def["lookup_model"])->getMultiList($item[$field], $def["lookup_params"]);
+                $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($item[$field], $def["lookup_params"]);
 
             } elseif ($dtype == "att") {
                 $def["att"] = Att::i()->one($item[$field]);
@@ -463,7 +463,7 @@ class FwDynamicController extends FwController {
 
             } elseif ($dtype == "multicb") {
                 #complex field
-                $def["multi_datarow"] = fw::model($def["lookup_model"])->getMultiList($item[$field], $def["lookup_params"]);
+                $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($item[$field], $def["lookup_params"]);
                 foreach ($def["multi_datarow"] as &$row) {
                     $row["field"] = $def["field"];
                 }

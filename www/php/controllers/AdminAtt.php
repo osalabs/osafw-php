@@ -79,8 +79,8 @@ class AdminAttController extends FwAdminController {
         $ps = array(
             'id'                => $id,
             'i'                 => $item,
-            'add_users_id_name' => Users::i()->getFullName($item['add_users_id']),
-            'upd_users_id_name' => Users::i()->getFullName($item['upd_users_id']),
+            'add_users_id_name' => Users::i()->iname($item['add_users_id']),
+            'upd_users_id_name' => Users::i()->iname($item['upd_users_id']),
 
             'fsize_human' => Utils::bytes2str($item['fsize']),
             'url'         => $this->model->getUrl($id),

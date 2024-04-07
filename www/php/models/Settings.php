@@ -35,8 +35,8 @@ class Settings extends FwModel {
         $this->table_name = 'settings';
     }
 
-    public function oneByIcode($icode, $is_force = false) {
-        $cache_key = $this->CACHE_PREFIX . $this->table_name . '*' . $icode;
+    public function oneByIcode($icode, $is_force = false): array {
+        $cache_key = $this->cache_prefix . $icode;
         if (!$is_force) {
             $row = FwCache::getValue($cache_key);
         }

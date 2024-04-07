@@ -298,7 +298,7 @@ abstract class FwController {
             if (isset($this->list_filter['status'])) {
                 $status = intval($this->list_filter['status']);
                 #if want to see trashed and not admin - just show active
-                if ($status == 127 && !Users::i()->isAccess(Users::ACL_ADMIN)) {
+                if ($status == 127 && !Users::i()->isAccessLevel(Users::ACL_ADMIN)) {
                     $status = 0;
                 }
                 $this->list_where .= " and " . $this->db->quote_ident($this->model->field_status) . "=" . $this->db->quote($status);

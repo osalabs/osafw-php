@@ -72,7 +72,7 @@ class AdminDemosController extends FwAdminController {
             'parent'         => $this->model->one($item['parent_id']),
             'demo_dicts'     => $this->model_related->one($item['demo_dicts_id']),
             'dict_link_auto' => $this->model_related->one($item['dict_link_auto_id']),
-            'multi_datarow'  => $this->model_related->getMultiList($dict_link_multi),
+            'multi_datarow'  => $this->model_related->listWithChecked($dict_link_multi),
             'att'            => Att::i()->one($item['att_id']),
             'att_links'      => Att::i()->getAttLinks($this->model->table_name, $id),
         ));
@@ -106,8 +106,8 @@ class AdminDemosController extends FwAdminController {
         $ps = array(
             'id'                           => $id,
             'i'                            => $item,
-            'add_users_id_name'            => Users::i()->getFullName($item['add_users_id']),
-            'upd_users_id_name'            => Users::i()->getFullName($item['upd_users_id']),
+            'add_users_id_name'            => Users::i()->iname($item['add_users_id']),
+            'upd_users_id_name'            => Users::i()->iname($item['upd_users_id']),
             'return_url'                   => $this->return_url,
             'related_id'                   => $this->related_id,
 
@@ -115,7 +115,7 @@ class AdminDemosController extends FwAdminController {
             'select_options_parent_id'     => $this->model->listSelectOptionsParent(),
             'select_options_demo_dicts_id' => $this->model_related->listSelectOptions(),
             'dict_link_auto_id_iname'      => $item['dict_link_auto_id'] ? $this->model_related->iname($item['dict_link_auto_id']) : $item['dict_link_auto_id_iname'],
-            'multi_datarow'                => $this->model_related->getMultiList($dict_link_multi),
+            'multi_datarow'                => $this->model_related->listWithChecked($dict_link_multi),
             'att'                          => Att::i()->one($item['att_id'] ?? 0),
             'att_links'                    => Att::i()->getAttLinks($this->model->table_name, $id),
         );

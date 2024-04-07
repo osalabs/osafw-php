@@ -11,7 +11,13 @@ require_once dirname(__FILE__) . "/dispatcher.php";
 require_once dirname(__FILE__) . "/parsepage.php";
 require_once dirname(__FILE__) . "/db.php";
 require_once dirname(__FILE__) . '/../vendor/autoload.php';
+#also directly preload common classes used in every request:
+require_once dirname(__FILE__) . "/Utils.php";
+require_once dirname(__FILE__) . "/FwModel.php";
 require_once dirname(__FILE__) . "/../SiteUtils.php";
+if (PHP_SAPI !== 'cli') {
+    require_once dirname(__FILE__) . "/FwController.php";
+}
 
 class fw {
     public static ?self $instance = null;

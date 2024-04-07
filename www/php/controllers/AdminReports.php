@@ -16,7 +16,7 @@ class AdminReportsController extends FwAdminController {
         parent::__construct();
 
         //optionally init controller
-        $this->is_admin = Users::i()->isAccess(Users::ACL_MANAGER);
+        $this->is_admin = Users::i()->isAccessLevel(Users::ACL_MANAGER);
     }
 
     public function IndexAction() {
@@ -24,23 +24,25 @@ class AdminReportsController extends FwAdminController {
         return $ps;
     }
 
-    public function ShowAction($repcode){
-        $ps=array();
+    public function ShowAction($repcode) {
+        $ps = array();
 
-        $repcode = $this->model->cleanupRepcode($repcode);
+        $repcode      = $this->model->cleanupRepcode($repcode);
         $ps["is_run"] = reqs("dofilter") > "" || reqs("is_run") > "";
 
         #report filters (options)
-        $f = $this->initFilter("AdminReports.".$repcode);
+        $f = $this->initFilter("AdminReports." . $repcode);
 
         #get format directly form request as we don't need to remember format
         $f["format"] = reqh("f")["format"];
-        if (!$f["format"]) $f["format"] = "html";
+        if (!$f["format"]) {
+            $f["format"] = "html";
+        }
 
         $report = $this->model->createInstance($repcode, $f);
 
         $ps["f"] = $report->getReportFilters();
-        if ($ps["is_run"]){
+        if ($ps["is_run"]) {
             $ps["rep"] = $report->getReportData();
         }
 
@@ -49,16 +51,16 @@ class AdminReportsController extends FwAdminController {
     }
 
     #save changes from editable reports
-    public function SaveAction($repcode){
+    public function SaveAction($repcode) {
         $repcode = $this->model->cleanupRepcode(reqs("repcode"));
 
         $report = $this->model->createInstance($repcode, reqh("f"));
 
         try {
-            if ($report->saveChanges()){
-                fw::redirect($base_url."/".$repcode."?is_run=1");
-            }else{
-                $_REQUEST['is_run']=1;
+            if ($report->saveChanges()) {
+                fw::redirect($base_url . "/" . $repcode . "?is_run=1");
+            } else {
+                $_REQUEST['is_run'] = 1;
                 $this->fw->routeRedirect("Show");
             }
         } catch (ApplicationException $e) {

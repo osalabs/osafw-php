@@ -28,7 +28,7 @@ class Users extends FwModel {
         return $this->db->row("SELECT * FROM " . $this->table_name . " WHERE email=" . $this->db->quote($email));
     }
 
-    public function getFullName($id) {
+    public function iname(string|int $id): string {
         $result = '';
         $item   = $this->one($id);
         if ($item) {
@@ -38,7 +38,7 @@ class Users extends FwModel {
     }
 
     #return standard list of id,iname where status=0 order by iname
-    public function ilist($min_acl = null) {
+    public function ilist($min_acl = null): array {
         $where = '';
         if (!is_null($min_acl)) {
             $where = ' and access_level>=' . dbqi($min_acl);
@@ -47,17 +47,6 @@ class Users extends FwModel {
 
         $sql = "SELECT *, (fname+' '+lname) as iname FROM $this->table_name WHERE status=0 $where ORDER BY fname,lname";
         return $this->db->arr($sql);
-    }
-
-    public function getMultiList($hsel_ids, $min_acl = null) {
-        $rows = $this->ilist($min_acl);
-        if (is_array($hsel_ids) && count($hsel_ids)) {
-            foreach ($rows as $k => $row) {
-                $rows[$k]['is_checked'] = array_key_exists($row['id'], $hsel_ids) !== FALSE;
-            }
-        }
-
-        return $rows;
     }
 
     public function addOrUpdate($login, $pwd, $item) {
@@ -73,7 +62,7 @@ class Users extends FwModel {
         return $result;
     }
 
-    public function add($item) {
+    public function add($item): int {
         if (!array_key_exists('pwd', $item)) {
             $item['pwd'] = Utils::getRandStr(8); #generate password
         }
@@ -89,8 +78,8 @@ class Users extends FwModel {
         return parent::update($id, $item);
     }
 
-    public function isExists($email, $not_id = NULL) {
-        return $this->isExistsByField($email, 'email', $not_id);
+    public function isExists($uniq_key, $not_id = null): bool {
+        return $this->isExistsByField($uniq_key, 'email', $not_id);
     }
 
     /**
@@ -250,13 +239,12 @@ class Users extends FwModel {
     }
 
     #check access for "at least" level
-    public function isAccess($acl) {
-        $req_level = intval($acl);
+    public function isAccessLevel(int $req_level): bool {
         return $this->fw->userAccessLevel() >= $req_level;
     }
 
-    public function checkAccess($acl, $is_die = true) {
-        $result = $this->isAccess($acl);
+    public function checkAccessLevel(int $req_level, bool $is_die = true): bool {
+        $result = $this->isAccessLevel($req_level);
         if (!$result && $is_die) {
             throw new AuthException("Access Denied");
         }
@@ -271,7 +259,7 @@ class Users extends FwModel {
      */
     public function sql_acl($alias = '', $field = '') {
         $result = '';
-        if (self::isAccess(self::ACL_SITE_ADMIN)) {
+        if (self::isAccessLevel(self::ACL_SITE_ADMIN)) {
             //if we are admin user - allow access to all records
         } else {
             //if we are normal user - allows access only records we created

@@ -520,7 +520,7 @@ class Utils {
      * return parsed json from the POST request
      * @return array json or FALSE
      */
-    public static function getPostedJson() {
+    public static function getPostedJson(): array {
         $raw = file_get_contents("php://input");
         return json_decode($raw, true);
     }
@@ -532,7 +532,113 @@ class Utils {
      * @param string $str
      * @return array
      */
-    public static function split2($separator, $str) {
+    public static function split2(string $separator, string $str): array {
         return array_pad(explode($separator, $str, 2), 2, '');
     }
+
+    /**
+     * capitalize string:
+     *  - if mode='all' - capitalize all words
+     *  - otherwise - just a first word
+     * EXAMPLE: mode="" : sample string => Sample string
+     *          mode="all" : sample STRING => Sample String
+     * @param string $str
+     * @param string $mode
+     * @return string
+     */
+    public static function capitalize(string $str, string $mode = ""): string {
+        if ($mode == "all") {
+            return ucwords(strtolower($str));
+        } else {
+            return ucfirst(strtolower($str));
+        }
+    }
+
+    /**
+     * convert/normalize external table/field name to fw standard name
+     * "SomeCrazy/Name" => "some_crazy_name"
+     * @param string $str
+     * @return string
+     */
+    public static function name2fw(string $str): string {
+        $result = $str;
+        $result = preg_replace('/^tbl|dbo/i', '', $result); // remove tbl,dbo prefixes if any
+        $result = preg_replace('/([A-Z]+)/', '_$1', $result); // split CamelCase to underscore, but keep abbrs together ZIP/Code -> zip_code
+        $result = preg_replace('/\W+/', '_', $result); // replace all non-alphanum to underscore
+        $result = preg_replace('/_+/', '_', $result); // deduplicate underscore
+        $result = trim($result, " _"); // remove first and last _ if any
+        $result = strtolower($result); // and finally to lowercase
+        return $result;
+    }
+
+    /**
+     * convert some system name to human-friendly name'
+     * "system_name_id" => "System Name ID"
+     * @param string $str
+     * @return string
+     */
+    public static function name2human(string $str): string {
+        $str_lc = strtolower($str);
+        if ($str_lc == "icode") {
+            return "Code";
+        }
+        if ($str_lc == "iname") {
+            return "Name";
+        }
+        if ($str_lc == "idesc") {
+            return "Description";
+        }
+        if ($str_lc == "idate") {
+            return "Date";
+        }
+        if ($str_lc == "itype") {
+            return "Type";
+        }
+        if ($str_lc == "iyear") {
+            return "Year";
+        }
+        if ($str_lc == "id") {
+            return "ID";
+        }
+        if ($str_lc == "fname") {
+            return "First Name";
+        }
+        if ($str_lc == "lname") {
+            return "Last Name";
+        }
+        if ($str_lc == "midname") {
+            return "Middle Name";
+        }
+
+        $result = $str;
+        $result = preg_replace('/^tbl|dbo/i', '', $result); // remove tbl prefix if any
+        $result = preg_replace('/_+/', ' ', $result); // underscores to spaces
+        $result = preg_replace('/([a-z ])([A-Z]+)/', '$1 $2', $result); // split CamelCase words
+        $result = preg_replace('/ +/', ' ', $result); // deduplicate spaces
+        $result = static::capitalize($result, 'all'); // Title Case
+        $result = trim($result);
+
+        if (preg_match('/\bid\b/i', $result)) {
+            // if contains id/ID - remove it and make singular
+            $result = preg_replace('/\s*\bid\b/i', '', $result);
+            // singularize TODO use external lib to handle all cases
+            $result = preg_replace('/(\S)(?:ies)\s*$/', '$1y', $result); // -ies -> -y
+            $result = preg_replace('/(\S)(?:es)\s*$/', '$1e', $result); // -es -> -e
+            $result = preg_replace('/(\S)(?:s)\s*$/', '$1', $result); // remove -s at the end
+        }
+
+        $result = trim($result);
+        return $result;
+    }
+
+    /**
+     * convert c/snake style name to CamelCase
+     * system_name => SystemName
+     * @param string $str
+     * @return string
+     */
+    public static function nameCamelCase(string $str): string {
+        return str_replace(' ', '', ucwords(str_replace('_', ' ', $str)));
+    }
+
 }
