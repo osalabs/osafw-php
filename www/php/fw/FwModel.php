@@ -371,7 +371,7 @@ abstract class FwModel {
         }
 
         if (!empty($this->field_upd_time)) {
-            $item[$this->field_upd_time] = DB::NOW;
+            $item[$this->field_upd_time] = DB::NOW();
         }
         if (!empty($this->field_upd_users_id) && !isset($item[$this->field_upd_users_id]) && $this->fw->isLogged()) {
             $item[$this->field_upd_users_id] = $this->fw->userId();

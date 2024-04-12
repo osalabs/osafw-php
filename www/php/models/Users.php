@@ -157,7 +157,7 @@ class Users extends FwModel {
         $host = gethostbyaddr($ip);
 
         $vars = array(
-            'login_time' => DB::NOW,
+            'login_time' => DB::NOW(),
             'login_ip'   => $ip,
             'login_host' => $host,
         );

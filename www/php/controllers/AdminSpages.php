@@ -129,7 +129,7 @@ class AdminSpagesController extends FwAdminController {
             if ($itemdb["pub_time"]) {
                 $itemdb["pub_time"] = DateUtils::Str2SQL($itemdb["pub_time"]);
             } else {
-                $itemdb["pub_time"] = DB::NOW;
+                $itemdb["pub_time"] = DB::NOW();
             }
             if (!$itemdb["head_att_id"]) {
                 $itemdb["head_att_id"] = null;
