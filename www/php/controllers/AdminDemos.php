@@ -174,7 +174,7 @@ class AdminDemosController extends FwAdminController {
         $query = reqs('q');
 
         $ps = array(
-            '_json' => $this->model_related->getAutocompleteList($query),
+            '_json' => $this->model_related->listAutocomplete($query),
         );
         return $ps;
     }

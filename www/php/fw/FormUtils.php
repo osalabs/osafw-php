@@ -276,4 +276,81 @@ class FormUtils {
         return implode(',', $acol);
     }
 
+    /// ****** helpers to detect changes
+
+    /**
+     * leave in only those item keys, which are absent/different from itemold
+     * @param array $item
+     * @param array $itemold
+     * @return array
+     */
+    public static function changesOnly(array $item, array $itemold) {
+        $result = array();
+
+        foreach ($item as $key => $vnew) {
+            $vold = $itemold[$key] ?? null;
+
+            // If both are dates, compare only the date part.
+            $dtNew = DateUtils::f2date($vnew);
+            $dtOld = DateUtils::f2date($vold);
+            if ($dtNew && $dtOld) {
+                if ($dtNew->format('Y-m-d') != $dtOld->format('Y-m-d')) {
+                    $result[$key] = $vnew;
+                }
+            } else {
+                // Handle non-date values and the case where one value is a date and the other is not.
+                if (!array_key_exists($key, $itemold) || strval($vnew) != strval($vold)) {
+                    $result[$key] = $vnew;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * return true if any of passed fields changed
+     * @param array $item1
+     * @param array $item2
+     * @param string $fields qw-list of fields
+     * @return bool false if no changes in passed fields or fields are empty
+     */
+    public static function isChanged(array $item1, array $item2, string $fields): bool {
+        $result  = false;
+        $afields = Utils::qw($fields);
+        foreach ($afields as $fld) {
+            if (array_key_exists($fld, $item1) && array_key_exists($fld, $item2) && strval($item1[$fld]) != strval($item2[$fld])) {
+                $result = true;
+                break;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * check if 2 dates (without time) changed
+     * @param $date1
+     * @param $date2
+     * @return bool
+     */
+    public static function isChangedDate($date1, $date2): bool {
+        $dt1 = DateUtils::f2date($date1);
+        $dt2 = DateUtils::f2date($date2);
+
+        if ($dt1 != null || $dt2 != null) {
+            if ($dt1 != null && $dt2 != null) {
+                // both set - compare dates
+                if (DateUtils::Date2SQL($dt1) != DateUtils::Date2SQL($dt2)) {
+                    return true;
+                }
+            } else // one set, one no - changed
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 }

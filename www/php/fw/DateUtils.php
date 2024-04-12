@@ -12,7 +12,7 @@ class DateUtils {
     public const WEEK_SECONDS     = 604800; #seconds in one day
 
     public static $DATE_FORMAT = 1; //0 - DD/MM/YYYY (Europe), 1-MM/DD/YYYY (USA)
-    public static $DATE_FORMAT_STR = 'MM/DD/YYYY'; #or DD/MM/YYYY
+    public static $DATE_FORMAT_STR = 'MM/DD/YY'; #or DD/MM/YY
     public static $TIME_FORMAT = 1; #0 - HH:MM (Europe), 1-HH:MM AM/PM (USA)
     public static $TIME_FORMAT_STR = 'HH:MM'; #or HH:MM AM/PM
 
@@ -122,6 +122,14 @@ class DateUtils {
         }
     }
 
+    public static function Date2SQL(DateTime $dt): string {
+        return $dt->format('Y-m-d');
+    }
+
+    public static function Date2Str(DateTime $dt): string {
+        return $dt->format(self::$DATE_FORMAT_STR);
+    }
+
     // from date string to YYYY-MM-DD
     public static function Str2SQL($s) {
         if (!strlen($s)) {
@@ -138,6 +146,24 @@ class DateUtils {
         }
 
         return "$year-$month-$day";
+    }
+
+    // anything to date, if not valid - return null
+    public static function f2date($s): ?DateTime {
+        if (empty($s)) {
+            return null;
+        }
+        if ($s instanceof DateTime) {
+            return $s;
+        }
+        if (is_numeric($s) || preg_match('/^\d+$/', $s)) {
+            return new DateTime('@' . $s); //unix timestamp
+        }
+        try {
+            return new DateTime($s);
+        } catch (Exception $e) {
+            return null;
+        }
     }
 
     // from date string to array (day, month, year)

@@ -71,7 +71,7 @@ class Users extends FwModel {
         return $id;
     }
 
-    public function update($id, $item) {
+    public function update(int $id, array $item): bool {
         if (array_key_exists('pwd', $item)) {
             $item['pwd'] = $this->hashPwd($item['pwd']);
         }

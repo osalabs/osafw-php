@@ -346,7 +346,7 @@ class DB {
     const ERROR_GONE_AWAY                 = 2006;
     const ERROR_DUPLICATE_ENTRY           = 1062;
 
-    const NOW = '###special_case_value_for_current_timestamp###';
+    const NOW            = '###special_case_value_for_current_timestamp###';
     const NOTNULL        = '###special_case_value_for_not_null###';
     const MORE_THAN_ZERO = '###special_case_value_for_more_than_zero###';
 
@@ -570,7 +570,7 @@ class DB {
                 }
                 call_user_func_array(array($st, 'bind_param'), $query_params);
 
-                $res = $st->execute();
+                $res            = $st->execute();
                 $this->lastRows = $this->dbh->affected_rows;
                 #$this->handle_error($res);
 
@@ -585,7 +585,7 @@ class DB {
                 //use direct query
                 $this->logger('NOTICE', $dbhost_info . $sql);
 
-                $result = $this->dbh->query($sql);
+                $result         = $this->dbh->query($sql);
                 $this->lastRows = $this->dbh->affected_rows;
                 #no need to check for metadata here as query returns TRUE for non-select
                 #$this->handle_error($result);
@@ -867,6 +867,17 @@ class DB {
         $this->exec($sql);
     }
 
+    //TODO make this main delete() method
+    public function deleteWhere($table, $vars, $more_where = '') {
+        $where = $this->build_where_str($vars);
+        if ($more_where) {
+            $where .= ' AND ' . $this->build_where_str($more_where);
+        }
+
+        $sql = 'DELETE FROM ' . $this->quote_ident($table) . ' WHERE ' . $where;
+        $this->exec($sql);
+    }
+
     /**
      * insert or replace record into db
      * @param string $table table name
@@ -949,9 +960,9 @@ class DB {
      * @param array $vars assoc array of fields/values to update
      * @param string $where array of (field => value) where conditions
      * *
-     * @return int              last insert id or null (if no_identity option provided)
+     * @return int number of affected rows
      */
-    public function update($table, $vars, $key_id_or_where, $column = 'id', $more_set = '', $more_where = '') {
+    public function update($table, $vars, $key_id_or_where, $column = 'id', $more_set = '', $more_where = ''): int {
         list($sql_set, $params_set) = $this->quote_array_params($vars);
 
         //detect syntax
@@ -972,6 +983,26 @@ class DB {
             }
             $this->exec($sql, $params_set);
         }
+
+        return $this->lastRows;
+    }
+
+    /**
+     * update or insert record in db
+     * @param string $table
+     * @param array $fields
+     * @param array $where
+     * @return int get last inserted id or 0 if updated
+     */
+    public function updateOrInsert(string $table, array $fields, array $where): int {
+        // try to update first
+        $result       = 0;
+        $updated_rows = $this->update($table, $fields, $where);
+        if ($updated_rows == 0) {
+            // if no rows updated - insert
+            $result = $this->insert($table, $fields);
+        }
+        return $result;
     }
 
     /**
