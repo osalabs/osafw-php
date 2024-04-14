@@ -152,7 +152,7 @@ class Att extends FwModel {
         }
 
         #3. remove not updated atts (i.e. user removed them)
-        $this->db->delete($this->att_table_link, 1, 'status', " and item_id=" . dbqi($id) . " and table_name=" . $this->db->quote($table_name));
+        $this->db->delete($this->att_table_link, ['status' => 1, 'item_id' => $id, 'table_name' => $table_name]);
     }
 
     //return correct url

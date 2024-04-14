@@ -138,21 +138,12 @@ class Users extends FwModel {
         $_SESSION['access_level'] = $user['access_level'];
     }
 
-    private function updateAfterLogin($id) {
+    private function updateAfterLogin($id): void {
         $hU = $this->one($id);
         #TODO add_notify_log($GLOBAL['NOTIFY_LOG_LOGIN'], $id, 0, $hU);
 
         #update login vars
         $ip = getenv("REMOTE_ADDR");
-
-        /*TODO
-        $vars=array(
-        'users_id'     => $id,
-        'login_ip' => $ip,
-        'add_time' => DB::NOW,
-        );
-        $this->db->insert('users_log', $vars);
-         */
 
         $host = gethostbyaddr($ip);
 
@@ -161,7 +152,7 @@ class Users extends FwModel {
             'login_ip'   => $ip,
             'login_host' => $host,
         );
-        $this->db->update($this->table_name, $vars, $id);
+        $this->update($id, $vars);
     }
 
     public function createPermCookie($id) {

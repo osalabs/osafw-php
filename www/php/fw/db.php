@@ -300,43 +300,51 @@ function db_identity(): int {
 //******************** helpers for INSERT/UPDATE/DELETE
 
 /**
- * delete record(s) from db
- * @param string $table table name to delete from
- * @param string $value id value
- * @param string $column optional, column name for value, default = 'id'
- * @param string|array $more_where additonal where for delete
- * @return void
+ * delete record(s) from db by where condition
+ * @param string $table table name
+ * @param array $where array of (field => value) where conditions
+ * @param string|null $order_by optional, order string to be added to ORDER BY
+ * @param string|null $limit optional, limit string to be added to LIMIT
+ * @return int number of deleted rows
+ * @throws DBException
  */
-function db_delete(string $table, string $value, string $column = 'id', string|array $more_where = ''): void {
-    DB::i()->delete($table, $value, $column, $more_where);
+function db_delete(string $table, array $where, string $order_by = null, string $limit = null): int {
+    return DB::i()->delete($table, $where, $order_by, $limit);
 }
 
 /**
  * insert or replace record into db
  * @param string $table table name
- * @param array $vars assoc array of fields/values to insert
+ * @param array $vars assoc array of fields/values to insert or multi-array for multi-insert
  * @param array $options optional, options: ignore, replace, no_identity
  * @return int              last insert id or null (if no_identity option provided)
+ * @throws DBException
  */
 function db_insert(string $table, array $vars, array $options = array()): int {
     return DB::i()->insert($table, $vars, $options);
 }
 
 /**
- * update record in db
- * syntax 1: (update by one key field with more options)
- * @param string $table table name
- * @param array $vars assoc array of fields/values to update
- * @param array $options optional, options: ignore, replace, no_identity
- * syntax 2: (update by where)
- * @param string $table table name
- * @param array $vars assoc array of fields/values to update
- * @param string $where array of (field => value) where conditions
- * *
- * @return int number of affected rows
+ * update record(s) in db by table/fields/where
+ * @param string $table
+ * @param array $fields
+ * @param array $where
+ * @return int
+ * @throws DBException
  */
-function db_update(string $table, array $vars, $key_id, $column = 'id', $more_set = '', $more_where = ''): int {
-    return DB::i()->update($table, $vars, $key_id, $column, $more_set, $more_where);
+function db_update(string $table, array $fields, array $where): int {
+    return DB::i()->update($table, $fields, $where);
+}
+
+/**
+ * update record(s) in db by parametrized query
+ * @param string $sql
+ * @param array|null $params
+ * @return int
+ * @throws DBException
+ */
+function db_updatep(string $sql, array $params = null): int {
+    return DB::i()->updatep($sql, $params);
 }
 
 /**
@@ -347,6 +355,7 @@ function db_update(string $table, array $vars, $key_id, $column = 'id', $more_se
  * @param string|null $not_id optional, not id to check
  * @param string $not_id_column optional, not id column name
  * @return bool                 true if record exists or false if not
+ * @throws DBException
  */
 function db_is_record_exists(string $table_name, string $uniq_value, string $column, string $not_id = null, string $not_id_column = 'id'): bool {
     return DB::i()->isRecordExists($table_name, $uniq_value, $column, $not_id, $not_id_column);
@@ -446,7 +455,7 @@ class DBOperation {
  * helper structure - describes query and params
  */
 class DBQueryAndParams {
-    public array $fields = []; // list of parametrized fields in order
+    public array $fields = []; // plain unquoted list of parametrized fields in order
     public string $sql = ''; // sql with parameter names, ex: field=@field
     public array $params = []; // parameter name => value, ex: field => 123
 }
@@ -1012,141 +1021,161 @@ class DB {
     }
 
     /**
+     * build delete query and params
+     * @param string $table
+     * @param array $where
+     * @param string|null $order_by
+     * @param string|null $limit
+     * @return DBQueryAndParams
+     */
+    public function buildDelete(string $table, array $where, string $order_by = null, string $limit = null): DBQueryAndParams {
+        $result      = new DBQueryAndParams();
+        $result->sql = 'DELETE FROM ' . $this->qid($table);
+        if ($where) {
+            $where_params   = $this->prepareParams($table, $where);
+            $result->sql    .= ' WHERE ' . $where_params->sql;
+            $result->params = $where_params->params;
+        }
+        if ($order_by) {
+            $result->sql .= ' ORDER BY ' . $order_by;
+        }
+        if ($limit) {
+            $result->sql .= ' LIMIT ' . $limit;
+        }
+        return $result;
+    }
+
+    /**
      * delete record(s) from db
-     * @param string $table table name to delete from
-     * @param string $value id value
-     * @param string $column optional, column name for value, default = 'id'
-     * @param string|array $more_where additonal where for delete
-     * @return void
-     */
-    public function delete($table, $value, $column = 'id', $more_where = '') {
-        $where = $this->qid($column) . (is_array($value) ? $this->insql($value) : '=' . $this->quote($value));
-        if ($more_where) {
-            $where .= ' AND ' . $this->build_where_str($more_where);
-        }
-
-        $sql = 'DELETE FROM ' . $this->qid($table) . ' WHERE ' . $where;
-        $this->exec($sql);
-    }
-
-    //TODO make this main delete() method
-    public function deleteWhere($table, $vars, $more_where = '') {
-        $where = $this->build_where_str($vars);
-        if ($more_where) {
-            $where .= ' AND ' . $this->build_where_str($more_where);
-        }
-
-        $sql = 'DELETE FROM ' . $this->qid($table) . ' WHERE ' . $where;
-        $this->exec($sql);
-    }
-
-    /**
-     * insert or replace record into db
-     * @param string $table table name
-     * @param array $vars assoc array of fields/values to insert OR array of assoc arrays (multi-row mode insert)
-     * @param array $options optional, options: ignore, replace, no_identity
-     * @return int              last insert id or null (if no_identity option provided)
-     *
-     * Note - multi-insert doesn't support DB::NOW
-     */
-    public function insert($table, $vars, $options = array()) {
-        $sql_command = 'INSERT';
-        if (array_key_exists('replace', $options)) {
-            $sql_command = 'REPLACE';
-        }
-
-        $sql_ignore = '';
-        if (array_key_exists('ignore', $options)) {
-            $sql_ignore = ' IGNORE';
-        }
-
-        $sql_insert = $sql_command . $sql_ignore . ' INTO ' . $this->qid($table);
-
-        if (isset($vars[0]) && is_array($vars[0])) {
-            #multi row mode
-            $MAX_BIND_PARAMS = 2000; #let's set some limit
-            $rows_per_query  = floor($MAX_BIND_PARAMS / count($vars[0]));
-            $anames          = $row_values = $avalues = $params = array();
-            $is_anames_set   = false;
-
-            foreach ($vars as $i => $row) {
-                foreach ($row as $k => $v) {
-                    if (!$is_anames_set) {
-                        $anames[]     = $this->qid($k);
-                        $row_values[] = '?';
-                    }
-                    $params[] = $v;
-                }
-                $is_anames_set = true; #only remember names from first row
-
-                $avalues[] = '(' . implode(',', $row_values) . ')';
-                if (count($avalues) >= $rows_per_query) {
-                    $sql = $sql_insert . '(' . implode(',', $anames) . ') VALUES ' . implode(',', $avalues);
-                    $this->exec($sql, $params);
-                    #reset for next set
-                    $avalues = $params = array();
-                }
-            }
-
-            #insert what's left
-            if (count($avalues) > 0) {
-                $sql = $sql_insert . '(' . implode(',', $anames) . ') VALUES ' . implode(',', $avalues);
-                $this->exec($sql, $params);
-            }
-        } else {
-            #single row mode
-            list($vars_quoted, $params) = $this->quote_array_params($vars);
-
-            $sql = $sql_insert . ' SET ' . implode(', ', $vars_quoted);
-            $this->exec($sql, $params);
-        }
-
-        if (array_key_exists('no_identity', $options)) {
-            return;
-        } else {
-            return $this->get_identity();
-        }
-    }
-
-    /**
-     * update record in db by one column value or multiple where conditions
-     * syntax 1: (update by one key field with more options)
-     * @param string $table table name
-     * @param array $vars assoc array of fields/values to update
-     * @param string $key_id column value for where
-     * @param string $column optional, column id for where, default 'id'
-     * @param string $more_set optional, additional string to include in set (you have to take care about quotes!)
-     * @param string $more_where optional, additional string to include in where (you have to take care about quotes!)
-     * syntax 2: (update by where)
-     * @param string $table table name
-     * @param array $vars assoc array of fields/values to update
-     * @param string $where array of (field => value) where conditions
-     * *
+     * @param string $table
+     * @param array $where
+     * @param string|null $order_by
+     * @param string|null $limit
      * @return int number of affected rows
+     * @throws DBException
      */
-    public function update($table, $vars, $key_id_or_where, $column = 'id', $more_set = '', $more_where = ''): int {
-        list($sql_set, $params_set) = $this->quote_array_params($vars);
+    public function delete(string $table, array $where, string $order_by = null, string $limit = null): int {
+        $qp = $this->buildDelete($table, $where, $order_by, $limit);
+        return $this->exec($qp->sql, $qp->params);
+    }
 
-        //detect syntax
-        if (is_array($key_id_or_where)) {
-            //syntax 2
-            list($sql_where, $params_where) = $this->quote_array_params($key_id_or_where, true);
-            $sql = 'UPDATE ' . $this->qid($table) . ' SET ' . implode(', ', $sql_set);
-            if ($sql_where) {
-                #if we have non-empty where
-                $sql .= ' WHERE ' . implode(' AND ', $sql_where);
-            }
-            $this->exec($sql, array_merge($params_set, $params_where));
-        } else {
-            //syntax 1
-            $sql = 'UPDATE ' . $this->qid($table) . ' SET ' . implode(', ', $sql_set) . ' ' . $more_set;
-            if (strlen($key_id_or_where) > 0) {
-                $sql .= ' WHERE ' . $this->qid($column) . '=' . $this->quote($key_id_or_where) . ' ' . $more_where;
-            }
-            $this->exec($sql, $params_set);
+    public function buildInsert(string $table, array $fields, array $options = null): DBQueryAndParams {
+        $result      = new DBQueryAndParams();
+        $result->sql = 'INSERT';
+        if (array_key_exists('replace', $options)) {
+            $result->sql = 'REPLACE';
         }
 
-        return $this->lastRows;
+        $result->sql .= array_key_exists('ignore', $options) ? ' IGNORE' : '';
+        $result->sql .= ' INTO ' . $this->qid($table);
+
+        if (isset($fields[0]) && is_array($fields[0])) {
+            // multi row mode
+
+            foreach ($fields as $row) {
+                $insert_params = $this->prepareParams($table, $row, 'insert');
+                if (empty($result->fields)) {
+                    $result->fields = $insert_params->fields;
+                    $sql_fields     = implode(', ', array_map(fn($v) => $this->qid($v), $insert_params->fields));
+                    $result->sql    .= ' (' . $sql_fields . ') VALUES ';
+                }
+                $result->sql    .= '(' . $insert_params->sql . '), ';
+                $result->params = array_merge($result->params, $insert_params->params);
+            }
+
+        } else {
+            // single row mode
+            $insert_params = $this->prepareParams($table, $fields, 'insert');
+            $sql_fields    = implode(', ', array_map(fn($v) => $this->qid($v), $insert_params->fields));
+
+            $result->sql    .= ' (' . $sql_fields . ') VALUES (' . $insert_params->sql . ')';
+            $result->params = $insert_params->params;
+        }
+
+        return $result;
+    }
+
+    /**
+     * insert record(s) into db
+     * @param string $table
+     * @param array $fields - single record (field => value) or array of records (array of field => value arrays
+     * @param array|null $options optional, options: [ignore=>true, replace=>true, no_identity=>true]
+     * @return int last insert id or 0 (if no_identity option provided or multi-row insert)
+     * @throws DBException
+     */
+    public function insert(string $table, array $fields, array $options = null): int {
+        if (count($fields) == 0) {
+            return 0; // nothing to insert
+        }
+
+        $is_get_identity = !array_key_exists('no_identity', $options);
+
+        if (isset($fields[0]) && is_array($fields[0])) {
+            // multi row mode
+            $MAX_BIND_PARAMS = 2000; #let's set some limit
+            $rows_per_exec   = floor($MAX_BIND_PARAMS / count($fields[0])); # group insert by this number of rows
+
+            $rows = [];
+            foreach ($fields as $row) {
+                $rows[] = $row;
+                if (count($rows) >= $rows_per_exec) {
+                    $qp = $this->buildInsert($table, $rows, $options);
+                    $this->exec($qp->sql, $qp->params, $is_get_identity);
+                    $rows = [];
+                }
+            }
+            if (count($rows) > 0) {
+                $qp = $this->buildInsert($table, $rows, $options);
+                return $this->exec($qp->sql, $qp->params, $is_get_identity);
+            }
+            return 0;
+
+        } else {
+            // single row mode
+            $qp = $this->buildInsert($table, $fields, $options);
+            return $this->exec($qp->sql, $qp->params, $is_get_identity);
+        }
+    }
+
+    public function buildUpdate(string $table, array $fields, array $where): DBQueryAndParams {
+        $result      = new DBQueryAndParams();
+        $result->sql = 'UPDATE ' . $this->qid($table) . ' SET ';
+
+        list($sql_set, $params_set) = $this->quote_array_params($fields);
+        $result->sql .= implode(', ', $sql_set);
+
+        list($sql_where, $params_where) = $this->quote_array_params($where, true);
+        if ($sql_where) {
+            #if we have non-empty where
+            $result->sql .= ' WHERE ' . implode(' AND ', $sql_where);
+        }
+        $result->params = array_merge($params_set, $params_where);
+
+        return $result;
+    }
+
+    /**
+     * update record(s) in db with table/fields/where
+     * @param string $table table name
+     * @param array $fields assoc array of (field => value) to update
+     * @param array $where array of (field => value) where conditions
+     * @return int number of affected rows
+     * @throws DBException
+     */
+    public function update(string $table, array $fields, array $where): int {
+        $qp = $this->buildUpdate($table, $fields, $where);
+        return $this->updatep($qp->sql, $qp->params);
+    }
+
+    /**
+     * update record(s) in db with parametrized sql
+     * @param string $sql
+     * @param array|null $params
+     * @return int number of affected rows
+     * @throws DBException
+     */
+    public function updatep(string $sql, array $params = null): int {
+        return $this->exec($sql, $params);
     }
 
     /**
@@ -1155,8 +1184,9 @@ class DB {
      * @param array $fields
      * @param array $where
      * @return int get last inserted id or 0 if updated
+     * @throws DBException
      */
-    public function updateOrInsert(string $table, array $fields, array $where): int {
+    public function upsert(string $table, array $fields, array $where): int {
         // try to update first
         $result       = 0;
         $updated_rows = $this->update($table, $fields, $where);
@@ -1412,7 +1442,7 @@ class DB {
      * get last inserted id
      * @return int  last inserted id or 0
      */
-    public function get_identity() {
+    public function get_identity(): int {
         return $this->dbh->insert_id;
     }
 
@@ -1453,7 +1483,7 @@ class DB {
         return $rows;
     }
 
-    public function map_sqltype2internal($type) {
+    public function map_sqltype2internal($type): string {
         switch (strtolower($type)) {
             #TODO - unsupported: image, varbinary
             case "tinyint":

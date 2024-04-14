@@ -346,7 +346,7 @@ abstract class FwModel {
 
         if (!empty($this->field_prio) && !isset($item[$this->field_prio])) {
             //if priority field defined - update it with newly added id to allow proper re/ordering
-            $this->db->update($this->getTable(), [$this->field_prio => $id], $id, $this->field_id);
+            $this->db->update($this->getTable(), [$this->field_prio => $id], [$this->field_id => $id]);
         }
 
         return $id;
@@ -404,7 +404,7 @@ abstract class FwModel {
         if ($is_perm || !strlen($this->field_status)) {
             // place here code that remove related data
 
-            $this->db->delete($this->getTable(), $id, $this->field_id);
+            $this->db->delete($this->getTable(), [$this->field_id => $id]);
             $this->removeCache($id);
 
             if ($this->is_log_changes) {
@@ -791,7 +791,7 @@ abstract class FwModel {
             $this->junction_field_main_id => $main_id,
             $junction_field_status        => self::STATUS_UNDER_UPDATE,
         ];
-        $this->db->deleteWhere($this->getTable(), $where);
+        $this->db->delete($this->getTable(), $where);
         $this->is_under_bulk_update = false;
     }
 
@@ -802,7 +802,7 @@ abstract class FwModel {
         }
 
         $where = [$this->junction_field_main_id => $main_id];
-        $this->db->deleteWhere($this->getTable(), $where);
+        $this->db->delete($this->getTable(), $where);
     }
 
     /**
@@ -834,7 +834,7 @@ abstract class FwModel {
                 $where                  = [];
                 $where[$main_id_name]   = $main_id;
                 $where[$linked_id_name] = $linked_id;
-                $this->db->updateOrInsert($junction_table_name, $fields, $where);
+                $this->db->upsert($junction_table_name, $fields, $where);
             }
         }
 
@@ -842,7 +842,7 @@ abstract class FwModel {
         $where                           = [];
         $where[$main_id_name]            = $main_id;
         $where[$link_table_field_status] = self::STATUS_UNDER_UPDATE;
-        $this->db->deleteWhere($junction_table_name, $where);
+        $this->db->delete($junction_table_name, $where);
     }
 
     // override to add set more additional fields
@@ -885,7 +885,7 @@ abstract class FwModel {
                 $where                                  = [];
                 $where[$this->junction_field_main_id]   = $main_id;
                 $where[$this->junction_field_linked_id] = $link_id;
-                $this->db->updateOrInsert($this->getTable(), $fields, $where);
+                $this->db->upsert($this->getTable(), $fields, $where);
             }
         }
 
@@ -935,7 +935,7 @@ abstract class FwModel {
                 $where                                  = [];
                 $where[$this->junction_field_linked_id] = $linked_id;
                 $where[$this->junction_field_main_id]   = $main_id;
-                $this->db->updateOrInsert($this->getTable(), $fields, $where);
+                $this->db->upsert($this->getTable(), $fields, $where);
             }
         }
 
@@ -943,7 +943,7 @@ abstract class FwModel {
         $where                                  = [];
         $where[$this->junction_field_linked_id] = $linked_id;
         $where[$link_table_field_status]        = self::STATUS_UNDER_UPDATE;
-        $this->db->deleteWhere($this->getTable(), $where);
+        $this->db->delete($this->getTable(), $where);
     }
 
     //</editor-fold>
@@ -985,7 +985,7 @@ abstract class FwModel {
     }
 
     public function updatePrio(int $id, int $prio): int {
-        return $this->db->update($this->table_name, [$this->field_prio => $prio], $id, $this->field_id);
+        return $this->db->update($this->table_name, [$this->field_prio => $prio], [$this->field_id => $id]);
     }
 
     /**
