@@ -494,9 +494,6 @@ class DB {
     const int SLEEP_RETRY_MIN         = 1; # min time for sleep between retries
     const int SLEEP_RETRY_MAX         = 3; # max time for sleep between retries
 
-    const string NOTNULL        = '###special_case_value_for_not_null###'; #TODO REMOVE
-    const string MORE_THAN_ZERO = '###special_case_value_for_more_than_zero###'; #TODO REMOVE
-
     public static string $lastSQL = ""; // last executed sql
     public static int $SQL_QUERY_CTR = 0; //counter for SQL queries in request
     public static ?self $instance = null;
@@ -1059,7 +1056,7 @@ class DB {
         return $this->exec($qp->sql, $qp->params);
     }
 
-    public function buildInsert(string $table, array $fields, array $options = null): DBQueryAndParams {
+    public function buildInsert(string $table, array $fields, array $options = []): DBQueryAndParams {
         $result      = new DBQueryAndParams();
         $result->sql = 'INSERT';
         if (array_key_exists('replace', $options)) {
@@ -1099,11 +1096,11 @@ class DB {
      * insert record(s) into db
      * @param string $table
      * @param array $fields - single record (field => value) or array of records (array of field => value arrays
-     * @param array|null $options optional, options: [ignore=>true, replace=>true, no_identity=>true]
+     * @param array $options optional, options: [ignore=>true, replace=>true, no_identity=>true]
      * @return int last insert id or 0 (if no_identity option provided or multi-row insert)
      * @throws DBException
      */
-    public function insert(string $table, array $fields, array $options = null): int {
+    public function insert(string $table, array $fields, array $options = []): int {
         if (count($fields) == 0) {
             return 0; // nothing to insert
         }
@@ -1141,15 +1138,14 @@ class DB {
         $result      = new DBQueryAndParams();
         $result->sql = 'UPDATE ' . $this->qid($table) . ' SET ';
 
-        list($sql_set, $params_set) = $this->quote_array_params($fields);
-        $result->sql .= implode(', ', $sql_set);
+        $qp_set      = $this->prepareParams($table, $fields, 'update', '_SET');
+        $result->sql .= $qp_set->sql;
 
-        list($sql_where, $params_where) = $this->quote_array_params($where, true);
-        if ($sql_where) {
-            #if we have non-empty where
-            $result->sql .= ' WHERE ' . implode(' AND ', $sql_where);
+        if ($where) {
+            $qp_where       = $this->prepareParams($table, $where);
+            $result->sql    .= ' WHERE ' . $qp_where->sql;
+            $result->params = array_merge($qp_set->params, $qp_where->params);
         }
-        $result->params = array_merge($params_set, $params_where);
 
         return $result;
     }
@@ -1221,10 +1217,340 @@ class DB {
 
     //************* helpers
 
-    //to use with IN sql queries with proper quoting, ex:
-    // $sql=" AND `sender` ".$this->insql($scopes);
-    // note: if $values array empty the follwign sql returned: " IN (NULL) "
-    public function insql($values) {
+    /**
+     * prepare query and parameters
+     * @param string $table table name
+     * @param array $fields fields/values
+     * @param string $join_type "where"(default), "update"(for SET), "insert"(for VALUES)
+     * @param string $suffix optional suffix to append to each param name
+     * @return DBQueryAndParams
+     */
+    public function prepareParams(string $table, array $fields, string $join_type = 'where', string $suffix = ''): DBQueryAndParams {
+        if (count($fields) == 0) {
+            return new DBQueryAndParams();
+        }
+
+        $is_for_insert  = $join_type == 'insert';
+        $is_for_where   = $join_type == 'where'; // if for where "IS NULL" will be used instead of "=NULL"
+        $join_delimiter = $is_for_where ? ' AND ' : ',';
+        $fields_list    = [];
+        $params_sqls    = [];
+        $params         = [];
+
+        foreach ($fields as $fname => $value) {
+            $dbop = $this->field2Op($table, $fname, $value, $is_for_where);
+
+            $delim      = ' ' . $dbop->opstr . ' ';
+            $param_name = preg_replace('/\W/', '_', $fname) . $suffix; // replace any non-alphanum in param names and add suffix
+
+            // for insert VALUES it will be form @p1,@p2,... i.e. without field names
+            // for update/where we need it in form like "field="
+            $sql = $is_for_insert ? '' : $fname . $delim;
+
+            if ($dbop->is_value) {
+                // if we have value - add it to params
+                if ($dbop->op == DBOps::BETWEEN) {
+                    // special case for between
+                    $params[$param_name . '_1'] = $value[0];
+                    $params[$param_name . '_2'] = $value[1];
+                    // BETWEEN @p1 AND @p2
+                    $sql .= '@' . $param_name . '_1 AND @' . $param_name . '_2';
+                } elseif ($dbop->op == DBOps::IN || $dbop->op == DBOps::NOTIN) {
+                    $sql_params = array();
+                    $i          = 1;
+                    foreach ($value as $pvalue) {
+                        $params[$param_name . '_' . $i] = $pvalue;
+                        $sql_params[]                   = '@' . $param_name . '_' . $i;
+                        $i                              += 1;
+                    }
+                    // [NOT] IN (@p1,@p2,@p3...)
+                    $sql .= '(' . (count($sql_params) > 0 ? implode(',', $sql_params) : 'NULL') . ')';
+                } else {
+                    if ($value === DB::NOW()) {
+                        // if value is NOW object - don't add it to params, just use NOW()/GETDATE() in sql
+                        $sql .= 'NOW()';
+                    } else {
+                        $params[$param_name] = $value;
+                        $sql                 .= '@' . $param_name;
+                    }
+                }
+                $fields_list[] = $fname; // only if field has a parameter - include in the list
+            } else {
+                $sql .= $dbop->sql; //if no value - add operation's raw sql if any
+            }
+            $params_sqls[] = $sql;
+        }
+
+        $result         = new DBQueryAndParams();
+        $result->fields = $fields_list;
+        $result->sql    = implode($join_delimiter, $params_sqls);
+        $result->params = $params;
+        return $result;
+    }
+
+    /*
+     *     public DBOperation field2Op(string table, string field_name, object field_value_or_op, bool is_for_where = false)
+    {
+        DBOperation dbop;
+        if (field_value_or_op is DBOperation dbop1)
+            dbop = dbop1;
+        else
+        {
+            // if it's equal - convert to EQ db operation
+            if (is_for_where)
+                // for WHERE xxx=NULL should be xxx IS NULL
+                dbop = opEQ(field_value_or_op);
+            else
+                // for update SET xxx=NULL should be as is
+                dbop = new DBOperation(DBOps.EQ, field_value_or_op);
+        }
+
+        return field2Op(table, field_name, dbop, is_for_where);
+    }
+
+    // return DBOperation class with value converted to type appropriate for the db field
+    public DBOperation field2Op(string table, string field_name, DBOperation dbop, bool is_for_where = false)
+    {
+        connect();
+        loadTableSchema(table);
+        field_name = field_name.ToLower();
+        Hashtable schema_table = (Hashtable)schema[table];
+        if (!schema_table.ContainsKey(field_name))
+        {
+            throw new ApplicationException("field " + table + "." + field_name + " does not defined in FW.config(\"schema\") ");
+        }
+
+        string field_type = (string)schema_table[field_name];
+        //logger(LogLevel.DEBUG, "field2Op IN: ", table, ".", field_name, " ", field_type, " ", dbop.op, " ", dbop.value);
+
+        // db operation
+        if (dbop.op == DBOps.IN || dbop.op == DBOps.NOTIN)
+        {
+            ArrayList result = new(((IList)dbop.value).Count);
+            foreach (var pvalue in (IList)dbop.value)
+                result.Add(field2typed(field_type, pvalue));
+            dbop.value = result;
+        }
+        else if (dbop.op == DBOps.BETWEEN)
+        {
+            ((IList)dbop.value)[0] = field2typed(field_type, ((IList)dbop.value)[0]);
+            ((IList)dbop.value)[1] = field2typed(field_type, ((IList)dbop.value)[1]);
+        }
+        else
+        {
+            // convert to field's type
+            dbop.value = field2typed(field_type, dbop.value);
+            if (is_for_where && dbop.value == DBNull.Value)
+            {
+                // for where if we got null value here for EQ/NOT operation - make it ISNULL/ISNOT NULL
+                // (this could happen when comparing int field to empty string)
+                if (dbop.op == DBOps.EQ)
+                    dbop = opISNULL();
+                else if (dbop.op == DBOps.NOT)
+                    dbop = opISNOTNULL();
+            }
+        }
+
+        return dbop;
+    }
+     */
+    public function field2Op(string $table, string $field_name, mixed $field_value_or_op, bool $is_for_where = false): DBOperation {
+        $dbop = $field_value_or_op instanceof DBOperation ? $field_value_or_op : new DBOperation(DBOps::EQ, $field_value_or_op);
+
+        // $field_name = strtolower($field_name);
+        //        $schema     = $this->loadTableSchema($table);
+        //        if (!array_key_exists($field_name, $schema)) {
+        //            throw new Exception("field $table.$field_name does not defined in FW.config(\"schema\") ");
+        //        }
+        //        $field_type = $schema[$field_name];
+        $field_type = 'x';//TBD
+
+        if ($dbop->op == DBOps::IN || $dbop->op == DBOps::NOTIN) {
+            $result = array();
+            foreach ($dbop->value as $pvalue) {
+                $result[] = $this->field2typed($field_type, $pvalue);
+            }
+            $dbop->value = $result;
+        } elseif ($dbop->op == DBOps::BETWEEN) {
+            $dbop->value[0] = $this->field2typed($field_type, $dbop->value[0]);
+            $dbop->value[1] = $this->field2typed($field_type, $dbop->value[1]);
+        } else {
+            $dbop->value = $this->field2typed($field_type, $dbop->value);
+            if ($is_for_where && is_null($dbop->value)) {
+                if ($dbop->op == DBOps::EQ) {
+                    $dbop = $this->opISNULL();
+                } elseif ($dbop->op == DBOps::NOT) {
+                    $dbop = $this->opISNOTNULL();
+                }
+            }
+        }
+
+        return $dbop;
+    }
+
+    // TBD if needed
+    public function field2typed(string $field_type, mixed $value): mixed {
+        return $value;
+    }
+
+    //<editor-fold desc="DBOperation support">
+
+    /**
+     * EQUAL operation, basically the same as assigning value directly
+     * But for null values - return ISNULL operation - equivalent to opISNULL()
+     * Example: $rows = $db->arr("users", ["status", db.opEQ(0)])
+     *          select * from users where status=0
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opEQ(mixed $value): DBOperation {
+        if (is_null($value)) {
+            return $this->opISNULL();
+        } else {
+            return new DBOperation(DBOps::EQ, $value);
+        }
+    }
+
+    /**
+     * NOT EQUAL operation
+     * Example: $rows = $db->arr("users", ["status", db.opNOT(127)])
+     *          select * from users where status<>127
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opNOT(mixed $value): DBOperation {
+        return new DBOperation(DBOps::NOT, $value);
+    }
+
+    /**
+     * LESS OR EQUAL than operation
+     * Example: $rows = $db->arr("users", ["access_level", db.opLE(50)])
+     *          select * from users where access_level<=50
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opLE(mixed $value): DBOperation {
+        return new DBOperation(DBOps::LE, $value);
+    }
+
+    /**
+     * LESS than operation
+     * Example: $rows = $db->arr("users", ["access_level", db.opLT(50)])
+     *          select * from users where access_level<50
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opLT(mixed $value): DBOperation {
+        return new DBOperation(DBOps::LT, $value);
+    }
+
+    /**
+     * GREATER OR EQUAL than operation
+     * Example: $rows = $db->arr("users", ["access_level", db.opGE(50)])
+     *          select * from users where access_level>=50
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opGE(mixed $value): DBOperation {
+        return new DBOperation(DBOps::GE, $value);
+    }
+
+    /**
+     * GREATER than operation
+     * Example: $rows = $db->arr("users", ["access_level", db.opGT(50)])
+     *          select * from users where access_level>50
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opGT(mixed $value): DBOperation {
+        return new DBOperation(DBOps::GT, $value);
+    }
+
+    /**
+     * Example: $rows = $db->array("users", ["field", db.opISNULL()])
+     *          select * from users where field IS NULL
+     * @return DBOperation
+     */
+    public function opISNULL(): DBOperation {
+        return new DBOperation(DBOps::ISNULL, null);
+    }
+
+    /**
+     * Example: $rows = $db->array("users", ["field", db.opISNOTNULL()])
+     *          select * from users where field IS NOT NULL
+     * @return DBOperation
+     */
+    public function opISNOTNULL(): DBOperation {
+        return new DBOperation(DBOps::ISNOTNULL, null);
+    }
+
+    // continue for opLIKE, opNOTLIKE, opIN, opNOTIN, opBETWEEN, opNOTBETWEEN
+
+    /**
+     * LIKE operation
+     * Example: $rows = $db->arr("users", ["fname", db.opLIKE("John")])
+     *          select * from users where fname LIKE '%John%'
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opLIKE(mixed $value): DBOperation {
+        return new DBOperation(DBOps::LIKE, $value);
+    }
+
+    /**
+     * NOT LIKE operation
+     * Example: $rows = $db->arr("users", ["fname", db.opNOTLIKE("John")])
+     *          select * from users where fname NOT LIKE '%John%'
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opNOTLIKE(mixed $value): DBOperation {
+        return new DBOperation(DBOps::NOTLIKE, $value);
+    }
+
+    /**
+     * IN operation
+     * Example: $rows = $db->arr("users", ["id", db.opIN([1,2,3])])
+     *          select * from users where id IN (1,2,3)
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opIN(mixed $value): DBOperation {
+        return new DBOperation(DBOps::IN, $value);
+    }
+
+    /**
+     * NOT IN operation
+     * Example: $rows = $db->arr("users", ["id", db.opNOTIN([1,2,3])])
+     *          select * from users where id NOT IN (1,2,3)
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opNOTIN(mixed $value): DBOperation {
+        return new DBOperation(DBOps::NOTIN, $value);
+    }
+
+    /**
+     * BETWEEN operation
+     * Example: $rows = $db->arr("users", ["age", db.opBETWEEN([18, 25])])
+     *          select * from users where age BETWEEN 18 AND 25
+     * @param mixed $value
+     * @return DBOperation
+     */
+    public function opBETWEEN(mixed $value): DBOperation {
+        return new DBOperation(DBOps::BETWEEN, $value);
+    }
+    //</editor-fold>
+
+    /**
+     * convert array of values to quoted string for IN sql query
+     * to use with IN sql queries with proper quoting, ex:
+     *      $sql=" AND `sender` ".$this->insql($scopes);
+     *      note: if $values array empty the following sql returned: " IN (NULL) "
+     * @param array $values
+     * @return string " IN (1,2,3)" sql or IN (NULL) if empty params passed
+     */
+    public function insql(array $values): string {
         #quote first
         $arr = array();
         foreach ($values as $value) {
@@ -1241,7 +1567,7 @@ class DB {
      * @param array $values array of values
      * @return string        "IN (1,2,3)" sql or IN (NULL) if empty params passed
      */
-    public function insqli($values) {
+    public function insqli($values): string {
         #quote first
         $arr = array();
         foreach ($values as $value) {
@@ -1250,99 +1576,6 @@ class DB {
         $sql = ($arr ? implode(",", $arr) : "NULL");
         #return sql
         return ' IN (' . $sql . ') ';
-    }
-
-    //DEPRECATED, use insql()
-    public function in_implode($values) {
-        logger("WARN", "Deprecated function usage: in_implode");
-        return $this->insql($values);
-    }
-
-    public function quote_array($vars) {
-        $quoted = array();
-        if (is_array($vars)) {
-            foreach ($vars as $key => $value) {
-                $quoted[] = $this->qid($key) . '=' . $this->quote($value);
-            }
-        }
-        return $quoted;
-    }
-
-    // is_where=true - this quoted for where (i.e. use IS NULL instead of "=")
-    public function quote_array_params($vars, $is_where = false) {
-        $quoted = array();
-        $params = array();
-        if (is_array($vars)) {
-            foreach ($vars as $key => $value) {
-                //special case for NULL and now()
-                if ($value instanceof DBSpecialValue) {
-                    $quoted[] = $this->qid($key) . $value;
-                } elseif (is_null($value)) {
-                    $quoted[] = $this->qid($key) . ($is_where ? ' IS NULL' : '=NULL');
-                } elseif ($value === DB::NOTNULL) {
-                    $quoted[] = $this->qid($key) . ($is_where ? ' IS NOT NULL' : '!=NULL');
-                } elseif ($value === DB::MORE_THAN_ZERO) {
-                    $quoted[] = $this->qid($key) . ' > 0';
-                } else {
-                    $quoted[] = $this->qid($key) . '=?';
-                    $params[] = $value;
-                }
-            }
-        }
-        return array($quoted, $params);
-    }
-
-    /**
-     * build where string from the array of fields/values
-     * If string passed instead of array - it's returned unchanged
-     * @param array $where fields/values
-     * @return string           conditions to be included in where as string or empty string
-     */
-    public function build_where_str($where) {
-        $result = '';
-        if (!is_array($where)) {
-            return $where;
-        }
-
-        $where_quoted = $this->quote_array($where);
-        if (count($where_quoted)) {
-            $result = implode(' AND ', $where_quoted);
-        }
-        return $result;
-    }
-
-    /**
-     * build where string from array
-     * @param array|int $where number (where id=number), array (where build as AND conditions against all array fields/values), if null - empty string returned
-     * @return string        "where xxxx" string or empty if no
-     */
-    public function _where($where, $noident = false) {
-        $result = '';
-        if (is_array($where)) {
-            $afields_sql = array();
-            foreach ($where as $key => $value) {
-                if (is_null($value)) {
-                    #special case for NULL values
-                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' IS NULL';
-                } elseif ($value === DB::NOTNULL) {
-                    #special case for NULL values
-                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' IS NOT NULL';
-                } elseif ($value === DB::MORE_THAN_ZERO) {
-                    #special case for NULL values
-                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . ' > 0';
-                } elseif (is_array($value)) {
-                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . $this->insql($value);
-                } else {
-                    $afields_sql[] = ($noident ? $key : $this->qident($key)) . '=' . $this->q($value);
-                }
-            }
-            if (count($afields_sql)) {
-                $result = "where " . implode(" and ", $afields_sql);
-            }
-        } elseif (!is_null($where)) {
-            $result = " where id=" . $this->q($where);
-        }
-        return $result;
     }
 
     /**
@@ -1360,10 +1593,10 @@ class DB {
         $result->sql = "SELECT " . $select_fields . " FROM " . $this->qid($table);
 
         if (count($where) > 0) {
-            list($where_quoted, $params) = $this->quote_array_params($where, true);
-            if (count($where_quoted)) {
-                $result->sql    .= ' WHERE ' . implode(' AND ', $where_quoted);
-                $result->params = $params;
+            $qp = $this->prepareParams($table, $where);
+            if ($qp->sql > '') {
+                $result->sql    .= ' WHERE ' . $qp->sql;
+                $result->params = $qp->params;
             }
         }
 
@@ -1426,9 +1659,6 @@ class DB {
         } elseif (is_null($value)) {
             //null value
             $result = 'NULL';
-        } elseif ($value === DB::NOTNULL) {
-            //null value
-            throw new DBException("Impossible use of NOTNULL");
         } elseif ($value instanceof DBSpecialValue) {
             $result = $value;
         } else {
@@ -1455,7 +1685,7 @@ class DB {
         return $this->colp("show tables");
     }
 
-    public function table_schema($table_name): array {
+    public function tableSchema($table_name): array {
         $rows = $this->arrp("SELECT
              c.column_name as `name`,
              c.data_type as `type`,

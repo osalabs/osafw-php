@@ -27,18 +27,24 @@ class AdminUsersController extends FwAdminController {
 
     //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
 
-    public function ShowFormAction($form_id) {
-        $ps        = parent::ShowFormAction($form_id);
+    public function ShowFormAction($form_id): ?array {
+        $ps = parent::ShowFormAction($form_id);
+        if (!$this->fw->isGetRequest()) {
+            $ps['i']["email"] = $ps['i']["ehack"];
+        }
+
         $att_id    = $ps['i']['att_id'] ?? 0;
         $ps['att'] = Att::i()->one($att_id);
         return $ps;
     }
 
-    public function SaveAction($form_id) {
+    public function SaveAction($form_id): void {
         $this->fw->checkXSS();
 
         $id   = intval($form_id);
         $item = reqh('item');
+
+        $item["email"] = $item["ehack"]; // just because Chrome autofills fields too agressively
 
         try {
             $this->Validate($id, $item);
@@ -65,17 +71,17 @@ class AdminUsersController extends FwAdminController {
         }
     }
 
-    public function Validate($id, $item) {
+    public function Validate($id, $item): void {
         $result = $this->validateRequired($item, $this->required_fields);
 
         //result here used only to disable further validation if required fields validation failed
         if ($result) {
-            if ($this->model->isExists($item['email'], $id)) {
-                $this->setError('email', 'EXISTS');
+            if ($this->model->isExists($item['ehack'], $id)) {
+                $this->setError('ehack', 'EXISTS');
             }
 
-            if (!FormUtils::isEmail($item['email'])) {
-                $this->setError('email', 'WRONG');
+            if (!FormUtils::isEmail($item['ehack'])) {
+                $this->setError('ehack', 'WRONG');
             }
         }
 

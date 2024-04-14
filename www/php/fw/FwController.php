@@ -398,10 +398,12 @@ abstract class FwController {
     //also set global ERR[INVALID] if ERR non-empty, but ERR[REQUIRED] not true
     public function validateCheckResult($result = true) {
         if (isset($this->fw->GLOBAL['ERR']['REQUIRED'])) {
+            logger('validateCheckResult required:', $this->fw->GLOBAL['ERR']);
             $result = false;
         }
 
         if (is_array($this->fw->GLOBAL['ERR']) && !empty($this->fw->GLOBAL['ERR']) && !$this->fw->GLOBAL['ERR']['REQUIRED']) {
+            logger('validateCheckResult invalid:', $this->fw->GLOBAL['ERR']);
             $this->setError('INVALID', true);
             $result = false;
         }
@@ -410,7 +412,7 @@ abstract class FwController {
         }
     }
 
-    public function setFormError($err_msg) {
+    public function setFormError($err_msg): void {
         $this->fw->GLOBAL['err_msg'] = $err_msg;
     }
 

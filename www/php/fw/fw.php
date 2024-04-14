@@ -35,6 +35,7 @@ class fw {
 
     public string $page_layout;
     public bool $is_session = true; #if use session, can be set to false in initRequest to abort session use
+    public bool $is_log_events = true; // can be set temporarly to false to prevent event logging (for batch process for ex)
 
     public static array $LOG_LEVELS = array(
         'OFF'    => 0, #no logging occurs
@@ -835,6 +836,21 @@ class fw {
         list($msg_subj, $msg_body) = preg_split("/\n/", $msg_body, 2);
 
         return $this->sendEmail($to_email, $msg_subj, $msg_body, $options);
+    }
+
+    public function logActivity(string $log_types_icode, string $entity_icode, int $item_id = 0, string $iname = "", array $changed_fields = null): void {
+        if (!$this->is_log_events) {
+            return;
+        }
+
+        $payload = null;
+        if ($changed_fields) {
+            $payload = array(
+                'fields' => $changed_fields
+            );
+        }
+
+        FwActivityLogs::i()->addSimple($log_types_icode, $entity_icode, $item_id, $iname, $payload);
     }
 
     ##########################  STATIC methods

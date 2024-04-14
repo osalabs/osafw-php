@@ -41,14 +41,14 @@ class FormUtils {
      * $itemdb=FormUtils::filter($_POST, 'fname lname address');
      *
      * @param array $form array of fields from posted form (usually $_POST)
-     * @param string|array $names_str_or_arr space separated field names
+     * @param array|string $names_str_or_arr space separated field names
      * @param boolean $is_exists (default true) only values actually exists in input hash returned
      * @return array              filtered fields, if value was array - converted to comma-separated string (for select multiple)
      */
-    public static function filter($form, $names_str_or_arr, $is_exists = true) {
+    public static function filter(array $form, array|string $names_str_or_arr, bool $is_exists = true): array {
         $result = array();
         if (is_array($form)) {
-            $anames = Utils::qw($names);
+            $anames = Utils::qw($names_str_or_arr);
 
             #copy fields
             foreach ($anames as $name) {
