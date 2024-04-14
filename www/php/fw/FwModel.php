@@ -173,7 +173,7 @@ abstract class FwModel {
     }
 
     public function listFields(): array {
-        $rows = $this->db->arr("EXPLAIN " . $this->qTable());
+        $rows = $this->db->arrp("EXPLAIN " . $this->qTable());
         foreach ($rows as $key => $row) {
             #add standard id/name fields
             $rows[$key]['id']    = $row['Field'];
@@ -185,7 +185,7 @@ abstract class FwModel {
 
     # list multiple records by multiple ids
     public function listMulti(array $ids): array {
-        return $this->db->arr("SELECT * from " . $this->qTable() . " where " . $this->db->qident($this->field_id) . $this->db->insql($ids));
+        return $this->db->arrp("SELECT * from " . $this->qTable() . " where " . $this->db->qident($this->field_id) . $this->db->insql($ids));
     }
 
     // add renamed fields For template engine - spaces and special chars replaced With "_" and other normalizations
@@ -268,6 +268,7 @@ abstract class FwModel {
      * return standard list of id,iname for all non-deleted OR wtih specified statuses order by by getOrderBy
      * @param array|null $statuses
      * @return array
+     * @throws DBException
      */
     public function ilist(array $statuses = null): array {
         $where = '';
@@ -281,7 +282,7 @@ abstract class FwModel {
 
         $orderby = $this->field_iname > '' ? $this->db->qident($this->field_iname) : null;
 
-        return $this->db->arr("SELECT * from " . $this->qTable() . " WHERE 1=1 $where ORDER BY $orderby");
+        return $this->db->arrp("SELECT * from " . $this->qTable() . " WHERE 1=1 $where ORDER BY $orderby");
     }
 
     /**
@@ -294,12 +295,12 @@ abstract class FwModel {
             $where .= " WHERE " . $this->db->qident($this->field_status) . "<>127";
         }
 
-        return intval($this->db->value("SELECT count(*) FROM " . $this->qTable() . $where));
+        return intval($this->db->valuep("SELECT count(*) FROM " . $this->qTable() . $where));
     }
 
     //check if item exists for a given iname
     public function isExistsByField($uniq_key, $field, $not_id = null): bool {
-        return $this->db->is_record_exists($this->getTable(), $uniq_key, $field, $not_id);
+        return $this->db->isRecordExists($this->getTable(), $uniq_key, $field, $not_id);
     }
 
     public function isExists($uniq_key, $not_id = null): bool {
@@ -524,7 +525,7 @@ abstract class FwModel {
             $where = " WHERE " . $this->db->qident($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
         }
 
-        return $this->db->arr("SELECT " . $this->db->qident($this->field_id) . " as id, " . $this->db->qident($this->field_iname) . " as iname 
+        return $this->db->arrp("SELECT " . $this->db->qident($this->field_id) . " as id, " . $this->db->qident($this->field_iname) . " as iname 
             FROM " . $this->qTable() .
             " $where ORDER BY " . $this->getOrderBy());
     }
@@ -539,7 +540,7 @@ abstract class FwModel {
             $where = " WHERE " . $this->db->qident($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
         }
 
-        return $this->db->arr("SELECT " . $this->db->qident($this->field_iname) . " as id, " . $this->db->qident($this->field_iname) . " as iname 
+        return $this->db->arrp("SELECT " . $this->db->qident($this->field_iname) . " as id, " . $this->db->qident($this->field_iname) . " as iname 
             FROM " . $this->qTable() .
             " $where ORDER BY " . $this->getOrderBy());
     }

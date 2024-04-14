@@ -16,7 +16,7 @@ class Demos extends FwModel {
     }
 
     public function listSelectOptionsParent(): array {
-        return $this->db->arr("SELECT id, iname FROM {$this->table_name} WHERE parent_id=0 and status<>127 ORDER BY iname");
+        return $this->db->arrp("SELECT id, iname FROM {$this->table_name} WHERE parent_id=0 and status<>127 ORDER BY iname");
     }
 
 }

@@ -19,16 +19,27 @@ class UserLists extends FwModel {
     }
 
     #list for select by entity and for only logged user
-    public function listSelectByEntity($entity) {
-        return $this->db->arr("SELECT id, iname FROM $this->table_name WHERE status=0 and entity=" . $this->db->q($entity) . " and add_users_id=" . $this->fw->userId() . " ORDER BY iname");
+    public function listSelectByEntity($entity): array {
+        $where = [
+            'status'       => 0,
+            'entity'       => $entity,
+            'add_users_id' => $this->fw->userId()
+        ];
+        return $this->db->arr($this->getTable(), $where, 'iname', '', ['id', 'iname']);
     }
 
-    public function listForItem($entity, $item_id) {
-        return $this->db->arr("SELECT t.id, t.iname, " . dbqi($item_id) . " as item_id, ti.id as is_checked FROM $this->table_name t
-                        LEFT OUTER JOIN $this->table_items ti ON (ti.user_lists_id=t.id and ti.item_id=" . dbqi($item_id) . " )
-                        WHERE t.status=0 and t.entity=" . $this->db->q($entity) . "
-                        and t.add_users_id=" . $this->fw->userId() . "
-                        ORDER BY t.iname");
+    public function listForItem($entity, $item_id): array {
+        return $this->db->arrp("SELECT t.id, t.iname, " . dbqi($item_id) . " as item_id, ti.id as is_checked FROM $this->table_name t
+                        LEFT OUTER JOIN $this->table_items ti ON (ti.user_lists_id=t.id and ti.item_id=@item_id )
+                        WHERE t.status=0 and t.entity=@entity
+                        and t.add_users_id=@users_id
+                        ORDER BY t.iname",
+            [
+                'item_id'  => $item_id,
+                'entity'   => $entity,
+                'users_id' => $this->fw->userId()
+
+            ]);
     }
 
     public function delete($id, $is_perm = false): bool {

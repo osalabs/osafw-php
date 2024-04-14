@@ -24,8 +24,8 @@ class Users extends FwModel {
         $this->table_name = 'users';
     }
 
-    public function oneByEmail($email) {
-        return $this->db->row("SELECT * FROM " . $this->table_name . " WHERE email=" . $this->db->quote($email));
+    public function oneByEmail(string $email): array {
+        return $this->db->row($this->getTable(), ['email' => $email]);
     }
 
     public function iname(string|int $id): string {
@@ -46,7 +46,7 @@ class Users extends FwModel {
         }
 
         $sql = "SELECT *, (fname+' '+lname) as iname FROM $this->table_name WHERE status=0 $where ORDER BY fname,lname";
-        return $this->db->arr($sql);
+        return $this->db->arrp($sql);
     }
 
     public function addOrUpdate($login, $pwd, $item) {
@@ -193,11 +193,14 @@ class Users extends FwModel {
         #exit;
 
         if ($cookie_id) {
-            $u_id = $this->db->value("SELECT users_id
-                  FROM user_cookie
-                 WHERE cookie_id=" . $this->db->quote($cookie_id) . "
-                   and add_time>=FROM_DAYS(TO_DAYS(now())-" . self::$PERM_COOKIE_DAYS . ")
-            ");
+            $u_id = $this->db->valuep("SELECT users_id
+                  FROM users_cookie
+                 WHERE cookie_id=@cookie_id
+                   and add_time>=FROM_DAYS(TO_DAYS(now())-@days)
+            ", [
+                'cookie_id' => $cookie_id,
+                'days'      => self::$PERM_COOKIE_DAYS,
+            ]);
 
             if ($u_id > 0) {
                 $result = true;

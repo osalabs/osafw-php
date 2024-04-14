@@ -44,7 +44,7 @@ class DevConfigureController extends FwController {
         $ps['is_db_tables'] = false;
         if ($ps['is_db_conn']) {
             try {
-                $value              = $db->value("select count(*) from user_filters"); #checking last table in a script as first tables might be filled
+                $value              = $db->value('user_filters', [], 'count(*)'); #checking last table in a script as first tables might be filled
                 $ps['is_db_tables'] = true;
             } catch (Exception $e) {
                 $ps['db_tables_err'] = $e->getMessage();

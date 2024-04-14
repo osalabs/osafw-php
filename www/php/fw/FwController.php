@@ -283,7 +283,7 @@ abstract class FwController {
         $hsearch = reqh("search");
         foreach ($hsearch as $fieldname => $value) {
             if ($value > '' && (!$this->is_dynamic_index || array_key_exists($fieldname, $this->view_list_map))) {
-                $this->list_where .= " and " . dbq_ident($fieldname) . " LIKE " . dbq("%" . $value . "%");
+                $this->list_where .= " and " . $this->db->qid($fieldname) . " LIKE " . dbq("%" . $value . "%");
             }
         }
     }
@@ -315,13 +315,13 @@ abstract class FwController {
      * @return string $this->list_pager pager from FormUtils::getPager
      */
     public function getListRows() {
-        $this->list_count = $this->db->value("SELECT count(*) FROM {$this->list_view} WHERE " . $this->list_where);
+        $this->list_count = $this->db->valuep("SELECT count(*) FROM {$this->list_view} WHERE " . $this->list_where);
         if ($this->list_count) {
             $offset = $this->list_filter['pagenum'] * $this->list_filter['pagesize'];
             $limit  = $this->list_filter['pagesize'];
 
             $sql              = "SELECT * FROM {$this->list_view} WHERE {$this->list_where} ORDER BY {$this->list_orderby} LIMIT {$offset}, {$limit}";
-            $this->list_rows  = $this->db->arr($sql);
+            $this->list_rows  = $this->db->arrp($sql);
             $this->list_pager = FormUtils::getPager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
         } else {
             $this->list_rows  = array();

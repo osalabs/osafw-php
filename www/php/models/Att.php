@@ -103,7 +103,7 @@ class Att extends FwModel {
         if (!$id || !$table_name) {
             return array();
         }
-        return $this->db->arr('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name=' . $this->db->quote($table_name) . ' and atl.item_id=' . dbqi($id));
+        return $this->db->arrp('select att.* from att, att_table_link atl where att.id = atl.att_id and atl.table_name=' . $this->db->quote($table_name) . ' and atl.item_id=' . dbqi($id));
     }
 
     //add/update att_table_links
@@ -248,7 +248,7 @@ class Att extends FwModel {
         if ($is_image > -1) {
             $where .= " and a.is_image=" . dbqi($is_image);
         }
-        return $this->db->arr("SELECT a.* " .
+        return $this->db->arrp("SELECT a.* " .
             "  FROM " . $this->att_table_link . " atl, att a " .
             " WHERE atl.table_name=" . dbq($table_name) .
             "   and atl.item_id=" . dbqi($id) .

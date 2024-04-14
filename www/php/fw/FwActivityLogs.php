@@ -245,7 +245,7 @@ class FwActivityLogs extends FwModel {
             $sql .= " and al.add_time > DATEADD(day, " . $this->db->q($since_days) . ", GETDATE())";
         }
 
-        return intval($this->db->value($sql));
+        return intval($this->db->valuep($sql));
     }
 
 

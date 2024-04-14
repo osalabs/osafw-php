@@ -47,7 +47,7 @@ class MainController extends FwController {
         $one["title"] = "Logins per day";
         $one["id"]    = "logins_per_day";
         #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"]       = $this->db->arr("select CAST(el.add_time as date) as idate, CONCAT(MONTH(el.add_time),'/',DAY(el.add_time)) as ilabel, count(*) as ivalue
+        $one["rows"]       = $this->db->arrp("select CAST(el.add_time as date) as idate, CONCAT(MONTH(el.add_time),'/',DAY(el.add_time)) as ilabel, count(*) as ivalue
             from fwevents ev, fwevents_log el
             where ev.icode='login' and el.events_id=ev.id
             group by CAST(el.add_time as date), CONCAT(MONTH(el.add_time),'/',DAY(el.add_time))
@@ -60,7 +60,7 @@ class MainController extends FwController {
         $one["title"] = "Users by Type";
         $one["id"]    = "user_types";
         #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"] = $this->db->arr("select access_level, count(*) as ivalue from users group by access_level order by count(*) desc");
+        $one["rows"] = $this->db->arrp("select access_level, count(*) as ivalue from users group by access_level order by count(*) desc");
         foreach ($one["rows"] as $key => $row) {
             $one["rows"][$key]['ilabel'] = get_selvalue('/common/sel/access_level.sel', $row['access_level']);
         }
@@ -70,7 +70,7 @@ class MainController extends FwController {
         $one["type"]  = "table";
         $one["title"] = "Last Events";
         #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"]    = $this->db->arr("select el.add_time as `On`, ev.iname as `Event` from fwevents ev, fwevents_log el where el.events_id=ev.id order by el.id desc LIMIT 10");
+        $one["rows"]    = $this->db->arrp("select el.add_time as `On`, ev.iname as `Event` from fwevents ev, fwevents_log el where el.events_id=ev.id order by el.id desc LIMIT 10");
         $one["headers"] = array();
         if ($one["rows"]) {
             $fields = array_keys($one["rows"][0]);
@@ -98,7 +98,7 @@ class MainController extends FwController {
         $one["title"] = "Events per day";
         $one["id"]    = "eventsctr";
         #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"]        = $this->db->arr("select CAST(el.add_time as date) as idate, CONCAT(MONTH(el.add_time),'/',DAY(el.add_time)) as ilabel, count(*) as ivalue
+        $one["rows"]        = $this->db->arrp("select CAST(el.add_time as date) as idate, CONCAT(MONTH(el.add_time),'/',DAY(el.add_time)) as ilabel, count(*) as ivalue
             from fwevents ev, fwevents_log el
             where el.events_id=ev.id
             group by CAST(el.add_time as date), CONCAT(MONTH(el.add_time),'/',DAY(el.add_time))

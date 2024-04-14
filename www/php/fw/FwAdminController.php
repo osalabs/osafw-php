@@ -29,7 +29,7 @@ class FwAdminController extends FwController {
         parent::__construct();
 
         //optionally init controller
-        $this->list_view = $this->model->table_name;
+        $this->list_view = $this->model->table_name ?? '';
     }
 
     public function IndexAction() {
