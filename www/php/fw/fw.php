@@ -591,11 +591,12 @@ class fw {
                     parse_json($ps['_json']);
                 }
             } else {
-                #logger("WARN", "JSON response is not enabled for the Controller.Action (set ps[_json]=true to enable).", array($_SERVER, $_REQUEST, $_SESSION));
+                $msg = "JSON response is not enabled for the Controller.Action (set ps[_json]=true to enable).";
+                logger("DEBUG", $msg);
 
                 parse_json(array(
                     'success' => false,
-                    'message' => 'JSON response is not enabled for the Controller.Action (set ps[\"_json\"]=true to enable).',
+                    'message' => $msg,
                 ));
 
             }
@@ -612,6 +613,7 @@ class fw {
 
             if (!array_key_exists('ERR', $ps)) {
                 $ps["ERR"] = $this->GLOBAL['ERR']; #add errors if any
+                logger("DEBUG", "Form errors:", $ps["ERR"]);
             }
 
             logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");

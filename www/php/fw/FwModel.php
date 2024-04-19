@@ -91,7 +91,7 @@ abstract class FwModel {
      * @return string
      */
     public function qTable(): string {
-        return $this->db->qident($this->getTable());
+        return $this->db->qid($this->getTable());
     }
 
     /**
@@ -185,7 +185,7 @@ abstract class FwModel {
 
     # list multiple records by multiple ids
     public function listMulti(array $ids): array {
-        return $this->db->arrp("SELECT * from " . $this->qTable() . " where " . $this->db->qident($this->field_id) . $this->db->insql($ids));
+        return $this->db->arrp("SELECT * from {$this->qTable()} where " . $this->db->qid($this->field_id) . $this->db->insql($ids));
     }
 
     // add renamed fields For template engine - spaces and special chars replaced With "_" and other normalizations
@@ -259,7 +259,7 @@ abstract class FwModel {
     public function getOrderBy(): string {
         $result = $this->field_iname;
         if (strlen($this->field_prio)) {
-            $result = $this->db->qident($this->field_prio) . ", " . $this->db->qident($this->field_iname);
+            $result = $this->db->qid($this->field_prio) . ", " . $this->db->qid($this->field_iname);
         }
         return $result;
     }
@@ -274,15 +274,15 @@ abstract class FwModel {
         $where = '';
         if (strlen($this->field_status)) {
             if ($statuses && count($statuses) > 0) {
-                $where .= " and " . $this->db->qident($this->field_status) . $this->db->insqli($statuses);
+                $where .= " and " . $this->db->qid($this->field_status) . $this->db->insqli($statuses);
             } else {
-                $where .= " and " . $this->db->qident($this->field_status) . ' != ' . dbqi(self::STATUS_DELETED);
+                $where .= " and " . $this->db->qid($this->field_status) . ' != ' . dbqi(self::STATUS_DELETED);
             }
         }
 
-        $orderby = $this->field_iname > '' ? $this->db->qident($this->field_iname) : null;
+        $orderby = $this->field_iname > '' ? $this->db->qid($this->field_iname) : null;
 
-        return $this->db->arrp("SELECT * from " . $this->qTable() . " WHERE 1=1 $where ORDER BY $orderby");
+        return $this->db->arrp("SELECT * from {$this->qTable()} WHERE 1=1 $where ORDER BY $orderby");
     }
 
     /**
@@ -292,7 +292,7 @@ abstract class FwModel {
     public function getCount(): int {
         $where = '';
         if (strlen($this->field_status)) {
-            $where .= " WHERE " . $this->db->qident($this->field_status) . "<>127";
+            $where .= " WHERE " . $this->db->qid($this->field_status) . "<>127";
         }
 
         return intval($this->db->valuep("SELECT count(*) FROM " . $this->qTable() . $where));
@@ -439,8 +439,7 @@ abstract class FwModel {
      * @throws DBException
      */
     public function deleteMulti(array $ids): true {
-        $this->db->exec("DELETE from " . $this->qTable() .
-            " where " . $this->db->qident($this->field_id) . $this->db->insqli($ids));
+        $this->db->exec("DELETE from {$this->qTable()} where " . $this->db->qid($this->field_id) . $this->db->insqli($ids));
 
         foreach ($ids as $id) {
             $this->removeCache($id);
@@ -522,12 +521,11 @@ abstract class FwModel {
     public function listSelectOptions(): array {
         $where = '';
         if (strlen($this->field_status)) {
-            $where = " WHERE " . $this->db->qident($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
+            $where = " WHERE " . $this->db->qid($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
         }
 
-        return $this->db->arrp("SELECT " . $this->db->qident($this->field_id) . " as id, " . $this->db->qident($this->field_iname) . " as iname 
-            FROM " . $this->qTable() .
-            " $where ORDER BY " . $this->getOrderBy());
+        return $this->db->arrp("SELECT " . $this->db->qid($this->field_id) . " as id, " . $this->db->qid($this->field_iname) . " as iname 
+            FROM {$this->qTable()} $where ORDER BY " . $this->getOrderBy());
     }
 
     /**
@@ -537,12 +535,11 @@ abstract class FwModel {
     public function listSelectOptionsName(): array {
         $where = '';
         if (strlen($this->field_status)) {
-            $where = " WHERE " . $this->db->qident($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
+            $where = " WHERE " . $this->db->qid($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
         }
 
-        return $this->db->arrp("SELECT " . $this->db->qident($this->field_iname) . " as id, " . $this->db->qident($this->field_iname) . " as iname 
-            FROM " . $this->qTable() .
-            " $where ORDER BY " . $this->getOrderBy());
+        return $this->db->arrp("SELECT " . $this->db->qid($this->field_iname) . " as id, " . $this->db->qid($this->field_iname) . " as iname 
+            FROM {$this->qTable()} $where ORDER BY " . $this->getOrderBy());
     }
 
     /**
@@ -553,13 +550,13 @@ abstract class FwModel {
      * @throws DBException
      */
     public function listAutocomplete(string $q, int $limit = 5): array {
-        $where = $this->db->qident($this->field_iname) . " like " . $this->db->quote('%' . $q . '%');
+        $where = $this->db->qid($this->field_iname) . " like " . $this->db->quote('%' . $q . '%');
         if (strlen($this->field_status)) {
-            $where .= " and " . $this->db->qident($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
+            $where .= " and " . $this->db->qid($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
         }
 
-        $sql = "SELECT " . $this->db->qident($this->field_iname) . " as iname FROM " . $this->qTable() . " WHERE " . $where . " LIMIT $limit";
-        return $this->db->col($sql);
+        $sql = "SELECT " . $this->db->qid($this->field_iname) . " as iname FROM " . $this->qTable() . " WHERE " . $where . " LIMIT $limit";
+        return $this->db->colp($sql);
     }
 
     //</editor-fold>
@@ -973,15 +970,15 @@ abstract class FwModel {
 
     //<editor-fold desc="support for sortable records">
     public function updatePrioRange(int $inc_value, int $from_prio, int $to_prio): int {
-        $field_prioq = $this->db->qident($this->field_prio);
+        $field_prioq = $this->db->qid($this->field_prio);
         $p           = [
             "inc_value" => $inc_value,
             "from_prio" => $from_prio,
             "to_prio"   => $to_prio,
         ];
-        return $this->db->exec("UPDATE " . $this->db->qident($this->table_name) .
-            " SET " . $field_prioq . "=" . $field_prioq . "+(@inc_value)" .
-            " WHERE " . $field_prioq . " BETWEEN @from_prio AND @to_prio", $p);
+        return $this->db->exec("UPDATE {$this->qTable()}
+             SET {$field_prioq}={$field_prioq}+(@inc_value)
+             WHERE {$field_prioq} BETWEEN @from_prio AND @to_prio", $p);
     }
 
     public function updatePrio(int $id, int $prio): int {

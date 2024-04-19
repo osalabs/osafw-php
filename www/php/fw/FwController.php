@@ -270,7 +270,7 @@ abstract class FwController {
 
         #if related id and field name set - filter on it
         if ($this->related_id > '' && $this->related_field_name) {
-            $this->list_where .= ' and ' . $this->db->quote_ident($this->related_field_name) . '=' . $this->db->quote($this->related_id);
+            $this->list_where .= ' and ' . $this->db->qid($this->related_field_name) . '=' . $this->db->quote($this->related_id);
         }
 
         $this->setListSearchAdvanced();
@@ -301,9 +301,9 @@ abstract class FwController {
                 if ($status == 127 && !Users::i()->isAccessLevel(Users::ACL_ADMIN)) {
                     $status = 0;
                 }
-                $this->list_where .= " and " . $this->db->quote_ident($this->model->field_status) . "=" . $this->db->quote($status);
+                $this->list_where .= " and " . $this->db->qid($this->model->field_status) . "=" . $this->db->quote($status);
             } else {
-                $this->list_where .= " and " . $this->db->quote_ident($this->model->field_status) . "<>127"; #by default - show all non-deleted
+                $this->list_where .= " and " . $this->db->qid($this->model->field_status) . "<>127"; #by default - show all non-deleted
             }
         }
     }

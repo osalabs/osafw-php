@@ -14,52 +14,6 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 (c) 2009-2024 Oleg Savchuk www.osalabs.com
  */
 
-
-//        //and now for each result row with fields - convert fields from Hashtable to ArrayList for ParsePage
-//        foreach (Hashtable row in result)
-//        {
-//            if (!row.ContainsKey("fields"))
-//                continue;
-//
-//            var fields = (Hashtable)row["fields"];
-//            var fields_list = new ArrayList();
-//            foreach (string key in fields.Keys)
-//            {
-//                fields_list.Add(new Hashtable()
-//                    {
-//                        {"key",key},
-//                        {"value",fields[key]}
-//                    });
-//            }
-//            row["fields"] = fields_list;
-//        }
-//
-//        return result;
-//    }
-//
-//    public long getCountByLogIType(int log_itype, IList statuses = null, int? since_days = null)
-//    {
-//        var sql = $@"SELECT count(*)
-//                    from {db.qid(table_name)} al
-//                        INNER JOIN {fw.model<FwLogTypes>().table_name} lt on (lt.id=al.log_types_id)
-//                    where lt.itype=@itype
-//                     and al.status IN (@statuses)
-//            ";
-//        var p = new Hashtable()
-//        {
-//            {"itype", log_itype},
-//            {"statuses", statuses}
-//        };
-//        if (since_days != null)
-//        {
-//            sql += " and al.add_time > DATEADD(day, @since_days, GETDATE())";
-//            p["since_days"] = since_days;
-//        }
-//
-//        return Utils.f2long(db.valuep(sql, p));
-//    }
-//
-//}
 class FwActivityLogs extends FwModel {
     public const string TAB_ALL      = "all";
     public const string TAB_COMMENTS = "comments";
@@ -237,8 +191,8 @@ class FwActivityLogs extends FwModel {
 
     public function getCountByLogIType(int $log_itype, array $statuses = null, int $since_days = null): int {
         $sql = "SELECT count(*) 
-                    from " . $this->db->qident($this->getTable()) . " al 
-                        INNER JOIN " . $this->db->qident(FwLogTypes::i()->getTable()) . " lt on (lt.id=al.log_types_id)
+                    from {$this->qTable()} al 
+                        INNER JOIN {FwLogTypes::i()->qTable()} lt on (lt.id=al.log_types_id)
                     where lt.itype=" . dbqi($log_itype) . "
                      and al.status " . $this->db->insqli($statuses);
         if ($since_days !== null) {
