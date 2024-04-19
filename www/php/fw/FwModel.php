@@ -267,7 +267,7 @@ abstract class FwModel {
     /**
      * return standard list of id,iname for all non-deleted OR wtih specified statuses order by by getOrderBy
      * @param array|null $statuses
-     * @return array
+     * @return array<int, array<string, mixed>>
      * @throws DBException
      */
     public function ilist(array $statuses = null): array {
@@ -288,6 +288,7 @@ abstract class FwModel {
     /**
      * return total count of all non-deleted rows
      * @return int
+     * @throws DBException
      */
     public function getCount(): int {
         $where = '';
@@ -312,6 +313,7 @@ abstract class FwModel {
      * @param array $fields
      * @param int $not_id
      * @return bool
+     * @throws DBException
      */
     public function isExistsByFields(array $fields, int $not_id): bool {
         $where = [];
@@ -357,6 +359,7 @@ abstract class FwModel {
      * @param int $id
      * @param array $item
      * @return bool
+     * @throws DBException
      */
     public function update(int $id, array $item): bool {
         $item_changes = [];
@@ -399,6 +402,7 @@ abstract class FwModel {
      * @param int $id
      * @param bool $is_perm
      * @return bool
+     * @throws DBException
      */
     public function delete(int $id, bool $is_perm = false): bool {
         if ($is_perm || !strlen($this->field_status)) {
@@ -420,7 +424,7 @@ abstract class FwModel {
      * delete record with permanent check
      * @param int $id
      * @return void
-     * @throws NoModelException
+     * @throws NoModelException|DBException
      */
     public function deleteWithPermanentCheck(int $id): void {
         if (Users::i()->isAccessLevel(Users::ACL_ADMIN)
@@ -460,7 +464,7 @@ abstract class FwModel {
         FwCache::remove($cache_key);
 
         if ($this->field_icode > '') {
-            #we need to cleanup all cache keys which might be realted, so cleanup all cached icodes
+            #we need to cleanup all cache keys which might be related, so cleanup all cached icodes
             FwCache::removeWithPrefix($this->cache_prefix_bycode);
         }
     }
@@ -517,6 +521,7 @@ abstract class FwModel {
     /**
      * return db array of id, iname for select options
      * @return array
+     * @throws DBException
      */
     public function listSelectOptions(): array {
         $where = '';
@@ -531,6 +536,7 @@ abstract class FwModel {
     /**
      * similar to listSelectOptions but returns iname/iname
      * @return array
+     * @throws DBException
      */
     public function listSelectOptionsName(): array {
         $where = '';
@@ -586,6 +592,7 @@ abstract class FwModel {
      * @param array|null $def
      * @return array
      * @throws ApplicationException
+     * @throws DBException
      */
     public function listByMainId(int $main_id, array $def = null): array {
         if (empty($this->junction_field_main_id)) {
@@ -600,6 +607,7 @@ abstract class FwModel {
      * @param array|null $def
      * @return array
      * @throws ApplicationException
+     * @throws DBException
      */
     public function listByLinkedId(int $linked_id, array $def = null): array {
         if (empty($this->junction_field_linked_id)) {
@@ -633,7 +641,7 @@ abstract class FwModel {
      * @param int $main_id main table id
      * @param array|null $def in dynamic controller - field definition (also contains "i" and "ps", "lookup_params", ...) or you could use it to pass additional params
      * @return array
-     * @throws ApplicationException
+     * @throws ApplicationException|DBException
      */
     public function listLinkedByMainId(int $main_id, array $def = null): array {
         $linked_rows = $this->listByMainId($main_id, $def);
@@ -666,6 +674,7 @@ abstract class FwModel {
      * @param array|null $def in dynamic controller - field definition (also contains "i" and "ps", "lookup_params", ...) or you could use it to pass additional params
      * @return array
      * @throws ApplicationException
+     * @throws DBException
      */
     public function listMainByLinkedId(int $linked_id, array $def = null): array {
         $linked_rows = $this->listByLinkedId($linked_id, $def);
@@ -734,6 +743,7 @@ abstract class FwModel {
      * @param array|string $hsel_ids array or comma-separated string - selected ids from the list()
      * @param array|null $def def - in dynamic controller - field definition (also contains "i" and "ps", "lookup_params", ...) or you could use it to pass additional params
      * @return array           array of hashtables for templates
+     * @throws DBException
      */
     public function listWithChecked(array|string $hsel_ids, array $def = null): array {
         if (!is_array($hsel_ids)) {
@@ -747,6 +757,7 @@ abstract class FwModel {
      * return array of LINKED ids for the MAIN id in junction table
      * @param int $main_id
      * @return array
+     * @throws DBException
      */
     public function colLinkedIdsByMainId(int $main_id): array {
         return $this->db->col($this->getTable(), [$this->junction_field_main_id => $main_id], $this->junction_field_linked_id);
@@ -756,6 +767,7 @@ abstract class FwModel {
      * return array of MAIN ids for the LINKED id in junction table
      * @param int $linked_id
      * @return array
+     * @throws DBException
      */
     public function colMainIdsByLinkedId(int $linked_id): array {
         return $this->db->col($this->getTable(), [$this->junction_field_linked_id => $linked_id], $this->junction_field_main_id);
@@ -810,6 +822,7 @@ abstract class FwModel {
      * @param string $linked_id_name field name for linked id
      * @param array $linked_keys hashtable with keys as link id (as passed from web)
      * @return void
+     * @throws DBException
      */
     public function updateJunction(string $junction_table_name, int $main_id, string $main_id_name, string $linked_id_name, array $linked_keys): void {
         $fields                  = [];
@@ -857,10 +870,10 @@ abstract class FwModel {
      * @param int $main_id main id
      * @param array $linked_keys hashtable with keys as linked_id (as passed from web)
      * @return void
+     * @throws DBException
      */
     public function updateJunctionByMainId(int $main_id, array $linked_keys): void {
         $fields                  = [];
-        $where                   = [];
         $link_table_field_status = $this->getJunctionFieldStatus();
 
         // set all rows as under update
@@ -905,6 +918,7 @@ abstract class FwModel {
      * @param int $linked_id linked id
      * @param array $main_keys hashtable with keys as main_id (as passed from web)
      * @return void
+     * @throws DBException
      */
     public function updateJunctionByLinkedId(int $linked_id, array $main_keys): void {
         $fields                  = [];
@@ -970,15 +984,15 @@ abstract class FwModel {
 
     //<editor-fold desc="support for sortable records">
     public function updatePrioRange(int $inc_value, int $from_prio, int $to_prio): int {
-        $field_prioq = $this->db->qid($this->field_prio);
+        $qfield_prio = $this->db->qid($this->field_prio);
         $p           = [
             "inc_value" => $inc_value,
             "from_prio" => $from_prio,
             "to_prio"   => $to_prio,
         ];
         return $this->db->exec("UPDATE {$this->qTable()}
-             SET {$field_prioq}={$field_prioq}+(@inc_value)
-             WHERE {$field_prioq} BETWEEN @from_prio AND @to_prio", $p);
+             SET $qfield_prio=$qfield_prio+(@inc_value)
+             WHERE $qfield_prio BETWEEN @from_prio AND @to_prio", $p);
     }
 
     public function updatePrio(int $id, int $prio): int {
@@ -1166,6 +1180,7 @@ abstract class FwModel {
     /**
      * fetch all active records and export to CSV with csv_export_fields and Utils::exportCSV
      * @return void
+     * @throws DBException
      */
     public function exportCSV(): void {
         $where = [];

@@ -202,6 +202,7 @@ function db_valuep(string $sql, array $params = null): ?string {
  * @param array $where array of (field => value) where conditions
  * @param string|null $order_by optional, order string to be added to ORDER BY
  * @return array                   assoc array (has keys as field names and values as field values)
+ * @throws DBException
  */
 function db_row(string $table, array $where, string $order_by = null): array {
     return DB::i()->row($table, $where, $order_by);
@@ -281,11 +282,11 @@ function db_query(string $sql, array $params = null): mysqli_result|bool {
 /**
  * execute query without returning result set. Throws an exception if error occurred.
  * @param string $sql SQL query
- * @param array $params optional, array of params for prepared queries
+ * @param array|null $params optional, array of params for prepared queries
  * @return void
  * @throws DBException
  */
-function db_exec($sql, $params = null): void {
+function db_exec(string $sql, array $params = null): void {
     DB::i()->exec($sql, $params);
 }
 
@@ -444,9 +445,6 @@ class DBOperation {
             case DBOps::NOTLIKE:
                 $this->opstr = "NOT LIKE";
                 break;
-            default:
-                //Throw New ApplicationException("Wrong DB OP")
-                break;
         }
     }
 }
@@ -464,9 +462,9 @@ class DBQueryAndParams {
  * DBSpecialValue class - special values for DB operations like 'NOW()'
  */
 class DBSpecialValue {
-    private $value;
+    private string $value;
 
-    public function __construct($value) {
+    public function __construct(string $value) {
         $this->value = $value;
     }
 
@@ -598,7 +596,7 @@ class DB {
                 #php_network_getaddresses: getaddrinfo failed: Temporary failure in name resolution
                 #Error while reading greeting packet.
                 $last_exception = $e;
-                $this->logger('NOTICE', "Got Exception in connect()", "code=" . $e->getCode() . ", msg=" . $e->getMessage() . ", host=" . $this->config['HOST'], $e);
+                $this->logger('NOTICE', "Got Exception in connect()", "code=" . $e->getCode() . ", msg=" . $e->getMessage() . ", host=" . $this->config['HOST']);
                 if ($e instanceof mysqli_sql_exception) {
                     if ($attempts > 0 && in_array($e->getCode(), [self::ERROR_TOO_MANY_CONNECTIONS, self::ERROR_TOO_MANY_CONNECTIONS_USER, self::ERROR_CANT_CONNECT, self::ERROR_GONE_AWAY])) {
                         // too many connections, connection timed out/no route to host, server has gone away,
@@ -628,7 +626,7 @@ class DB {
         if (!$is_reconnect) {
             try {
                 $is_reconnect = !@$this->dbh->ping(); #we don't need Warning: mysqli::ping(): MySQL server has gone away
-            } catch (mysqli_sql_exception $e) {
+            } catch (mysqli_sql_exception) {
                 //if ping fails - MySQL server has gone away
                 $is_reconnect = true;
             }
@@ -689,7 +687,7 @@ class DB {
                 $last_ex = $ex;
                 $err_msg = $ex->getMessage();
                 if (preg_match("/deadlock/i", $err_msg)) {
-                    $this->logger('NOTICE', "Sleep/retry on deadlock", "attempts left:" . $deadlock_attempts, $err_msg);
+                    $this->logger('NOTICE', "Sleep/retry on deadlock", "attempts left:" . $deadlock_attempts . $err_msg);
                     sleep(rand(self::SLEEP_RETRY_MIN, self::SLEEP_RETRY_MAX)); #if got deadlock - sleep 1-3s before repeat
                 } else {
                     throw $ex;
@@ -740,7 +738,7 @@ class DB {
                             }
                         }
                         if ($actualKey === null) {
-                            throw new Exception("DB->queryInner - Parameter '{$matches[0]}' not found in parameter list.");
+                            throw new Exception("DB->queryInner - Parameter '$matches[0]' not found in parameter list.");
                         }
 
                         $paramValues[] = $params[$actualKey]; // Add the corresponding value to the paramValues array
@@ -895,6 +893,14 @@ class DB {
         return $result;
     }
 
+    /**
+     * read single first row from the table based on conditions/order
+     * @param string $table table name
+     * @param array $where array of (field => value) where conditions
+     * @param string|null $order_by optional, order string to be added to ORDER BY
+     * @return array<string, mixed>
+     * @throws DBException
+     */
     public function row(string $table, array $where, string $order_by = null): array {
         $qp = $this->buildSelect($table, $where, $order_by, 1);
         return $this->rowp($qp->sql, $qp->params);
@@ -904,7 +910,7 @@ class DB {
      * read single first row using parametrized sql query
      * @param string $sql sql query
      * @param array|null $params optional, array of params for prepared queries
-     * @return array
+     * @return array<string, mixed>
      * @throws DBException
      */
     public function rowp(string $sql, array $params = null): array {
@@ -922,7 +928,7 @@ class DB {
      * @param string|null $order_by optional, order string to be added to ORDER BY, field names should be already quoted
      * @param string|null $limit optional, limit string to be added to LIMIT, example: "10" or "10,20" (with offset)
      * @param array|string $select_fields optional, fields to select, default - all fields(*), can be array of unquoted fields or comma-separated already quoted string
-     * @return array
+     * @return array<int, array<string, mixed>>
      * @throws DBException
      */
     public function arr(string $table, array $where, string $order_by = null, string $limit = null, array|string $select_fields = '*'): array {
@@ -937,7 +943,7 @@ class DB {
      * read all rows using parametrized query
      * @param string $sql
      * @param array|null $params
-     * @return array
+     * @return array<int, array<string, mixed>>
      * @throws DBException
      */
     public function arrp(string $sql, array $params = null): array {
@@ -1012,7 +1018,7 @@ class DB {
      */
     public function colp(string $sql, array $params = null): array {
         $res    = $this->query($sql, $params);
-        $result = $res->fetch_all(MYSQLI_NUM);
+        $result = $res->fetch_all();
         $res->free();
         return array_map(fn($v) => $v[0], $result);
     }
@@ -1567,7 +1573,7 @@ class DB {
      * @param array $values array of values
      * @return string        "IN (1,2,3)" sql or IN (NULL) if empty params passed
      */
-    public function insqli($values): string {
+    public function insqli(array $values): string {
         #quote first
         $arr = array();
         foreach ($values as $value) {
@@ -1649,7 +1655,6 @@ class DB {
     public function quote($value, $field_type = ''): string {
         $this->checkConnect();
 
-        $result = '';
         if ($field_type == 'x') {
             $result = $value;
         } elseif ($field_type == 's') {
@@ -1705,7 +1710,7 @@ class DB {
             '@TABLE_SCHEMA' => $this->config['DBNAME'],
             '@TABLE_NAME'   => $table_name
         ]);
-        foreach ($rows as $key => &$row) {
+        foreach ($rows as &$row) {
             $row["internal_type"] = $this->map_sqltype2internal($row["type"]);
         }
         unset($row);
@@ -1714,37 +1719,12 @@ class DB {
     }
 
     public function map_sqltype2internal($type): string {
-        switch (strtolower($type)) {
-            #TODO - unsupported: image, varbinary
-            case "tinyint":
-            case "smallint":
-            case "int":
-            case "bigint":
-            case "bit":
-                $result = "int";
-                break;
-
-            case "real":
-            case "numeric":
-            case "decimal":
-            case "money":
-            case "smallmoney":
-            case "float":
-                $result = "float";
-                break;
-
-            case "datetime":
-            case "datetime2":
-            case "date":
-            case "smalldatetime":
-                $result = "datetime";
-                break;
-
-            default: #"text", "ntext", "varchar", "nvarchar", "char", "nchar"
-                $result = "varchar";
-                break;
-        }
-        return $result;
+        return match (strtolower($type)) {
+            "tinyint", "smallint", "int", "bigint", "bit" => "int",
+            "real", "numeric", "decimal", "money", "smallmoney", "float" => "float",
+            "datetime", "datetime2", "date", "smalldatetime" => "datetime",
+            default => "varchar",
+        };
     }
 
     /**
