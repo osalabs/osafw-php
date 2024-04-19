@@ -28,7 +28,7 @@ class Users extends FwModel {
         return $this->db->row($this->getTable(), ['email' => $email]);
     }
 
-    public function iname(string|int $id): string {
+    public function iname(string|int|null $id): string {
         $result = '';
         $item   = $this->one($id);
         if ($item) {

@@ -123,7 +123,7 @@ abstract class FwModel {
 
     //cached, pass $is_force=true to force read from db
     // Note: use removeCache($id) if you need force re-read!
-    public function one(string|int $id): array {
+    public function one(string|int|null $id): array {
         if (empty($id)) {
             return []; #return empty array for empty id
         }
@@ -204,7 +204,7 @@ abstract class FwModel {
         }
     }
 
-    public function iname(string|int $id): string {
+    public function iname(string|int|null $id): string {
         $row = $this->one($id);
         return $row[$this->field_iname];
     }
@@ -520,10 +520,11 @@ abstract class FwModel {
 
     /**
      * return db array of id, iname for select options
+     * @param array|null $def in dynamic controller - field definition (also contains "i" and "ps", "lookup_params", ...) or you could use it to pass additional params
      * @return array
      * @throws DBException
      */
-    public function listSelectOptions(): array {
+    public function listSelectOptions(array $def = null): array {
         $where = '';
         if (strlen($this->field_status)) {
             $where = " WHERE " . $this->db->qid($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);

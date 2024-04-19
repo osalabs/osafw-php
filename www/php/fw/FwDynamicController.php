@@ -111,10 +111,10 @@ class FwDynamicController extends FwController {
             'related_id' => $this->related_id,
         );
         if ($this->model->field_add_users_id) {
-            $ps['add_users_id_name'] = Users::i()->iname($item['add_users_id']);
+            $ps['add_users_id_name'] = Users::i()->iname($item['add_users_id'] ?? 0);
         }
         if ($this->model->field_upd_users_id) {
-            $ps['upd_users_id_name'] = Users::i()->iname($item['upd_users_id']);
+            $ps['upd_users_id_name'] = Users::i()->iname($item['upd_users_id'] ?? 0);
         }
 
         if ($this->is_dynamic_showform) {
@@ -381,7 +381,7 @@ class FwDynamicController extends FwController {
 
             } elseif ($dtype == "multi") {
                 #complex field
-                $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($item[$field], $def["lookup_params"]);
+                $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($item[$field], $def);
 
             } elseif ($dtype == "att") {
                 $def["att"] = Att::i()->one($item[$field]);
@@ -444,18 +444,19 @@ class FwDynamicController extends FwController {
      * @param array $ps for parsepage
      * @return array       array of hashtables to build fields in templates
      */
-    public function prepareShowFormFields($item, $ps) {
-        $id = intval($item['id']);
+    public function prepareShowFormFields(array $item, array $ps): array {
+        $id = intval($item['id'] ?? 0);
 
         $fields = $this->config["showform_fields"];
         if (!$fields) {
             throw new ApplicationException("Controller config.json doesn't contain 'showform_fields'");
         }
         foreach ($fields as &$def) {
-            $def['i']  = $item;  #ref to item
-            $def['ps'] = $ps;   #ref to whole ps
-            $dtype     = $def["type"]; #type is required
-            $field     = $def["field"];
+            $def['i']    = $item;  #ref to item
+            $def['ps']   = $ps;   #ref to whole ps
+            $dtype       = $def["type"]; #type is required
+            $field       = $def["field"] ?? '';
+            $field_value = $item[$field] ?? '';
 
             if ($dtype == "row" || $dtype == "row_end" || $dtype == "col" || $dtype == "col_end") {
                 #structural tags
@@ -463,15 +464,16 @@ class FwDynamicController extends FwController {
 
             } elseif ($dtype == "multicb") {
                 #complex field
-                $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($item[$field], $def["lookup_params"]);
+                logger($def);
+                $def["multi_datarow"] = fw::model($def["lookup_model"] ?? '')->listWithChecked($field_value, $def);
                 foreach ($def["multi_datarow"] as &$row) {
                     $row["field"] = $def["field"];
                 }
                 unset($row);
 
             } elseif ($dtype == "att_edit") {
-                $def["att"]   = Att::i()->one($item[$field]);
-                $def["value"] = $item[$field];
+                $def["att"]   = Att::i()->one($field_value);
+                $def["value"] = $field_value;
 
             } elseif ($dtype == "att_links_edit") {
                 $def["att_links"] = Att::i()->getAllLinked($this->model->table_name, $id);
@@ -491,31 +493,31 @@ class FwDynamicController extends FwController {
                         $lookup_field = "iname";
                     }
 
-                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $item[$field]));
+                    $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $field_value));
                     $def["value"]      = $def["lookup_row"][$lookup_field];
 
                 } elseif (array_key_exists('lookup_model', $def)) {
                     if (array_key_exists('lookup_field', $def)) {
                         #lookup value
-                        $def["lookup_row"] = fw::model($def["lookup_model"])->one($item[$field]);
-                        $def["value"]      = $def["lookup_row"][$def["lookup_field"]];
+                        $def["lookup_row"] = fw::model($def["lookup_model"])->one($field_value);
+                        $def["value"]      = $def["lookup_row"][$def["lookup_field"]] ?? '';
                     } else {
                         #lookup select
-                        $def["select_options"] = fw::model($def["lookup_model"])->listSelectOptions($def['lookup_params']);
-                        $def["value"]          = $item[$field];
+                        $def["select_options"] = fw::model($def["lookup_model"])->listSelectOptions($def['lookup_params'] ?? null);
+                        $def["value"]          = $field_value;
                     }
 
                 } elseif (array_key_exists('lookup_tpl', $def)) {
-                    $def['select_options'] = FormUtils::selectTplOptions($def['lookup_tpl'], $item[$field]);
-                    $def["value"]          = $item[$field];
+                    $def['select_options'] = FormUtils::selectTplOptions($def['lookup_tpl'], $field_value);
+                    $def["value"]          = $field_value;
                     foreach ($def['select_options'] as &$row) { #contains id, iname
-                        $row["is_inline"] = $def["is_inline"];
+                        $row["is_inline"] = $def["is_inline"] ?? false;
                         $row["field"]     = $def["field"];
-                        $row["value"]     = $item["field"];
+                        $row["value"]     = $item["field"] ?? '';
                     }
                     unset($row);
                 } else {
-                    $def["value"] = $item[$field];
+                    $def["value"] = $field_value;
                 }
             }
 
