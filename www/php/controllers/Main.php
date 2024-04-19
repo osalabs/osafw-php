@@ -42,16 +42,18 @@ class MainController extends FwController {
         $one["value"]    = Demos::i()->getCount();
         $panes['plate4'] = $one;
 
-        $one          = array();
-        $one["type"]  = "barchart";
-        $one["title"] = "Logins per day";
-        $one["id"]    = "logins_per_day";
-        #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"]       = $this->db->arrp("select CAST(el.add_time as date) as idate, CONCAT(MONTH(el.add_time),'/',DAY(el.add_time)) as ilabel, count(*) as ivalue
-            from fwevents ev, fwevents_log el
-            where ev.icode='login' and el.events_id=ev.id
-            group by CAST(el.add_time as date), CONCAT(MONTH(el.add_time),'/',DAY(el.add_time))
-            order by CAST(el.add_time as date) desc
+        $one               = array();
+        $one["type"]       = "barchart";
+        $one["title"]      = "Logins per day";
+        $one["id"]         = "logins_per_day";
+        $one["rows"]       = $this->db->arrp("select 
+                CAST(al.add_time as date) as idate
+                , CONCAT(MONTH(al.add_time),'/',DAY(al.add_time)) as ilabel
+                , count(*) as ivalue
+            from activity_logs al, log_types lt
+            where lt.icode='login' and al.log_types_id=lt.id
+            group by CAST(al.add_time as date), CONCAT(MONTH(al.add_time),'/',DAY(al.add_time))
+            order by CAST(al.add_time as date) desc
             LIMIT 14");
         $panes['barchart'] = $one;
 
@@ -70,7 +72,14 @@ class MainController extends FwController {
         $one["type"]  = "table";
         $one["title"] = "Last Events";
         #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"]    = $this->db->arrp("select el.add_time as `On`, ev.iname as `Event` from fwevents ev, fwevents_log el where el.events_id=ev.id order by el.id desc LIMIT 10");
+        $one["rows"]    = $this->db->arrp("select 
+            al.add_time as `On`
+            , lt.iname as `Event`
+            , u.fname as `User` 
+            from activity_logs al, log_types lt, users u 
+            where al.log_types_id=lt.id and al.add_users_id=u.id 
+            order by al.id desc 
+            LIMIT 10");
         $one["headers"] = array();
         if ($one["rows"]) {
             $fields = array_keys($one["rows"][0]);
@@ -98,11 +107,11 @@ class MainController extends FwController {
         $one["title"] = "Events per day";
         $one["id"]    = "eventsctr";
         #$one["url"] = "/Admin/Reports/sample";
-        $one["rows"]        = $this->db->arrp("select CAST(el.add_time as date) as idate, CONCAT(MONTH(el.add_time),'/',DAY(el.add_time)) as ilabel, count(*) as ivalue
-            from fwevents ev, fwevents_log el
-            where el.events_id=ev.id
-            group by CAST(el.add_time as date), CONCAT(MONTH(el.add_time),'/',DAY(el.add_time))
-            order by CAST(el.add_time as date) desc
+        $one["rows"]        = $this->db->arrp("select CAST(al.add_time as date) as idate, CONCAT(MONTH(al.add_time),'/',DAY(al.add_time)) as ilabel, count(*) as ivalue
+            from activity_logs al, log_types lt
+            where al.log_types_id=lt.id
+            group by CAST(al.add_time as date), CONCAT(MONTH(al.add_time),'/',DAY(al.add_time))
+            order by CAST(al.add_time as date) desc
             LIMIT 14");
         $panes['linechart'] = $one;
 

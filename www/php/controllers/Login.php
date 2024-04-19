@@ -79,7 +79,7 @@ class LoginController extends FwController {
     }
 
     public function LogoffAction() {
-        FwEvents::i()->log('logoff', $this->fw->userId());
+        $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGOFF, FwEntities::ICODE_USERS, $this->fw->userId());
 
         @session_start();
         //delete session

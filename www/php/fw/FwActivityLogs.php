@@ -64,7 +64,7 @@ class FwActivityLogs extends FwModel {
      * @param int $id - entity item id
      * @param array|null $log_types_icodes - optional list of log types(by icode) to filter on
      * @return array
-     * @throws NoModelException
+     * @throws NoModelException|DBException
      */
     public function listByEntity(string $entity_icode, int $id, array $log_types_icodes = null): array {
         $fwentities_id = FwEntities::i()->idByIcodeOrAdd($entity_icode);

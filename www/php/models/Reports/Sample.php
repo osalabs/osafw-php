@@ -24,6 +24,8 @@ class ReportSample extends Reports {
     public function getReportData($value = '') {
         $ps = array();
 
+        $list_orderby = 'el.id desc'; #TODO setListSorting
+
         #apply filters from Me.f
         $where        = ' ';
         $where_params = [];
@@ -37,14 +39,25 @@ class ReportSample extends Reports {
         }
 
         #define query
-        $evmodel     = FwEvents::i();
-        $sql         = "SELECT el.*, e.iname as event_name, u.fname, u.lname, 1 as ctr
-                  FROM $evmodel->table_name e, $evmodel->log_table_name el
-                       LEFT OUTER JOIN users u ON (u.id=el.add_users_id)
-                 WHERE el.events_id=e.id
-                   $where
-                ORDER by el.id desc
-                LIMIT 50 ";
+        #REMEMBER to filter out deleted items for each table, i.e. add call andNotDeleted([alias])
+        $qactivity_logs = FwActivityLogs::i()->qTable();
+        $qlog_types     = FwLogTypes::i()->qTable();
+        $qfwentities    = FwEntities::i()->qTable();
+        $qusers         = Users::i()->qTable();
+        $sql            = "select al.*
+                , lt.iname as event_name
+                , et.iname as entity_name
+                , u.fname
+                , u.lname
+                from $qactivity_logs al
+                     INNER JOIN $qlog_types lt ON (lt.id=al.log_types_id)
+                     INNER JOIN $qfwentities et ON (et.id=al.fwentities_id)
+                     LEFT OUTER JOIN $qusers u ON (u.id=al.add_users_id " . $this->andNotDeleted("u.") . ")
+                where 1=1
+                $where
+                order by $list_orderby
+                LIMIT 50";
+
         $ps['rows']  = $this->db->arrp($sql, $where_params);
         $ps['count'] = count($ps['rows']);
 

@@ -114,7 +114,7 @@ class Users extends FwModel {
         $_SESSION['is_just_registered'] = $is_just_registered;
         session_write_close();
 
-        FwEvents::i()->log('login', $id);
+        $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGIN, FwEntities::ICODE_USERS, $id);
 
         //set permanent login if requested
         //if ($_REQUEST['is_remember']) createPermCookie($id);

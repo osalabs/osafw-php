@@ -51,29 +51,29 @@ class UserLists extends FwModel {
         return parent::delete($id, $is_perm);
     }
 
-    public function oneItemsByUK($user_lists_id, $item_id) {
+    public function oneItemsByUK($user_lists_id, $item_id): array {
         return $this->db->row($this->table_items, array("user_lists_id" => $user_lists_id, "item_id" => $item_id));
     }
 
     public function deleteItems($id): void {
         $this->db->delete($this->table_items, ['id' => $id]);
-        FwEvents::i()->log($this->table_items . '_del', $id);
+        $this->fw->logActivity(FwLogTypes::ICODE_DELETED, $this->table_items, $id);
     }
 
     #add new record and return new record id
-    public function addItems($user_lists_id, $item_id) {
+    public function addItems($user_lists_id, $item_id): int {
         $item = array(
             "user_lists_id" => $user_lists_id,
             "item_id"       => $item_id,
             "add_users_id"  => $this->fw->userId()
         );
         $id   = $this->db->insert($this->table_items, $item);
-        FwEvents::i()->log($this->table_items . '_add', $id);
+        $this->fw->logActivity(FwLogTypes::ICODE_ADDED, $this->table_items, $id);
         return $id;
     }
 
     #add or remove item from the list
-    public function toggleItemList($user_lists_id, $item_id) {
+    public function toggleItemList($user_lists_id, $item_id): bool {
         $result = false;
         $litem  = $this->oneItemsByUK($user_lists_id, $item_id);
         if ($litem) {

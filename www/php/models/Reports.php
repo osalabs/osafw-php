@@ -50,12 +50,14 @@ class Reports extends FwModel {
      */
     public function createInstance($repcode, $f) {
         $report_class_name = $this->repcodeToClass($repcode);
-        if (!$report_class_name)
+        if (!$report_class_name) {
             throw new ApplicationException('Wrong Report Code');
+        }
 
         $class_file = dirname(__FILE__) . '/Reports/' . $report_class_name . '.php';
-        if (!file_exists($class_file))
+        if (!file_exists($class_file)) {
             throw new ApplicationException('No Report Class found for the Report Code');
+        }
 
         require_once($class_file);
 
@@ -219,6 +221,15 @@ class Reports extends FwModel {
             unset($row);
         }
         return $total_ctr;
+    }
+
+    /**
+     * add " and status<>127" to reports where
+     * @param string $alias table alias with a dot, example: "t."
+     * @return string
+     */
+    protected function andNotDeleted(string $alias = ""): string {
+        return " and {$alias}status<>" . dbqi(FwModel::STATUS_DELETED);
     }
 
 }
