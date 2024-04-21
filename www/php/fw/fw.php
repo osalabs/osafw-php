@@ -20,6 +20,30 @@ if (PHP_SAPI !== 'cli') {
 }
 
 class fw {
+    //controller standard actions
+    public const string ACTION_SUFFIX        = "Action";
+    public const string ACTION_INDEX         = "Index";
+    public const string ACTION_SHOW          = "Show";
+    public const string ACTION_SHOW_FORM     = "ShowForm";
+    public const string ACTION_SHOW_FORM_NEW = "New"; // not actual action, just a const
+    public const string ACTION_SAVE          = "Save";
+    public const string ACTION_SAVE_MULTI    = "SaveMulti";
+    public const string ACTION_SHOW_DELETE   = "ShowDelete";
+    public const string ACTION_DELETE        = "Delete";
+    //additional actions used across controllers
+    public const string ACTION_DELETE_RESTORE  = "RestoreDeleted";
+    public const string ACTION_NEXT            = "Next"; // prev/next on view/edit forms
+    public const string ACTION_AUTOCOMPLETE    = "Autocomplete"; // autocomplete json
+    public const string ACTION_USER_VIEWS      = "UserViews"; // custom user views modal
+    public const string ACTION_SAVE_USER_VIEWS = "SaveUserViews"; // custom user views sacve changes
+    public const string ACTION_SAVE_SORT       = "SaveSort"; // sort rows on list screen
+
+    //helpers for route.action_more
+    public const string ACTION_MORE_NEW    = "new";
+    public const string ACTION_MORE_EDIT   = "edit";
+    public const string ACTION_MORE_DELETE = "delete";
+
+
     public static ?self $instance = null;
     public static float $start_time;
 
@@ -613,7 +637,9 @@ class fw {
 
             if (!array_key_exists('ERR', $ps)) {
                 $ps["ERR"] = $this->GLOBAL['ERR']; #add errors if any
-                logger("DEBUG", "Form errors:", $ps["ERR"]);
+                if (!empty($ps["ERR"])) {
+                    logger("DEBUG", "Form errors:", $ps["ERR"]);
+                }
             }
 
             logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");

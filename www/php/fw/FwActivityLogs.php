@@ -190,17 +190,23 @@ class FwActivityLogs extends FwModel {
     }
 
     public function getCountByLogIType(int $log_itype, array $statuses = null, int $since_days = null): int {
-        $sql = "SELECT count(*) 
+        $logtypes = FwLogTypes::i()->qTable();
+        $sql      = "SELECT count(*) 
                     from {$this->qTable()} al 
-                        INNER JOIN {FwLogTypes::i()->qTable()} lt on (lt.id=al.log_types_id)
-                    where lt.itype=" . dbqi($log_itype) . "
-                     and al.status " . $this->db->insqli($statuses);
+                        INNER JOIN $logtypes lt on (lt.id=al.log_types_id)
+                    where lt.itype=@itype
+                     and al.status IN (@statuses)";
+        $params   = [
+            "itype"    => $log_itype,
+            "statuses" => $statuses
+        ];
+
         if ($since_days !== null) {
-            $sql .= " and al.add_time > DATEADD(day, " . $this->db->q($since_days) . ", GETDATE())";
+            $sql                  .= " and al.add_time > DATE_SUB(NOW(), INTERVAL @since_days DAY)";
+            $params["since_days"] = $since_days;
         }
 
-        return intval($this->db->valuep($sql));
+        return intval($this->db->valuep($sql, $params));
     }
-
 
 }

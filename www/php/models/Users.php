@@ -6,6 +6,13 @@
  (c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
+#if using Roles - UNCOMMENT
+#require_once dirname(__FILE__) . "/Roles/Permissions.php";
+#require_once dirname(__FILE__) . "/Roles/Resources.php";
+#require_once dirname(__FILE__) . "/Roles/Roles.php";
+#require_once dirname(__FILE__) . "/Roles/RolesResourcesPermissions.php";
+#require_once dirname(__FILE__) . "/Roles/UsersRoles.php";
+
 class Users extends FwModel {
     public const ACL_SITE_ADMIN = 100;
     public const ACL_ADMIN      = 90;
@@ -173,7 +180,7 @@ class Users extends FwModel {
     }
 
     # check for permanent login cookie and if it's present - doLogin
-    public function checkPermanentLogin() {
+    public function checkPermanentLogin(): bool {
         $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
 
         $result = false;
@@ -185,7 +192,7 @@ class Users extends FwModel {
 
         if ($cookie_id) {
             $u_id = $this->db->valuep("SELECT users_id
-                  FROM users_cookie
+                  FROM users_cookies
                  WHERE cookie_id=@cookie_id
                    and add_time>=FROM_DAYS(TO_DAYS(now())-@days)
             ", [
@@ -218,13 +225,15 @@ class Users extends FwModel {
 
     }
 
+    //<editor-fold defaultstate="collapsed" desc="Access Control">
+
     #check access for "exact" level
-    public function isAccessExact($acl) {
+    public function isAccessExact($acl): bool {
         $req_level = intval($acl);
         return $this->fw->userAccessLevel() == $req_level;
     }
 
-    public function checkAccessExact($acl, $is_die = true) {
+    public function checkAccessExact($acl, $is_die = true): bool {
         $result = $this->isAccessExact($acl);
         if (!$result && $is_die) {
             throw new AuthException("Access Denied");
@@ -232,11 +241,22 @@ class Users extends FwModel {
         return $result;
     }
 
-    #check access for "at least" level
+    /**
+     * return true if currently logged user has at least minimum requested access level
+     * @param int $req_level
+     * @return bool
+     */
     public function isAccessLevel(int $req_level): bool {
         return $this->fw->userAccessLevel() >= $req_level;
     }
 
+    /**
+     * if currently logged user has at least minimum requested access level.
+     * @param int $req_level
+     * @param bool $is_die
+     * @return bool
+     * @throws AuthException if user's acl is not enough
+     */
     public function checkAccessLevel(int $req_level, bool $is_die = true): bool {
         $result = $this->isAccessLevel($req_level);
         if (!$result && $is_die) {
@@ -246,12 +266,47 @@ class Users extends FwModel {
     }
 
     /**
+     * return true if user is ReadOnly user
+     * @param int $id optional, if not passed - currently logged user checked
+     * @return bool
+     */
+    public function isReadOnly(int $id = -1): bool {
+        $result = false;
+        if ($id == -1) {
+            $id = $this->fw->userId();
+        }
+
+        if ($id <= 0) {
+            return true; //if no user logged - readonly
+        }
+
+        $user = $this->one($id);
+        if ($user["is_readonly"]) {
+            $result = true;
+        }
+
+        return $result;
+    }
+
+    /**
+     * check if logged user is readonly, if yes - throws AuthEception
+     * @param int $id optional, if not passed - currently logged user checked
+     * @return void
+     * @throws AuthException
+     */
+    public function checkReadOnly(int $id = -1): void {
+        if ($this->isReadOnly($id)) {
+            throw new AuthException();
+        }
+    }
+
+    /**
      * return sql for limiting access according to current user ACL
      * @param string $alias optional, add_users_id field alias with dot. Example: 'c.'. If not provided - no alias used
      * @param string $field optional, add_users_id field name
      * @return string        sql query string like " and add_users_id=".$this->fw->userId()
      */
-    public function sql_acl($alias = '', $field = '') {
+    public function sqlACL(string $alias = '', string $field = ''): string {
         $result = '';
         if (self::isAccessLevel(self::ACL_SITE_ADMIN)) {
             //if we are admin user - allow access to all records
@@ -265,5 +320,123 @@ class Users extends FwModel {
         }
         return $result;
     }
+
+    /**
+     * return true if roles support enabled
+     * @return bool
+     */
+    public function isRoles(): bool {
+        return false; #change to true if roles enabled
+    }
+
+    /**
+     * check if currently logged user roles has access to controller/action
+     * @param int $users_id - usually currently logged user - fw.userId
+     * @param string $resource_icode - resource code like controller name 'AdminUsers'
+     * @param string $resource_action - resource action like controller's action 'Index' or ''
+     * @param string $resource_action_more - optional additional action string, usually route.action_more to help distinguish sub-actions
+     * @param array|null $access_actions_to_permissions - optional list of permissions to override for the action
+     * @return bool
+     * @throws ApplicationException|DBException|NoModelException
+     */
+    public function isAccessByRolesResourceAction(int $users_id, string $resource_icode, string $resource_action, string $resource_action_more = "", array $access_actions_to_permissions = null): bool {
+        if ($this->isRoles()) {
+            // determine permission by resource action
+            $permission_icode = Permissions::i()->mapActionToPermission($resource_action, $resource_action_more);
+
+            if ($access_actions_to_permissions) {
+                //check if we have controller's permission's override for the action
+                if (array_key_exists($permission_icode, $access_actions_to_permissions)) {
+                    $permission_icode = $access_actions_to_permissions[$permission_icode];
+                }
+            }
+
+            $result = $this->isAccessByRolesResourcePermission($users_id, $resource_icode, $permission_icode);
+            if (!$result) {
+                logger('DEBUG', "Access by Roles denied", [
+                    "resource_icode"                => $resource_icode,
+                    "resource_action"               => $resource_action,
+                    "resource_action_more"          => $resource_action_more,
+                    "permission_icode"              => $permission_icode,
+                    "access_actions_to_permissions" => $access_actions_to_permissions,
+                ]);
+            }
+        } else {
+            $result = true; //if no Roles support - always allow
+        }
+        return $result;
+    }
+
+    /**
+     * check if currently logged user roles has access to resource with specific permission
+     * @param int $users_id
+     * @param string $resource_icode
+     * @param string $permission_icode
+     * @return bool
+     * @throws ApplicationException|DBException|NoModelException
+     */
+    public function isAccessByRolesResourcePermission(int $users_id, string $resource_icode, string $permission_icode): bool {
+        if ($this->isRoles()) {
+            // read resource id
+            $resource = Resources::i()->oneByIcode($resource_icode);
+            if (empty($resource)) {
+                return false; //if no resource defined - access denied
+            }
+            $resources_id = intval($resource["id"]);
+
+            $permission = Permissions::i()->oneByIcode($permission_icode);
+            if (empty($permission)) {
+                return false; //if no permission defined - access denied
+            }
+            $permissions_id = intval($permission["id"]);
+
+            // read all roles for user
+            $roles_ids = UsersRoles::i()->colLinkedIdsByMainId($users_id);
+
+            // check if any of user's roles has access to resource/permission
+            $result = RolesResourcesPermissions::i()->isExistsByResourcePermissionRoles($resources_id, $permissions_id, $roles_ids);
+            if (!$result) {
+                logger('DEBUG', "Access by Roles denied", [
+                    "resource_icode"   => $resource_icode,
+                    "permission_icode" => $permission_icode,
+                    "resources_id"     => $resources_id,
+                    "permissions_id"   => $permissions_id,
+                    "roles_ids"        => $roles_ids,
+                ]);
+            }
+        } else {
+            $result = true; //if no Roles support - always allow
+        }
+        return $result;
+    }
+
+    /**
+     * shortcut to avoid calling UsersRoles directly
+     * @param int $users_id
+     * @return array
+     * @throws ApplicationException|DBException|NoModelException
+     */
+    public function listLinkedRoles(int $users_id): array {
+        if ($this->isRoles()) {
+            return UsersRoles::i()->listLinkedByMainId($users_id);
+        } else {
+            return [];
+        }
+    }
+
+    /**
+     * shortcut to avoid calling UsersRoles directly
+     * @param int $users_id
+     * @param array $linked_keys
+     * @return void
+     * @throws DBException|NoModelException
+     */
+    public function updateLinkedRoles(int $users_id, array $linked_keys): void {
+        if ($this->isRoles()) {
+            UsersRoles::i()->updateJunctionByMainId($users_id, $linked_keys);
+        }
+    }
+
+    //</editor-fold>
 
 }

@@ -34,7 +34,8 @@ abstract class FwController {
     //not overridable
     public $fw; //current app/framework object
     public $model; //default model for the controller
-    protected $config = array();        // controller config, loaded from template dir/config.json
+    protected array $config = [];        // controller config, loaded from template dir/config.json
+    protected array $access_actions_to_permissions = []; // optional, controller-level custom actions to permissions mapping for role-based access checks, e.g. "UIMain" => Permissions.PERMISSION_VIEW . Can also be used to override default actions to permissions
     public $list_view; // table or view name to selecte from for the list screen
     public $list_orderby; // orderby for the list screen
     public $list_filter; // filter values for the list screen
@@ -498,6 +499,40 @@ abstract class FwController {
         }
     }
 
+    /*
+     *     // called before each controller action (init() already called), check access to current fw.route
+        // throw exception if no access
+        public virtual void checkAccess()
+        {
+            //var id = fw.route.id;
+
+            // if user is logged and not SiteAdmin(can access everything)
+            // and user's access level is enough for the controller - check access by roles (if enabled)
+            int current_user_level = fw.userAccessLevel;
+            if (current_user_level > Users.ACL_VISITOR && current_user_level < Users.ACL_SITEADMIN)
+            {
+                if (!fw.model<Users>().isAccessByRolesResourceAction(fw.userId, fw.route.controller, fw.route.action, fw.route.action_more, access_actions_to_permissions))
+                    throw new AuthException("Bad access - Not authorized (3)");
+            }
+        }
+
+     * */
+
+    /**
+     * called before each controller action (init() already called), check access to current fw.route
+     * @return void
+     * @throws AuthException|NoModelException if no access
+     */
+    public function checkAccess(): void {
+        // if user is logged and not SiteAdmin(can access everything)
+        // and user's access level is enough for the controller - check access by roles (if enabled)
+        $current_user_level = $this->fw->userAccessLevel();
+        if ($current_user_level > Users::ACL_VISITOR && $current_user_level < Users::ACL_SITE_ADMIN) {
+            if (!Users::i()->isAccessByRolesResourceAction($this->fw->userId(), $this->fw->route->controller, $this->fw->route->action, $this->fw->route->action_more, $this->access_actions_to_permissions)) {
+                throw new AuthException("Bad access - Not authorized (3)");
+            }
+        }
+    }
 
     ######################### dynamic controller support
 

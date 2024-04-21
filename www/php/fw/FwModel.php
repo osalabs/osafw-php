@@ -26,6 +26,7 @@ abstract class FwModel {
     # default field names. If you override it and make empty - automatic processing disabled
     public string $field_status = 'status';
     public string $field_add_users_id = 'add_users_id';
+    public string $field_add_time = 'add_time'; #add_time, usually no need as it's updated automatically by DB via "DEFAULT CURRENT_TIMESTAMP"
     public string $field_upd_users_id = 'upd_users_id';
     public string $field_upd_time = ''; #upd_time, usually no need as it's updated automatically by DB via "ON UPDATE CURRENT_TIMESTAMP"
     public string $field_prio = '';
@@ -286,17 +287,30 @@ abstract class FwModel {
     }
 
     /**
-     * return total count of all non-deleted rows
+     * return total count of all non-deleted rows or with specified statuses
+     * @param array|null $statuses
+     * @param int|null $since_days
      * @return int
      * @throws DBException
      */
-    public function getCount(): int {
-        $where = '';
+    public function getCount(array $statuses = null, ?int $since_days = null): int {
+        $where = [];
         if (strlen($this->field_status)) {
-            $where .= " WHERE " . $this->db->qid($this->field_status) . "<>127";
+            if ($statuses) {
+                $where[$this->field_status] = $this->db->opIN($statuses);
+            } else {
+                $where[$this->field_status] = $this->db->opNOT(self::STATUS_DELETED);
+            }
+        }
+        if (strlen($this->field_add_time) && !is_null($since_days)) {
+            $dt = new DateTime();
+            //$dt->sub(new DateInterval("P{$since_days}D")); - this produces "Unknown or bad format (P-7D)"
+            $dt->modify("-$since_days days");
+
+            $where[$this->field_add_time] = $this->db->opGT($dt);
         }
 
-        return intval($this->db->valuep("SELECT count(*) FROM " . $this->qTable() . $where));
+        return intval($this->db->value($this->getTable(), $where, "count(*)"));
     }
 
     //check if item exists for a given iname

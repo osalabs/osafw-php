@@ -718,7 +718,13 @@ class DB {
         try {
             if (is_array($params) && count($params)) {
                 //use prepared query
-                $this->logger('NOTICE', $dbhost_info . $sql, $params);
+                if (count($params) > 2) {
+                    // log as separate params if more than 2
+                    $this->logger('NOTICE', $dbhost_info . $sql, $params);
+                } else {
+                    // more compact log if less than 3 params
+                    $this->logger('NOTICE', $dbhost_info . $sql . ' {' . implode(',', array_values($params)) . '}');
+                }
 
                 //check if params are named or positional
                 $pkeys = array_keys($params);
@@ -1244,7 +1250,9 @@ class DB {
         $params         = [];
 
         foreach ($fields as $fname => $value) {
+            #logger("prepareParams", $fname, "=", $value);
             $dbop = $this->field2Op($table, $fname, $value, $is_for_where);
+            #logger("dbop:", $dbop);
 
             $delim      = ' ' . $dbop->opstr . ' ';
             $param_name = preg_replace('/\W/', '_', $fname) . $suffix; // replace any non-alphanum in param names and add suffix
@@ -1264,7 +1272,7 @@ class DB {
                 } elseif ($dbop->op == DBOps::IN || $dbop->op == DBOps::NOTIN) {
                     $sql_params = array();
                     $i          = 1;
-                    foreach ($value as $pvalue) {
+                    foreach ($dbop->value as $pvalue) {
                         $params[$param_name . '_' . $i] = $pvalue;
                         $sql_params[]                   = '@' . $param_name . '_' . $i;
                         $i                              += 1;
@@ -1272,11 +1280,14 @@ class DB {
                     // [NOT] IN (@p1,@p2,@p3...)
                     $sql .= '(' . (count($sql_params) > 0 ? implode(',', $sql_params) : 'NULL') . ')';
                 } else {
-                    if ($value === DB::NOW()) {
+                    if ($dbop->value === DB::NOW()) {
                         // if value is NOW object - don't add it to params, just use NOW()/GETDATE() in sql
                         $sql .= 'NOW()';
+                    } elseif ($dbop->value instanceof DateTime) {
+                        $params[$param_name] = $dbop->value->format('Y-m-d H:i:s');
+                        $sql                 .= '@' . $param_name;
                     } else {
-                        $params[$param_name] = $value;
+                        $params[$param_name] = $dbop->value;
                         $sql                 .= '@' . $param_name;
                     }
                 }

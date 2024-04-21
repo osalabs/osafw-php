@@ -296,6 +296,29 @@ class Utils {
     }
 
     /**
+     * for num (within total) and total - return string "+XXX%" or "-XXX%" depends if num is bigger or smaller than previous period (num-total)
+     * @param float $num
+     * @param float $total
+     * @return string
+     */
+    public static function percentChange(float $num, float $total): string {
+        $result = "";
+
+        $prev_num = $total - $num;
+        if ($prev_num == 0) {
+            return ($num == 0) ? "0%" : "+100%";
+        }
+
+        $percent = (($num - $prev_num) / $prev_num) * 100;
+        if ($percent >= 0) {
+            $result = "+";
+        }
+
+        return $result . round($percent, 2) . "%";
+    }
+
+
+    /**
      * simple encrypt or decrypt a string with vector/key
      * @param string $action 'encrypt' or 'decrypt'
      * @param string $string string to encrypt or decrypt (base64 encoded)
