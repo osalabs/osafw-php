@@ -7,8 +7,8 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 */
 
 class MainController extends FwController {
-    const access_level         = Users::ACL_USER; #logged only
-    const route_default_action = 'index';
+    const int    access_level         = Users::ACL_USER; #logged only
+    const string route_default_action = 'index';
 
     public function __construct() {
         parent::__construct();

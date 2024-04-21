@@ -8,55 +8,69 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 
 abstract class FwController {
     //overridable
-    const access_level = null; //access level for the controller. $CONFIG['ACCESS_LEVELS'] overrides this.
-    //Default=null - use config. If not set in config - all users can access this controller (even not logged)
-    const route_default_action = ''; //empty, "index", "show" - default action for controller, dispatcher will use it if no requested action found
+    const int    access_level         = Users::ACL_VISITOR; // access level for the controller. $CONFIG['ACCESS_LEVELS'] overrides this. 0 (public access), 1(min logged level), 100(max admin level)
+    const string route_default_action = ''; //empty, "index", "show" - default action for controller, dispatcher will use it if no requested action found
     //if no default action set - this is special case action - this mean action should be got form REST's 'id'
 
-    public $base_url;                   //base url for the controller
-    public $model_name; //default model name for the controller
+    public string $route_onerror = ""; //route redirect action name in case ApplicationException occurs in current route, if empty - 500 error page returned
 
-    public $list_sortdef = 'id asc'; //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array( //sorting map: req param name => sql field name(s) asc|desc direction
-                                  'id'       => 'id',
-                                  'iname'    => 'iname',
-                                  'add_time' => 'add_time',
-    );
-    public $search_fields = 'iname idesc'; //space-separated, fields to search via $list_filter['s'], ! - means exact match, not "like"
-    //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
+    public string $base_url;                    //base url for the controller
+    public string $base_url_suffix = '';        //additional base url suffix
 
-    public $form_new_defaults = array(); //defaults for the fields in new form
-    public $required_fields = '';           //optional, default required fields, space-separated
-    public $save_fields; //fields to save from the form to db, space-separated
-    public $save_fields_checkboxes; //checkboxes fields to save from the form to db, qw string: "field|def_value field2|def_value2" or "field field2" (def_value=1 in this case)
-    public $save_fields_nullable;           //nullable fields that should be set to null in db if form submit as ''
+    public array $form_new_defaults = array();  //defaults for the fields in new form
+    public string $required_fields = '';        //optional, default required fields, space-separated
+    public string $save_fields = '';            //fields to save from the form to db, space-separated
+    public string $save_fields_checkboxes = ''; //checkboxes fields to save from the form to db, qw string: "field|def_value field2|def_value2" or "field field2" (def_value=1 in this case)
+    public string $save_fields_nullable = '';   //nullable fields that should be set to null in db if form submit as ''
+    public string $model_name = ''; //default model name for the controller
 
     //not overridable
-    public $fw; //current app/framework object
-    public $model; //default model for the controller
+    protected FW $fw; //current app/framework object
+    protected DB $db;
+    protected FwModel $model; //default model for the controller
     protected array $config = [];        // controller config, loaded from template dir/config.json
     protected array $access_actions_to_permissions = []; // optional, controller-level custom actions to permissions mapping for role-based access checks, e.g. "UIMain" => Permissions.PERMISSION_VIEW . Can also be used to override default actions to permissions
-    public $list_view; // table or view name to selecte from for the list screen
-    public $list_orderby; // orderby for the list screen
-    public $list_filter; // filter values for the list screen
-    public $list_where = ' 1=1 '; // where to use in list sql, default all (see setListSearch() )
-    public $list_count; // count of list rows returned from db
-    public $list_rows; // list rows returned from db (array of hashes)
-    public $list_pager; // pager for the list from FormUtils::getPager
-    public $return_url; // url to return after SaveAction successfully completed, passed via request
-    public $related_id; // related id, passed via request. Controller should limit view to items related to this id
-    public $related_field_name; // if set and $related_id passed - list will be filtered on this field
+
+
+    protected string $list_view; // table or view name to selecte from for the list screen
+    protected string $list_orderby; // orderby for the list screen
+    protected array $list_filter; // filter values for the list screen
+    protected array $list_filter_search; // filter for the search columns from reqh("search")
+    protected array $list_where_params = []; // any sql params for the list_where
+    protected string $list_where = ' 1=1 '; // where to use in list sql, default all (see setListSearch() )
+    protected int $list_count; // count of list rows returned from db
+    protected array $list_rows; // list rows returned from db (array of hashes)
+    protected array $list_pager; // pager for the list from FormUtils::getPager
+    protected string $list_sortdef = 'id asc'; //default sorting - req param name, asc|desc direction
+    protected array $list_sortmap = [ //sorting map: req param name => sql field name(s) asc|desc direction
+                                      'id'       => 'id',
+                                      'iname'    => 'iname',
+                                      'add_time' => 'add_time',
+    ];
+    protected string $search_fields = 'iname idesc'; //space-separated, fields to search via $list_filter['s'], ! - means exact match, not "like"
+    //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
+
+    public string $export_format = '';            // empty or "csv" or "xls" (set from query string "export") - export format for IndexAction
+    protected string $export_filename = 'export'; // default filename for export, without extension
+
 
     #support of dynamic controller and customizable view list
-    protected $is_dynamic_index = false;    // true if controller has dynamic IndexAction, then define below:
-    protected $view_list_defaults = '';       // qw list of default columns
-    protected $view_list_map = array();  // list of all available columns fieldname|visiblename
-    protected $view_list_custom = '';       // array or qw list of custom-formatted fields for the list_table
+    protected bool $is_dynamic_index = false;    // true if controller has dynamic IndexAction, then define below:
+    protected string $view_list_defaults = '';       // qw list of default columns
+    protected array $view_list_map = [];  // list of all available columns fieldname|visiblename
+    protected string $view_list_custom = '';       // array or qw list of custom-formatted fields for the list_table
 
-    protected $is_dynamic_show = false;    // true if controller has dynamic ShowAction, requires "show_fields" to be defined in config.json
-    protected $is_dynamic_showform = false;    // true if controller has dynamic ShowFormAction, requires "showform_fields" to be defined in config.json
+    protected bool $is_dynamic_show = false;    // true if controller has dynamic ShowAction, requires "show_fields" to be defined in config.json
+    protected bool $is_dynamic_showform = false;    // true if controller has dynamic ShowFormAction, requires "showform_fields" to be defined in config.json
 
-    protected $db;
+    protected bool $is_userlists = false;         // true if controller should support UserLists
+    protected bool $is_activity_logs = false;     // true if controller should support ActivityLogs
+    protected bool $is_readonly = false;          // true if user is readonly, no actions modifying data allowed
+
+    protected string $route_return = '';        // FW.ACTION_SHOW or _INDEX to return (usually after SaveAction, default ACTION_SHOW_FORM)
+    protected string $return_url = '';            // url to return after SaveAction successfully completed, passed via request
+    protected string $related_id;               // related id, passed via request. Controller should limit view to items related to this id
+    protected string $related_field_name;       // if set (in Controller) and $related_id passed - list will be filtered on this field
 
     public function __construct() {
         $this->fw = fw::i();
@@ -68,9 +82,11 @@ abstract class FwController {
         if ($this->model_name) {
             $this->model = fw::model($this->model_name);
         }
+
+        $this->is_readonly = Users::i()->isReadOnly();
     }
 
-    public function loadControllerConfig($config_filename = 'config.json') {
+    public function loadControllerConfig($config_filename = 'config.json'): void {
         $conf_file0 = strtolower($this->base_url) . '/' . $config_filename;
         $conf_file  = $this->fw->config->SITE_TEMPLATES . $conf_file0;
         if (!file_exists($conf_file)) {
@@ -521,7 +537,8 @@ abstract class FwController {
     /**
      * called before each controller action (init() already called), check access to current fw.route
      * @return void
-     * @throws AuthException|NoModelException if no access
+     * @throws AuthException if no access
+     * @throws ApplicationException|DBException|NoModelException
      */
     public function checkAccess(): void {
         // if user is logged and not SiteAdmin(can access everything)
