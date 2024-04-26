@@ -1,30 +1,30 @@
 <?php
 
 class AdminAttController extends FwAdminController {
-    const access_level         = Users::ACL_MANAGER;
-    const route_default_action = '';
-    public $base_url = '/Admin/Att';
-    public $required_fields = 'iname';
-    public $save_fields = 'att_categories_id iname status';
-    public $model_name = 'Att';
+    const int    access_level         = Users::ACL_MANAGER;
+    const string route_default_action = '';
+    public string $base_url = '/Admin/Att';
+    public string $required_fields = 'iname';
+    public string $save_fields = 'att_categories_id iname status';
+    public string $model_name = 'Att';
 
     /*REMOVE OR OVERRIDE*/
-    public $search_fields = 'iname idesc';
-    public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array( //sorting map: req param name => sql field name(s) asc|desc direction
-                                  'id'       => 'id',
-                                  'iname'    => 'iname',
-                                  'add_time' => 'add_time',
-                                  'fsize'    => 'fsize',
-                                  'ext'      => 'ext',
-                                  'category' => 'att_categories_id',
+    public string $search_fields = 'iname idesc';
+    public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
+    public array $list_sortmap = array( //sorting map: req param name => sql field name(s) asc|desc direction
+                                        'id'       => 'id',
+                                        'iname'    => 'iname',
+                                        'add_time' => 'add_time',
+                                        'fsize'    => 'fsize',
+                                        'ext'      => 'ext',
+                                        'category' => 'att_categories_id',
     );
 
     public function __construct() {
         parent::__construct();
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         #get filters from the search form
         $f = $this->initFilter();
 
@@ -59,11 +59,11 @@ class AdminAttController extends FwAdminController {
         return $ps;
     }
 
-    public function ShowFormAction($form_id) {
+    public function ShowFormAction($form_id): ?array {
         $id              = intval($form_id);
         $dict_link_multi = array();
 
-        if ($this->fw->isGetRequest()) {
+        if ($this->isGet()) {
             if ($id > 0) {
                 $item = $this->model->one($id);
             } else {
@@ -92,7 +92,7 @@ class AdminAttController extends FwAdminController {
         return $ps;
     }
 
-    public function SaveAction($form_id) {
+    public function SaveAction($form_id): ?array {
         $this->fw->checkXSS();
 
         $id    = intval($form_id);
@@ -144,13 +144,14 @@ class AdminAttController extends FwAdminController {
                     'id'      => $id,
                 ));
             } else {
-                $this->setFormError($ex->getMessage());
+                $this->setFormError($ex);
                 $this->routeRedirect("ShowForm");
             }
         }
+        return null;
     }
 
-    public function Validate($id, $item, $files = array()) {
+    public function Validate($id, $item, $files = array()): void {
         #only require file during first upload
         #only require iname during update
         $result   = true;

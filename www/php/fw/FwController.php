@@ -76,8 +76,9 @@ abstract class FwController {
         $this->fw = fw::i();
         $this->db = $this->fw->db;
 
-        $this->return_url = reqs('return_url');
-        $this->related_id = reqs('related_id');
+        $this->return_url    = reqs('return_url');
+        $this->related_id    = reqs('related_id');
+        $this->export_format = reqs('export');
 
         if ($this->model_name) {
             $this->model = fw::model($this->model_name);
@@ -86,7 +87,8 @@ abstract class FwController {
         $this->is_readonly = Users::i()->isReadOnly();
     }
 
-    public function loadControllerConfig($config_filename = 'config.json'): void {
+    // load controller config from json in template dir (based on base_url)
+    public function loadControllerConfig(string $config_filename = 'config.json'): void {
         $conf_file0 = strtolower($this->base_url) . '/' . $config_filename;
         $conf_file  = $this->fw->config->SITE_TEMPLATES . $conf_file0;
         if (!file_exists($conf_file)) {
@@ -94,15 +96,20 @@ abstract class FwController {
         }
 
         $this->config = json_decode(file_get_contents($conf_file), true);
-        if (is_null($this->config) || !$this->config) {
+        if (!$this->config) {
             throw new ApplicationException("Controller Config is invalid, check json in templates: $conf_file0");
         }
         #logger("loaded config:", $this->config);
 
         #fill up controller params
-        $this->model = fw::model($this->config["model"]);
+        $model_name = $this->config["model"] ?? '';
+        if ($model_name) {
+            $this->model_name = $model_name;
+            $this->model      = fw::model($model_name);
+        }
 
         $this->required_fields = $this->config["required_fields"] ?? '';
+        $this->is_userlists    = $this->config["is_userlists"] ?? false;
 
         #save_fields could be defined as qw string or array - check and convert
         if (is_array($this->config["save_fields"])) {
@@ -110,6 +117,8 @@ abstract class FwController {
         } else {
             $this->save_fields = $this->config["save_fields"] ?? '';
         }
+
+        $this->form_new_defaults = $this->config["form_new_defaults"] ?? '';
 
         #save_fields_checkboxes could be defined as qw string - check and convert
         if (is_array($this->config["save_fields_checkboxes"])) {
@@ -125,12 +134,21 @@ abstract class FwController {
             $this->save_fields_nullable = $this->config["save_fields_nullable"] ?? '';
         }
 
-        $this->search_fields      = $this->config["search_fields"] ?? '';
-        $this->list_sortdef       = $this->config["list_sortdef"] ?? '';
-        $this->list_sortmap       = $this->config["list_sortmap"] ?? '';
+        $this->search_fields = $this->config["search_fields"] ?? '';
+        $this->list_sortdef  = $this->config["list_sortdef"] ?? '';
+
+        #list_sortmap could be defined as array or qw string - check and convert
+        if (is_array($this->config["list_sortmap"])) {
+            $this->list_sortmap = $this->config["list_sortmap"]; #not optimal, but simplest for now
+        } else {
+            $this->list_sortmap = Utils::qh($this->config["list_sortmap"] ?? '');
+        }
+
         $this->related_field_name = $this->config["related_field_name"] ?? '';
-        $this->list_view          = $this->config["list_view"] ?? '';
-        $this->is_dynamic_index   = $this->config["is_dynamic_index"] ?? false;
+
+        $this->list_view = $this->config["list_view"] ?? '';
+
+        $this->is_dynamic_index = $this->config["is_dynamic_index"] ?? false;
         if ($this->is_dynamic_index) {
             #Whoah! list view is dynamic
             $this->view_list_defaults = $this->config["view_list_defaults"] ?? '';
@@ -144,7 +162,9 @@ abstract class FwController {
 
             $this->view_list_custom = $this->config["view_list_custom"] ?? '';
 
-            $this->list_sortmap = $this->getViewListSortmap(); #just add all fields from view_list_map
+            if (!$this->list_sortmap) {
+                $this->list_sortmap = $this->getViewListSortmap(); #just add all fields from view_list_map
+            }
             if (!$this->search_fields) {
                 #just search in all visible fields if no specific fields defined
                 $this->search_fields = $this->getViewListUserFields();
@@ -153,209 +173,367 @@ abstract class FwController {
 
         $this->is_dynamic_show     = $this->config["is_dynamic_show"] ?? false;
         $this->is_dynamic_showform = $this->config["is_dynamic_showform"] ?? false;
+
+        $this->route_return = $this->config["route_return"] ?? '';
     }
 
     ############### helpers - shortcuts from fw
-    public function checkXSS() {
-        $this->fw->checkXSS();
+
+    /**
+     * return true if current request is GET request
+     * @return boolean
+     */
+    public function isGet(): bool {
+        return $this->fw->route->method == 'GET';
     }
 
-    public function routeRedirect($action, $controller = null, $args = null) {
-        $this->fw->routeRedirect($action, $controller, $args);
+    public function checkXSS(bool $is_die = true): bool {
+        return $this->fw->checkXSS($is_die);
     }
 
-    //add fields name to form error hash
-    public function setError($field_name, $error_type = true) {
-        $this->fw->GLOBAL['ERR'][$field_name] = $error_type;
+    public function routeRedirect(string $action, ?string $controller = null, ?array $params = null): void {
+        $this->fw->routeRedirect($action, $controller, $params);
     }
 
-    #get filter saved in session
-    #if request param 'dofilter' passed - session filters cleaned
-    #get filter values from request and overwrite saved in session
-    #save back to session and return
-    public function initFilter() {
-        #each filter remembered in session linking to controller.action
-        $session_key = '_filter_' . $this->fw->GLOBAL['controller.action'];
-        $sfilter     = $_SESSION[$session_key] ?? [];
+    /**
+     * initialize filter values from request and session
+     *   - automatically set to defaults - pagenum=0 and pagesize=MAX_PAGE_ITEMS
+     *   - if request param 'dofilter' passed - session filters cleaned
+     * @param string $session_key
+     * @return array and also set $this->list_filter
+     */
+    public function initFilter(string $session_key = ''): array {
+        $f = reqh('f');
 
-        $f = req('f');
-        if (!is_array($f)) {
-            $f = array();
+        if (!$session_key) {
+            $session_key = '_filter_' . $this->fw->GLOBAL['controller.action'];
         }
 
-        #if not forced filter
-        if (!reqs('dofilter')) {
+        $sfilter = $_SESSION[$session_key] ?? [];
+        if (!is_array($sfilter)) {
+            $sfilter = array();
+        }
+
+        $is_dofilter = reqs('dofilter');
+        if (!$is_dofilter) {
             $f = array_merge($sfilter, $f);
+        } else {
+            $userfilters_id = reqi('userfilters_id');
+            if ($userfilters_id > 0) {
+                $uf = UserFilters::i()->one($userfilters_id);
+                $f1 = json_decode($uf['idesc'], true);
+                if ($f1) {
+                    $f = $f1;
+                }
+                if (intval($uf['is_system']) == 0) {
+                    $f['userfilters_id'] = $userfilters_id; // set filter id (for edit/delete) only if not system
+                    $f['userfilter']     = $uf;
+                }
+            } else {
+                $userfilters_id = intval($f['userfilters_id']);
+                if ($userfilters_id > 0) {
+                    $uf              = UserFilters::i()->one($userfilters_id);
+                    $f['userfilter'] = $uf;
+                }
+            }
         }
 
-        #paging
-        if (!preg_match("/^\d+$/", $f['pagenum'] ?? '')) {
-            $f['pagenum'] = 0;
-        }
+        // paging
+        $f['pagenum']  = intval($f['pagenum'] ?? 0);
+        $f['pagesize'] = intval($f['pagesize'] ?? FormUtils::MAX_PAGE_ITEMS);
 
-        if (!preg_match("/^\d+$/", $f['pagesize'] ?? '')) {
-            $f['pagesize'] = $this->fw->config->MAX_PAGE_ITEMS;
-        }
-
-        #@session_start();
-        #save in session for later use
         $_SESSION[$session_key] = $f;
-        #@session_write_close();
 
         $this->list_filter = $f;
+
+        $session_key_search       = '_filtersearch_' . $this->fw->GLOBAL['controller.action'];
+        $this->list_filter_search = reqh('search');
+        if (empty($this->list_filter_search) && !$is_dofilter) {
+            //read from session
+            $this->list_filter_search = $_SESSION[$session_key_search] ?? [];
+            if (!is_array($this->list_filter_search)) {
+                $this->list_filter_search = array();
+            }
+        } else {
+            //remember in session
+            $_SESSION[$session_key_search] = $this->list_filter_search;
+        }
+
         return $f;
     }
 
     /**
-     * set list sorting fields - list_orderby and list_orderdir according to $this->list_filter filter
-     * @param array $f array of filter params from $this->initFilter, should contain sortby, sortdir
+     * clears list_filter and related session key
+     * @param string $session_key
+     * @return void
      */
-    public function setListSorting() {
-        #default sorting
+    public function clearFilter(string $session_key = ''): void {
+        $f = array();
+        if (!$session_key) {
+            $session_key = '_filter_' . $this->fw->GLOBAL['controller.action'];
+        }
+        $_SESSION[$session_key] = $f;
+        $this->list_filter      = $f;
+    }
+
+    public function setListSorting(): void {
+        if (empty($this->list_sortdef)) {
+            throw new Exception('No default sort order defined, define in list_sortdef');
+        }
+        if (empty($this->list_sortmap)) {
+            throw new Exception('No sort order mapping defined, define in list_sortmap');
+        }
+
         list($sortdef_field, $sortdef_dir) = Utils::qw($this->list_sortdef);
-        if (empty($this->list_filter['sortby'])) {
-            $this->list_filter['sortby'] = $sortdef_field;
-        }
 
+        $sortby  = $this->list_filter['sortby'] ?? '';
         $sortdir = $this->list_filter['sortdir'] ?? '';
+
+        if (empty($sortby)) {
+            $sortby = $sortdef_field;
+        }
         if ($sortdir != 'desc' && $sortdir != 'asc') {
-            $this->list_filter['sortdir'] = $sortdef_dir;
+            $sortdir = $sortdef_dir;
         }
 
-        $orderby = trim($this->list_sortmap[$this->list_filter['sortby']]);
+        $orderby = trim($this->list_sortmap[$sortby]);
         if (!$orderby) {
-            throw new Exception('No orderby defined for [' . $this->list_filter['sortby'] . ']');
+            throw new Exception('No orderby defined for [' . $sortby . ']');
         }
 
-        if ($this->list_filter['sortdir'] == 'desc') {
-            #if sortdir is desc, i.e. opposite to default - invert order for orderby fields
-            #go thru each order field
-            $aorderby = explode(',', $orderby);
-            foreach ($aorderby as $k => $field_dir) {
-                $arr   = preg_split('/\s+/', trim($field_dir));
-                $field = $arr[0];
-                $order = $arr[1] ?? '';
-                if ($order == 'desc') {
-                    $order = 'asc';
-                } else {
-                    $order = 'desc';
-                }
-                $aorderby[$k] = "$field $order";
-            }
-            $orderby = implode(', ', $aorderby);
-        }
+        $this->list_filter['sortby']  = $sortby;
+        $this->list_filter['sortdir'] = $sortdir;
 
-        $this->list_orderby = $orderby;
+        $this->list_orderby = FormUtils::sqlOrderBy($sortby, $sortdir, $this->list_sortmap);
     }
 
     /**
-     * add to $this->list_where search conditions from $this->list_filter['s'] and based on fields in $this->search_fields
+     * set list_where based on search[] filter based on $this->search_fields
+     * Sample: $this->search_fields="field1 field2,!field3 field4" => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
+     * @return void
      */
-    public function setListSearch() {
-        #$this->list_where =' 1=1 '; #override initial in child if necessary
-
+    public function setListSearch(): void {
         $s = trim($this->list_filter['s'] ?? '');
         if (strlen($s) && $this->search_fields) {
-            $like_quoted_both = $this->db->quote('%' . $s . '%');
-            $like_quoted      = $this->db->quote($s . '%');
-            $exact_quoted     = $this->db->quote($s);
-
-            $afields = Utils::qw($this->search_fields);
-            foreach ($afields as $key => $fieldsand) {
-                $afieldsand = explode(',', $fieldsand);
-
-                foreach ($afieldsand as $key2 => $fand) {
-                    if (preg_match("/^\!/", $fand)) {
-                        $fand              = preg_replace("/^\!/", "", $fand);
-                        $afieldsand[$key2] = $fand . " = " . $exact_quoted;
-                    } elseif (preg_match("/^\*/", $fand)) {
-                        $fand              = preg_replace("/^\*/", "", $fand);
-                        $afieldsand[$key2] = $fand . " LIKE " . $like_quoted_both;
-                    } else {
-                        $afieldsand[$key2] = $fand . " LIKE " . $like_quoted;
-                    }
-                }
-                $afields[$key] = implode(' and ', $afieldsand);
+            $is_subquery     = false;
+            $list_table_name = $this->list_view;
+            if (empty($list_table_name)) {
+                $list_table_name = $this->model->table_name;
+            } else {
+                // list_table_name could contain subquery as "(...) t" - detect it (contains whitespace)
+                $is_subquery = preg_match("/\s/", $list_table_name);
             }
 
-            $this->list_where .= ' and (' . implode(' or ', $afields) . ')';
+            $like_s = "%" . $s . "%";
+
+            $afields = Utils::qw($this->search_fields); // OR fields delimited by space
+            foreach ($afields as $i => $fieldsand) {
+                $afieldsand = explode(',', $fieldsand); // AND fields delimited by comma
+
+                foreach ($afieldsand as $j => $fand) {
+                    $param_name = "list_search_" . $i . "_" . $j;
+                    if (str_starts_with($fand, "!")) {
+                        // exact match
+                        $fand = preg_replace("/^!/", "", $fand);
+                        if ($is_subquery) {
+                            // for subqueries - just use string quoting, but convert to number (so only numeric search supported in this case)
+                            $this->list_where_params[$param_name] = intval($s);
+                        } else {
+                            $ft = $this->db->schemaFieldType($list_table_name, $fand);
+                            if ($ft == "int") {
+                                $this->list_where_params[$param_name] = intval($s);
+                            } elseif ($ft == "float") {
+                                $this->list_where_params[$param_name] = floatval($s);
+                            } elseif ($ft == "decimal") {
+                                $this->list_where_params[$param_name] = floatval($s);
+                            } else {
+                                $this->list_where_params[$param_name] = $s;
+                            }
+                        }
+                        $afieldsand[$j] = $this->db->qid($fand) . " = :" . $param_name;
+                    } else {
+                        // like match
+                        $afieldsand[$j]                       = $this->db->qid($fand) . " LIKE :" . $param_name;
+                        $this->list_where_params[$param_name] = $like_s;
+                    }
+                }
+                $afields[$i] = implode(' and ', $afieldsand);
+            }
+            $this->list_where .= " and (" . implode(' or ', $afields) . ")";
         }
 
-        if (isset($this->list_filter["userlist"])) {
-            $this->list_where .= " and id IN (SELECT ti.item_id FROM " . UserLists::i()->table_items . " ti WHERE ti.user_lists_id=" . dbqi($this->list_filter["userlist"]) . " and ti.add_users_id=" . $this->fw->userId() . " ) ";
-        }
+        $this->setListSearchUserList();
 
-        #if related id and field name set - filter on it
         if ($this->related_id > '' && $this->related_field_name) {
-            $this->list_where .= ' and ' . $this->db->qid($this->related_field_name) . '=' . $this->db->quote($this->related_id);
+            $this->list_where .= " and " . $this->db->qid($this->related_field_name) . "=:related_field_name";
+
+            $this->list_where_params['related_field_name'] = $this->related_id;
         }
 
         $this->setListSearchAdvanced();
     }
 
+    public function setListSearchUserList(): void {
+        if (isset($this->list_filter["userlist"])) {
+            $this->list_where                         .= " and id IN (SELECT ti.item_id FROM " . $this->db->qid(UserLists::i()->table_items) . " ti WHERE ti.user_lists_id=:user_lists_id and ti.add_users_id=:userId) ";
+            $this->list_where_params["user_lists_id"] = $this->list_filter["userlist"];
+            $this->list_where_params["userId"]        = $this->fw->userId();
+        }
+    }
+
     /**
      * set list_where based on search[] filter
+     *   - exact: "=term" or just "=" - mean empty
+     *   - Not equals "!=term" or just "!=" - means not empty
+     *   - Not contains: "!term"
+     *   - more/less: <=, <, >=, >"
+     *   - and support search by date if search value looks like date in format MM/DD/YYYY
+     * @return void
      */
-    public function setListSearchAdvanced() {
-        $hsearch = reqh("search");
+    public function setListSearchAdvanced(): void {
+        $hsearch = $this->list_filter_search;
         foreach ($hsearch as $fieldname => $value) {
-            if ($value > '' && (!$this->is_dynamic_index || array_key_exists($fieldname, $this->view_list_map))) {
-                $this->list_where .= " and " . $this->db->qid($fieldname) . " LIKE " . dbq("%" . $value . "%");
+            if (empty($value) || ($this->is_dynamic_index && !array_key_exists($fieldname, $this->view_list_map))) {
+                continue;
             }
+
+            $qfieldname = $this->db->qid($fieldname);
+            #for SQL Server:
+            #$fieldname_sql      = "COALESCE(CAST($qfieldname as NVARCHAR(255)), '')"; //255 need as SQL Server by default makes only 30
+            #$fieldname_sql_num  = "TRY_CONVERT(DECIMAL(18,1),CAST($qfieldname as NVARCHAR))"; // SQL Server 2012+ only
+            #$fieldname_sql_date = "TRY_CONVERT(DATE, $qfieldname)"; //for date search
+
+            #for MySQL:
+            $fieldname_sql      = "COALESCE(CAST($qfieldname as CHAR), '')";
+            $fieldname_sql_num  = "CAST($qfieldname as DECIMAL(18,1))";
+            $fieldname_sql_date = "STR_TO_DATE($qfieldname, '%m/%d/%Y')"; //for date search
+
+            $op  = substr($value, 0, 1);
+            $op2 = strlen($value) >= 2 ? substr($value, 0, 2) : null;
+
+            $v = substr($value, 1);
+            if ($op2 == "!=" || $op2 == "<=" || $op2 == ">=") {
+                $v = substr($value, 2);
+            }
+
+            $qv = $this->db->q($v); // quoted value
+            if (DateUtils::isDateStr($v)) {
+                //if input looks like a date - compare as date
+                $fieldname_sql = $fieldname_sql_date;
+                $qv            = $this->db->q(DateUtils::Str2SQL($v));
+            } else {
+                if ($op2 == "<=" || $op == "<" || $op2 == ">=" || $op == ">") {
+                    //numerical comparison
+                    $fieldname_sql = $fieldname_sql_num;
+                    $qv            = floatval($v);
+                }
+            }
+
+            $op_value = match ($op2) {
+                "!=" => " <> $qv",
+                "<=" => " <= $qv",
+                ">=" => " >= $qv",
+                default => match ($op) {
+                    "=" => " = $qv",
+                    "<" => " < $qv",
+                    ">" => " > $qv",
+                    "!" => " NOT LIKE " . $this->db->q("%$v%"),
+                    default => " LIKE " . $this->db->q("%$value%"),
+                },
+            };
+
+            $this->list_where .= " AND $fieldname_sql $op_value";
         }
     }
 
     /**
      * set list_where filter based on status filter:
-     * - if status not set - filter our deleted (i.e. show all)
-     * - if status set - filter by status, but if status=127 (deleted) only allow to see deleted by admins
+     *  - if status not set - filter our deleted (i.e. show all)
+     *  - if status set - filter by status, but if status=127 (deleted) only allow to see deleted by admins
+     * @return void
+     * @throws NoModelException
      */
-    public function setListSearchStatus() {
-        if ($this->model && strlen($this->model->field_status)) {
-            if (isset($this->list_filter['status'])) {
-                $status = intval($this->list_filter['status']);
-                #if want to see trashed and not admin - just show active
-                if ($status == 127 && !Users::i()->isAccessLevel(Users::ACL_ADMIN)) {
+    public function setListSearchStatus(): void {
+        if (!empty($this->model->field_status)) {
+            if (!empty($this->list_filter["status"])) {
+                $status = intval($this->list_filter["status"]);
+                // if want to see trashed and not admin - just show active
+                if ($status == FwModel::STATUS_DELETED && !Users::i()->isAccessLevel(Users::ACL_SITE_ADMIN)) {
                     $status = 0;
                 }
-                $this->list_where .= " and " . $this->db->qid($this->model->field_status) . "=" . $this->db->quote($status);
+                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "=:status";
+                $this->list_where_params["status"] = $status;
             } else {
-                $this->list_where .= " and " . $this->db->qid($this->model->field_status) . "<>127"; #by default - show all non-deleted
+                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "<>:status";
+                $this->list_where_params["status"] = FwModel::STATUS_DELETED; // by default - show all non-deleted
             }
         }
     }
 
-    /**
-     * perform 2 queries to get list of rows
-     * @return int $this->list_count count of rows obtained from db
-     * @return array of arrays $this->list_rows list of rows
-     * @return string $this->list_pager pager from FormUtils::getPager
-     */
-    public function getListRows() {
-        $this->list_count = $this->db->valuep("SELECT count(*) FROM {$this->list_view} WHERE " . $this->list_where);
-        if ($this->list_count) {
-            $offset = $this->list_filter['pagenum'] * $this->list_filter['pagesize'];
-            $limit  = $this->list_filter['pagesize'];
+    public function getListCount(string $list_view = ''): void {
+        $list_view_name   = !empty($list_view) ? $list_view : $this->list_view;
+        $this->list_count = intval($this->db->valuep("select count(*) from " . $list_view_name . " where " . $this->list_where, $this->list_where_params));
+    }
 
-            $sql              = "SELECT * FROM {$this->list_view} WHERE {$this->list_where} ORDER BY {$this->list_orderby} LIMIT {$offset}, {$limit}";
-            $this->list_rows  = $this->db->arrp($sql);
-            $this->list_pager = FormUtils::getPager($this->list_count, $this->list_filter['pagenum'], $this->list_filter['pagesize']);
+
+    /**
+     * Perform 2 queries to get list of rows.
+     * Set variables:
+     * $this->list_count - count of rows obtained from db
+     * $this->list_rows list of rows
+     * $this->list_pager pager from FormUtils::getPager
+     * @return void
+     * @throws DBException
+     */
+    public function getListRows(): void {
+        $is_export = false;
+        $pagenum   = intval($this->list_filter["pagenum"]);
+        $pagesize  = intval($this->list_filter["pagesize"]);
+        // if export requested - start with first page and have a high limit (still better to have a limit just for the case)
+        if ($this->export_format > '') {
+            $is_export = true;
+            $pagenum   = 0;
+            $pagesize  = 100000;
+        }
+
+        if (empty($this->list_view)) {
+            $this->list_view = $this->model->table_name;
+        }
+        $list_view_name = (str_starts_with($this->list_view, "(") ? $this->list_view : $this->db->qid($this->list_view)); // don't quote if list_view is a subquery (starting with parentheses)
+
+        $this->getListCount($list_view_name);
+        if ($this->list_count > 0) {
+            $offset = $pagenum * $pagesize;
+            $limit  = $pagesize;
+
+            $this->list_rows = $this->db->selectRaw("*", $list_view_name, $this->list_where, $this->list_where_params, $this->list_orderby, $offset, $limit);
+
+            if ($this->model->is_normalize_names) {
+                foreach ($this->list_rows as &$row) {
+                    $this->model->normalizeNames($row);
+                }
+                unset($row);
+            }
+
+            // for 2005<= SQL Server versions <2012
+            // offset+1 because _RowNumber starts from 1
+            // Dim sql As String = "SELECT * FROM (" &
+            // "   SELECT *, ROW_NUMBER() OVER (ORDER BY " & Me.list_orderby & ") AS _RowNumber" &
+            // "   FROM " & list_view &
+            // "   WHERE " & Me.list_where &
+            // ") tmp WHERE _RowNumber BETWEEN " & (offset + 1) & " AND " & (offset + 1 + limit - 1)
+
+            if (!$is_export) {
+                $this->list_pager = FormUtils::getPager($this->list_count, $pagenum, $pagesize);
+            }
         } else {
             $this->list_rows  = array();
             $this->list_pager = array();
         }
 
-        #if related_id defined - add it to each row
         if ($this->related_id > '') {
-            Utils::arrayInject($this->list_rows, array('related_id' => $this->related_id));
+            Utils::arrayInject($this->list_rows, ['related_id' => $this->related_id]);
         }
-
-        //add/modify rows from db - use in override child class
-        /*
-    foreach ($this->list_rows as $k => $row) {
-    $this->list_rows[$k]['field'] = 'value';
-    }
-     */
     }
 
     /**
@@ -364,10 +542,10 @@ abstract class FwController {
      * using save_fields and save_fields_checkboxes
      * override in child class if more modifications is necessary
      *
-     * @param integer $id item id, could be 0 for new item
+     * @param int $id item id, could be 0 for new item
      * @param array $item fields from the form
      */
-    public function getSaveFields($id, $item) {
+    public function getSaveFields(int $id, array $item): array {
         #load old record if necessary
         #$item_old = $this->model->one($id);
 
@@ -382,64 +560,110 @@ abstract class FwController {
      * validate required fields are non-empty and set global ERR[field] and ERR[REQ] values in case of errors
      * also set global ERR[REQUIRED]=true in case of validation error
      * @param array $item fields/values
-     * @param array or space-separated string $afields field names required to be non-empty (trim used)
-     * @return boolean        true if all required field names non-empty
+     * @return bool        true if all required field names non-empty
      */
-    public function validateRequired($item, $afields) {
+    /**
+     * Validate required fields are non-empty and set global fw.ERR[field] values in case of errors
+     * @param array $item to validate
+     * @param array|string $afields field names required to be non-empty (trim used)
+     * @param array|null $form_errors optional - form errors to fill
+     * @return bool true if all required field names non-empty
+     *              also set global fw.FormErrors[REQUIRED]=true in case of validation error if no form_errors defined
+     */
+    public function validateRequired(array $item, array|string $afields, array &$form_errors = null): bool {
         $result = true;
-
-        if (!is_array($item)) {
-            $item = array();
-        }
 
         if (!is_array($afields)) {
             $afields = Utils::qw($afields);
         }
 
-        foreach ($afields as $fld) {
-            if ($fld > '' && (!array_key_exists($fld, $item) || !strlen(trim($item[$fld])))) {
-                $result = false;
-                $this->setError($fld);
+        $is_global_errors = false;
+        if (is_null($form_errors)) {
+            $form_errors      = &$this->fw->FormErrors;
+            $is_global_errors = true;
+        }
+
+        if ($item && $afields) {
+            foreach ($afields as $fld) {
+                if ($fld > '' && (!array_key_exists($fld, $item) || !strlen(trim($item[$fld])))) {
+                    $result            = false;
+                    $form_errors[$fld] = true;
+                }
             }
         }
-        if (!$result) {
-            $this->setError('REQUIRED', true);
+
+        if (!$result && $is_global_errors) {
+            $form_errors["REQUIRED"] = true; // set global error
         }
 
         return $result;
     }
 
-    //check validation result
-    //optional $result param - to use from external validation check
-    //throw ValidationException exception if global ERR non-empty
-    //also set global ERR[INVALID] if ERR non-empty, but ERR[REQUIRED] not true
-    public function validateCheckResult($result = true) {
-        if (isset($this->fw->GLOBAL['ERR']['REQUIRED'])) {
-            logger('validateCheckResult required:', $this->fw->GLOBAL['ERR']);
+    /**
+     * Check validation result of validateRequired
+     * @param bool $result - to use from external validation check
+     * @return void
+     * @throws ValidationException if global ERR non-empty, Also set global ERR[INVALID] if ERR non-empty, but ERR[REQUIRED] not true
+     */
+    public function validateCheckResult(bool $result = true): void {
+        if (isset($this->fw->FormErrors['REQUIRED']) && $this->fw->FormErrors['REQUIRED']) {
             $result = false;
         }
 
-        if (is_array($this->fw->GLOBAL['ERR']) && !empty($this->fw->GLOBAL['ERR']) && !$this->fw->GLOBAL['ERR']['REQUIRED']) {
-            logger('validateCheckResult invalid:', $this->fw->GLOBAL['ERR']);
-            $this->setError('INVALID', true);
-            $result = false;
+        if (is_array($this->fw->FormErrors) && !empty($this->fw->FormErrors) && (!isset($this->fw->FormErrors['REQUIRED']) || !$this->fw->FormErrors['REQUIRED'])) {
+            $this->fw->FormErrors['INVALID'] = true;
+            $result                          = false;
         }
+
         if (!$result) {
             throw new ValidationException('');
         }
     }
 
-    public function setFormError($err_msg): void {
-        $this->fw->GLOBAL['err_msg'] = $err_msg;
+    public function setFormError(Exception $ex): void {
+        //if Validation exception - don't set general error message - specific validation message set in templates
+        if (!($ex instanceof ValidationException)) {
+            $this->fw->GLOBAL['err_msg'] = $ex->getMessage();
+        }
+    }
+
+    //add fields name to form error hash
+    public function setError(string $field_name, mixed $error_type = true): void {
+        $this->fw->FormErrors[$field_name] = $error_type;
+    }
+
+    /**
+     * called when unhandled error happens in controller's Action
+     * @param Exception $ex
+     * @param array $args
+     * @return array|null
+     * @throws Exception
+     */
+    public function actionError(Exception $ex, array $args): ?array {
+        if ($this->fw->isJsonExpected()) {
+            throw $ex; //exception will be handled in fw.dispatch() and fw.errMsg() called
+        } else {
+            //if not json - redirect to route route_onerror if it's defined
+            $this->setFormError($ex);
+
+            if (empty($this->route_onerror)) {
+                throw $ex; //re-throw exception
+            } else {
+                $this->fw->routeRedirect($this->route_onerror, null, $args);
+            }
+        }
+        return null;
     }
 
     /**
      * add or update records in db ($this->model)
+     *   Also set fw.flash
      * @param int $id id of the record
      * @param array $fields hash of field/values
      * @return int              new autoincrement id (if added) or old id (if update). Also set fw->flash
+     * @throws DBException
      */
-    public function modelAddOrUpdate($id, $fields) {
+    public function modelAddOrUpdate(int $id, array $fields): int {
         if ($id > 0) {
             $this->model->update($id, $fields);
             $this->fw->flash("record_updated", 1);
@@ -450,89 +674,134 @@ abstract class FwController {
         return $id;
     }
 
+
     /**
      * return URL for location after successful Save action
-     * basic rule: after save we return to edit form screen. Or, if return_url set, to the return_url
-     *
-     * @param integer $id new or updated form id
-     * @param string $explicit - 'index', 'form' - explicit return to Index, ShowForm without auto-detection and skipping return_url
-     * @return string     url
+     * if return_url set (and no add new form requested) - go to return_url
+     * id:
+     *  - if empty - base_url
+     *  - if >0 - base_url + index/view/new/edit depending on return_to var/param
+     * also appends:
+     *  - base_url_suffix
+     *  - related_id
+     *  - copy_id
+     * @param string $id
+     * @return string
      */
-    public function getReturnLocation($id = null, $explicit = '') {
-        $result = '';
+    public function afterSaveLocation(string $id = ''): string {
+        $url        = '';
+        $url_q      = ($this->related_id > '' ? '&related_id=' . $this->related_id : '');
+        $is_add_new = false;
 
-        #if no id passed - basically return to list url, if passed - return to edit url
-        if (is_null($id) || $explicit == 'index') {
-            $base_url = $this->base_url;
+        if ($id > '') {
+            $request_route_return = reqh('route_return');
+            $to                   = ($request_route_return > '' ? $request_route_return : $this->route_return);
+            if ($to == 'show') {
+                // or return to view screen
+                $url = $this->base_url . '/' . $id;
+            } elseif ($to == 'index') {
+                // or return to list screen
+                $url = $this->base_url;
+            } elseif ($to == 'show_form_new') {
+                // or return to add new form
+                $url        = $this->base_url . '/new';
+                $url_q      .= '&copy_id=' . $id;
+                $is_add_new = true;
+            } else {
+                // default is return to edit screen
+                $url = $this->base_url . '/' . $id . '/edit';
+            }
         } else {
-            $base_url = $this->base_url . '/' . $id . '/edit';
+            $url = $this->base_url;
         }
-        #logger('getReturnLocation:', $id, ', ex=' . $explicit);
-        #logger($base_url);
 
-        if ($this->return_url && !$explicit) {
+        //preserve return url if present
+        if ($this->return_url > '') {
+            $url_q .= '&return_url=' . Utils::urlescape($this->return_url);
+        }
+
+        //add base_url_suffix if any
+        if ($this->base_url_suffix > '') {
+            $url_q .= '&' . $this->base_url_suffix;
+        }
+
+        //add query
+        $is_url_q = false;
+        if ($url_q > '') {
+            $is_url_q = true;
+            $url_q    = preg_replace('/^&/', '', $url_q); // make url clean
+            $url_q    = '?' . $url_q;
+        }
+
+        if ($is_add_new || !$this->return_url) {
+            //if has add new or no specific return_url - just
+            $result = $url . $url_q;
+        } else {
+            //if has return url - go to it
             if ($this->fw->isJsonExpected()) {
-                //if json - it's usually autosave - don't redirect back to return url yet
-                $result = $base_url . '?return_url=' . Utils::urlescape($this->return_url) . ($this->related_id ? '&related_id=' . $this->related_id : '');
+                // if json - it's usually autosave - don't redirect back to return url yet
+                $result = $url . $url_q . ($is_url_q ? '&' : '?') . 'return_url=' . Utils::urlescape($this->return_url);
             } else {
                 $result = $this->return_url;
             }
-        } else {
-            $result = $base_url . (strlen($this->related_id) ? '?related_id=' . $this->related_id : '');
         }
-        #logger('result=', $result);
 
         return $result;
     }
 
     /**
-     * standard processing after SaveAction()
-     * usage: return $this->afterSave($success, $location, $id, $is_new);
-     * @param boolean $success save success or not
-     * @param string $location client redirect to this location
-     * @param integer $id old or new id
-     * @param boolean $is_new new id or not
-     * @return ps array of json response or none (will be redirected to new location or ShowForm)
+     * Called from SaveAction/DeleteAction/DeleteMulti or similar.
+     * Return json or route redirect back to ShowForm
+     * or redirect to proper location
+     * @param bool $success operation successful or not
+     * @param string $id item id
+     * @param bool $is_new true if it's newly added item
+     * @param string $action route redirect to this method if error
+     * @param string $location redirect to this location if success
+     * @param array|null $more_json added to json response
+     * @return array|null ps array of json response or null (will be redirected to new location or ShowForm)
      */
-    public function afterSave($success = true, $location = '', $id = 0, $is_new = false) {
+    public function afterSave(bool $success, string $id = '', bool $is_new = false, string $action = 'ShowForm', string $location = '', array $more_json = null): ?array {
+        if (!$location) {
+            $location = $this->afterSaveLocation($id);
+        }
+
         if ($this->fw->isJsonExpected()) {
-            return array('_json' => array(
+            $ps   = array();
+            $json = array(
                 'success'  => $success,
-                'err_msg'  => $this->fw->GLOBAL['err_msg'],
-                'location' => $location,
                 'id'       => $id,
                 'is_new'   => $is_new,
-                #TODO - add ERR field errors here
-            ));
+                'location' => $location,
+                'err_msg'  => $this->fw->GLOBAL['err_msg'],
+            );
+            // add ERR field errors to response if any
+            if (!empty($this->fw->FormErrors)) {
+                $json['ERR'] = $this->fw->FormErrors;
+            }
+
+            if ($more_json) {
+                $json = array_merge($json, $more_json);
+            }
+
+            $ps['_json'] = $json;
+            return $ps;
         } else {
-            #if save success - return redirect
-            #if save failed - return back to add/edit form
+            // If save Then success - Return redirect
+            // If save Then failed - Return back To add/edit form
             if ($success) {
                 fw::redirect($location);
             } else {
-                $this->routeRedirect("ShowForm");
+                $this->routeRedirect($action, null, [$id]);
             }
         }
+
+        return null;
     }
 
-    /*
-     *     // called before each controller action (init() already called), check access to current fw.route
-        // throw exception if no access
-        public virtual void checkAccess()
-        {
-            //var id = fw.route.id;
-
-            // if user is logged and not SiteAdmin(can access everything)
-            // and user's access level is enough for the controller - check access by roles (if enabled)
-            int current_user_level = fw.userAccessLevel;
-            if (current_user_level > Users.ACL_VISITOR && current_user_level < Users.ACL_SITEADMIN)
-            {
-                if (!fw.model<Users>().isAccessByRolesResourceAction(fw.userId, fw.route.controller, fw.route.action, fw.route.action_more, access_actions_to_permissions))
-                    throw new AuthException("Bad access - Not authorized (3)");
-            }
-        }
-
-     * */
+    public function afterSaveJson(bool $success, array $more_json = null): array {
+        return $this->afterSave($success, "", false, "no_action", "", $more_json);
+    }
 
     /**
      * called before each controller action (init() already called), check access to current fw.route
@@ -551,25 +820,97 @@ abstract class FwController {
         }
     }
 
-    ######################### dynamic controller support
+    public function setPS(array &$ps): array {
+        if (empty($ps)) {
+            $ps = array();
+        }
+
+        $ps["list_rows"]    = $this->list_rows;
+        $ps["count"]        = $this->list_count;
+        $ps["pager"]        = $this->list_pager;
+        $ps["f"]            = $this->list_filter;
+        $ps["related_id"]   = $this->related_id;
+        $ps["base_url"]     = $this->base_url;
+        $ps["is_userlists"] = $this->is_userlists;
+        $ps["is_readonly"]  = $this->is_readonly;
+
+        //implement "Showing FROM to TO of TOTAL records"
+        if (count($this->list_rows) > 0) {
+            $pagenum          = intval($this->list_filter["pagenum"]);
+            $pagesize         = intval($this->list_filter["pagesize"]);
+            $ps["count_from"] = $pagenum * $pagesize + 1;
+            $ps["count_to"]   = $pagenum * $pagesize + count($this->list_rows);
+        }
+
+        if ($this->return_url > '') {
+            $ps["return_url"] = $this->return_url; // if not passed - don't override return_url.html
+        }
+
+        return $ps;
+    }
+
+    public function setUserLists(array &$ps, int $id = 0): bool {
+        // userlists support
+        if ($id == 0) {
+            // select only for list screens
+            $ps["select_userlists"] = UserLists::i()->listSelectByEntity($this->base_url);
+        }
+        $ps["my_userlists"] = UserLists::i()->listForItem($this->base_url, $id);
+        return true;
+    }
+
+    public function exportList(): void {
+        if (empty($this->list_rows)) {
+            $this->list_rows = array();
+        }
+
+        $fields = $this->getViewListUserFields();
+        // header names
+        $headers = array();
+        foreach (Utils::qw($fields) as $fld) {
+            $headers[$fld] = $this->view_list_map[$fld];
+        }
+
+        if ($this->export_format == "xls") {
+            Utils::responseXLS($this->fw, $this->list_rows, $headers, $this->export_filename . ".xls");
+        } else {
+            Utils::responseCSV($this->list_rows, $headers, $this->export_filename . ".csv");
+        }
+    }
+
+    public function setAddUpdUser(array &$ps, array $item): void {
+        if ($this->model->field_add_users_id > '') {
+            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model->field_add_users_id]);
+        }
+        if ($this->model->field_upd_users_id > '') {
+            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model->field_upd_users_id]);
+        }
+    }
+
+    //<editor-fold desc="Dynamic Controller Support">
 
     /**
      * as arraylist of hashtables {field_name=>, field_name_visible=> [, is_checked=>true]} in right order
-     * @param string $fields qw-string, if fields defined - show fields only
-     * @param boolean $is_all if is_all true - then show all fields (not only from fields param)
+     * @param array|string $fields qw-string, if fields defined - show fields only
+     * @param bool $is_all if is_all true - then show all fields (not only from fields param)
      * @return array           array of hashtables
      */
-    public function getViewListArr($fields = '', $is_all = false) {
+    public function getViewListArr(array|string $fields = '', bool $is_all = false): array {
         $result = array();
+
+        if (!is_array($fields)) {
+            $fields = Utils::qw($fields);
+        }
 
         #if fields defined - first show these fields, then the rest
         $fields_added = array();
-        if ($fields > '') {
-            foreach (Utils::qw($fields) as $key => $fieldname) {
+        if ($fields) {
+            foreach ($fields as $fieldname) {
                 $result[]                 = array(
                     'field_name'         => $fieldname,
                     'field_name_visible' => $this->view_list_map[$fieldname],
                     'is_checked'         => true,
+                    'is_sortable'        => !empty($this->list_sortmap[$fieldname]),
                 );
                 $fields_added[$fieldname] = true;
             }
@@ -577,13 +918,17 @@ abstract class FwController {
 
         if ($is_all) {
             #rest/all fields
-            foreach ($this->view_list_map as $key => $value) {
+            #sorted by values (visible field name)
+            $arr = $this->view_list_map;
+            asort($arr);
+            foreach ($arr as $key => $value) {
                 if (array_key_exists($key, $fields_added)) {
                     continue;
                 }
                 $result[] = array(
                     'field_name'         => $key,
-                    'field_name_visible' => $this->view_list_map[$key],
+                    'field_name_visible' => $value,
+                    'is_sortable'        => !empty($this->list_sortmap[$key]),
                 );
             }
         }
@@ -591,7 +936,7 @@ abstract class FwController {
         return $result;
     }
 
-    public function getViewListSortmap($value = '') {
+    public function getViewListSortmap(): array {
         $result = array();
         foreach ($this->view_list_map as $fieldname => $value) {
             $result[$fieldname] = $fieldname;
@@ -599,29 +944,84 @@ abstract class FwController {
         return $result;
     }
 
-    public function getViewListUserFields($value = '') {
+    public function getViewListUserFields() {
         $item = UserViews::i()->oneByIcode($this->base_url); #base_url is screen identifier
         return $item['fields'] > '' ? $item['fields'] : $this->view_list_defaults;
     }
 
     /**
-     * add to $ps:
+     * Called from setViewList to get conversions for fields.
+     * Currently, supports only "date" conversion - i.e. date only fields will be formatted as date only (without time)
+     * Override to add more custom conversions
+     * @param array $afields
+     * @return array
+     */
+    public function getViewListConversions(array $afields): array {
+        $result = array();
+        //use table_name or list_view if it's not subquery
+        $list_view_name = $this->model->table_name;
+        if ($this->list_view > '' && $this->list_view[0] != "(") {
+            $list_view_name = $this->list_view;
+        }
+
+        $table_schema = $this->db->loadTableSchema($list_view_name);
+        foreach ($afields as $fieldname) {
+            $fieldname_lc = strtolower($fieldname);
+            if (!array_key_exists($fieldname_lc, $table_schema)) {
+                continue;
+            }
+            $field_schema = $table_schema[$fieldname_lc];
+
+            //if field is exactly DATE - show only date part without time
+            if ($field_schema["fw_subtype"] == "date") {
+                $result[$fieldname] = "date";
+            }
+            // ADD OTHER CONVERSIONS HERE if necessary
+        }
+
+        return $result;
+    }
+
+    /**
+     * Apply conversions to data for a single view list field
+     * Override to add custom conversions.
+     * @param string $fieldname field name to apply conversion to
+     * @param array $row data row from db
+     * @param array $hconversions standard conversion rules from getViewListConversions
+     * @return string
+     */
+    public function applyViewListConversions(string $fieldname, array $row, array $hconversions): string {
+        $data = $row[$fieldname];
+        if (array_key_exists($fieldname, $hconversions)) {
+            $data = DateUtils::Str2DateOnly($data);
+        }
+        return $data;
+    }
+
+    /**
+     * Add to $ps:
      * headers
      * headers_search
      * depends on $ps["list_rows"]
+     * use is_cols=false when return $ps as json
      * usage:
-     * $this->setViewList($ps, reqh("search"))
-     *
-     * @param [type] $ps      [description]
-     * @param [type] $hsearch [description]
+     * $this->setViewList($ps, $this->list_filter_search)
+     * @param array $ps
+     * @param array $hsearch
+     * @param bool $is_cols
+     * @return void
+     * @throws NoModelException
      */
-    public function setViewList(&$ps, $hsearch) {
+    public function setViewList(array &$ps, array $hsearch, bool $is_cols = true): void {
+        $user_view       = UserViews::i()->oneByIcode($this->base_url);
+        $ps["user_view"] = $user_view;
+
         $fields = $this->getViewListUserFields();
 
         $headers = $this->getViewListArr($fields);
-        #add search from user's submit
-        foreach ($headers as $key => $header) {
-            $headers[$key]["search_value"] = $hsearch[$header["field_name"]] ?? '';
+        // add search from user's submit
+        foreach ($headers as $header) {
+            $header["search_value"] = $hsearch[$header["field_name"]] ?? '';
         }
 
         $ps["headers"]        = $headers;
@@ -629,26 +1029,37 @@ abstract class FwController {
 
         $hcustom = Utils::qh($this->view_list_custom);
 
-        #dynamic cols
-        $fields_qw = Utils::qw($fields);
-        foreach ($ps["list_rows"] as $key => $row) {
-            $cols = array();
-            foreach ($fields_qw as $fieldname) {
-                $cols[] = array(
-                    'row'        => $row,
-                    'field_name' => $fieldname,
-                    'data'       => $row[$fieldname],
-                    'is_custom'  => array_key_exists($fieldname, $hcustom),
-                );
+        if ($is_cols) {
+            // dynamic cols
+            $afields = Utils::qw($fields);
+
+            $hconversions = $this->getViewListConversions($afields);
+
+            foreach ($ps["list_rows"] as &$row) {
+                $cols = array();
+                foreach ($afields as $fieldname) {
+                    $data = $this->applyViewListConversions($fieldname, $row, $hconversions);
+
+                    $cols[] = array(
+                        'row'        => $row,
+                        'field_name' => $fieldname,
+                        'data'       => $data,
+                        'is_custom'  => array_key_exists($fieldname, $hcustom),
+                    );
+                }
+                $row['cols'] = $cols;
             }
-            $ps["list_rows"][$key]['cols'] = $cols;
+            unset($row);
         }
     }
 
+    //</editor-fold>
+
     ######################### Default Actions
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         rw("in Base Fw Controller IndexAction");
         #fw->parser();
+        return null;
     }
 } //end of class

@@ -7,10 +7,10 @@
 */
 
 class AttController extends FwController {
-    const route_default_action = 'show';
-    public $model_name = 'Att';
+    const string route_default_action = 'show';
+    public string $model_name = 'Att';
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $ps = array();
 
         return $ps;
@@ -18,8 +18,9 @@ class AttController extends FwController {
 
     public function DownloadAction($id = '') {
         $id += 0;
-        if (!$id)
+        if (!$id) {
             throw new ApplicationException("404 File Not Found");
+        }
         $size = reqs('size');
 
         $this->model->transmitFile($id, $size);
@@ -27,8 +28,9 @@ class AttController extends FwController {
 
     public function ShowAction($id = '') {
         $id += 0;
-        if (!$id)
+        if (!$id) {
             throw new ApplicationException("404 File Not Found");
+        }
         $size       = reqs('size');
         $is_preview = reqi('preview');
 

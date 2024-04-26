@@ -7,8 +7,8 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 */
 
 class LoginController extends FwController {
-    const route_default_action = '';
-    public $model_name = 'Users';
+    const string route_default_action = '';
+    public string $model_name = 'Users';
 
     public function __construct() {
         parent::__construct();
@@ -17,7 +17,7 @@ class LoginController extends FwController {
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $item = reqh('item');
         if (!$item) {
             #defaults
@@ -73,7 +73,7 @@ class LoginController extends FwController {
 
         } catch (ApplicationException $ex) {
             $this->fw->GLOBAL['err_ctr'] = reqi('err_ctr') + 1;
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
             $this->routeRedirect("Index");
         }
     }

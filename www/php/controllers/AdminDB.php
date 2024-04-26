@@ -1,7 +1,7 @@
 <?php
 
 class AdminDBController extends FwController {
-    const access_level = Users::ACL_SITE_ADMIN; #logged admin only
+    const int access_level = Users::ACL_SITE_ADMIN; #logged admin only
 
     public function __construct() {
         parent::__construct();

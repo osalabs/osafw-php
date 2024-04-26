@@ -88,16 +88,16 @@ class RolesResourcesPermissions extends FwModel {
 
         // for each resource - get permissions for this role
         foreach ($resources as &$resource) {
-            $permissions_cols = [];
+            $permissions_cols             = [];
             $resource["permissions_cols"] = $permissions_cols;
 
             // load permissions for this resource
             $hpermissions = $this->matrixRowByRoleResource($roles_id, (int)$resource["id"]);
 
             foreach ($permissions as $permission) {
-                $permission_col = [
+                $permission_col     = [
                     "key"        => $this->matrixKey((int)$resource["id"], (int)$permission["id"]),
-                    "is_checked" => isset($hpermissions[$this->matrixKey((int)$resource["id"], (int)$permission["id")])
+                    "is_checked" => isset($hpermissions[$this->matrixKey((int)$resource["id"], (int)$permission["id"])]),
                 ];
                 $permissions_cols[] = $permission_col;
             }
@@ -114,7 +114,7 @@ class RolesResourcesPermissions extends FwModel {
         $where  = [];
 
         // set all fields as under update
-        $fields[$this->field_status] = self::STATUS_UNDER_UPDATE;
+        $fields[$this->field_status]          = self::STATUS_UNDER_UPDATE;
         $where[$this->junction_field_main_id] = $roles_id;
         $this->db->update($this->table_name, $fields, $where);
 
@@ -122,16 +122,16 @@ class RolesResourcesPermissions extends FwModel {
             list($resources_id, $permissions_id) = $this->extractKey($key);
 
             $fields = [
-                $this->junction_field_main_id       => $roles_id,
-                $this->junction_field_linked_id     => $resources_id,
+                $this->junction_field_main_id        => $roles_id,
+                $this->junction_field_linked_id      => $resources_id,
                 $this->junction_field_permissions_id => $permissions_id,
-                $this->field_status                 => self::STATUS_ACTIVE,
-                $this->field_upd_users_id           => $this->fw->userId(),
-                $this->field_upd_time               => $this->db->now()
+                $this->field_status                  => self::STATUS_ACTIVE,
+                $this->field_upd_users_id            => $this->fw->userId(),
+                $this->field_upd_time                => $this->db->now()
             ];
-            $where = [
-                $this->junction_field_main_id       => $roles_id,
-                $this->junction_field_linked_id     => $resources_id,
+            $where  = [
+                $this->junction_field_main_id        => $roles_id,
+                $this->junction_field_linked_id      => $resources_id,
                 $this->junction_field_permissions_id => $permissions_id
             ];
             $this->db->upsert($this->table_name, $fields, $where);

@@ -7,7 +7,7 @@
 */
 
 class AdminDemosDynamicController extends FwDynamicController {
-    const access_level = Users::ACL_MANAGER;
+    const int access_level = Users::ACL_MANAGER;
 
     public function __construct() {
         parent::__construct();

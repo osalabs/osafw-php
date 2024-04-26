@@ -53,9 +53,10 @@ class fw {
     public string $request_url; #current request url (relative to application url)
     public stdClass $route; #current request route data, stdClass
 
-    public array $GLOBAL = array(); #"global" vars, initialized with $CONFIG
+    public array $GLOBAL = []; #"global" vars, initialized with $CONFIG - used in template engine, also stores "_flash"
+    public array $FormErrors = []; # for storing form id's with error messages, put to ps("ERR") for parser
     public object $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
-    public array $models_cache = array(); #cached model instances
+    public array $models_cache = []; #cached model instances
 
     public string $page_layout;
     public bool $is_session = true; #if use session, can be set to false in initRequest to abort session use
@@ -209,7 +210,7 @@ class fw {
         spl_autoload_register(array($this, 'autoload'));
 
         $this->GLOBAL                 = $CONFIG;
-        $this->GLOBAL['ERR']          = []; #store form errors
+        $this->FormErrors             = []; #store form errors
         $this->GLOBAL['current_time'] = time(); #current time for the request
         $CONFIG['LANG']               = $CONFIG['LANG_DEF']; #use default language
 
@@ -352,14 +353,6 @@ class fw {
     }
 
     /**
-     * return true if current request is GET request
-     * @return boolean
-     */
-    public function isGetRequest(): bool {
-        return $this->route->method == 'GET';
-    }
-
-    /**
      * return true if script runs not under web server (i.e. cron script)
      * @return boolean
      */
@@ -415,7 +408,7 @@ class fw {
         if ($_SESSION["XSS"] != reqs("XSS")) {
             #logger("WARN", "XSS CHECK FAIL"); #too excessive logging
             if ($is_die) {
-                throw new AuthException("XSS Error");
+                throw new AuthException("XSS Error. Reload the page or try to re-login");
             }
             return false;
         }
@@ -604,6 +597,11 @@ class fw {
             throw new Exception("parser - wrong call");
         }
 
+        if ($this->FormErrors && !isset($ps['ERR'])) {
+            $ps['ERR'] = $this->FormErrors; // add form errors if any
+            logger("DEBUG", "Form errors:", $ps["ERR"]);
+        }
+
         $out_format = $this->getResponseExpectedFormat();
         if ($out_format == 'json') {
             if (isset($ps['_json'])) {
@@ -635,13 +633,6 @@ class fw {
                 $layout = $ps['_layout'];
             }
 
-            if (!array_key_exists('ERR', $ps)) {
-                $ps["ERR"] = $this->GLOBAL['ERR']; #add errors if any
-                if (!empty($ps["ERR"])) {
-                    logger("DEBUG", "Form errors:", $ps["ERR"]);
-                }
-            }
-
             logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
             return parse_page($basedir, $layout, $ps, $out_filename);
         } else {
@@ -659,11 +650,13 @@ class fw {
             #read mode
             return $this->GLOBAL['_flash'][$name];
         } else {
-            #write for next request
-            #@session_start();
-            $_SESSION['_flash'][$name] = $value;
-            #@session_write_close();
-            return null;
+            if (!$this->isJsonExpected()) {
+                #write for the next request
+                #@session_start();
+                $_SESSION['_flash'][$name] = $value;
+                #@session_write_close();
+            }
+            return $this; //for chaining
         }
     }
 
@@ -884,7 +877,7 @@ class fw {
     ##########################  STATIC methods
 
     // redirect to relative or absolute url using header
-    public static function redirect(string $url, bool $noexit = false): void {
+    public static function redirect(string $url, bool $noexit = false): null {
         $url = fw::url2abs($url);
 
         logger("REDIRECT to [$url]");
@@ -892,6 +885,7 @@ class fw {
         if (!$noexit) {
             exit;
         }
+        return null;
     }
 
     #make url absolute
@@ -945,6 +939,16 @@ function reqh(string $name) {
     }
 
     return $h;
+}
+
+// return date (timestamp seconds) from request
+function reqd(string $name): int {
+    $date = reqs($name);
+    if ($date) {
+        $date = strtotime($date);
+    }
+
+    return intval($date);
 }
 
 //get bool value from $_REQUEST

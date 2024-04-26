@@ -11,10 +11,10 @@
  */
 
 class DevConfigureController extends FwController {
-    const access_level         = Users::ACL_VISITOR; #unlogged
-    const route_default_action = 'index';
+    const int    access_level         = Users::ACL_VISITOR; #unlogged
+    const string route_default_action = 'index';
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         global $conf_server_name;
         $ps = array(
             'hide_sidebar' => true,

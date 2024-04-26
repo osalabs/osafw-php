@@ -7,7 +7,7 @@
 */
 
 class FwDynamicController extends FwController {
-    const access_level = 100; #by default Admin Controllers allowed only for Admins
+    const int access_level = 100; #by default Admin Controllers allowed only for Admins
     protected $model_related;
 
     public function __construct() {
@@ -19,7 +19,7 @@ class FwDynamicController extends FwController {
         //$this->model_related = DemoDicts::i();
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         #get filters from the search form
         $f = $this->initFilter();
 
@@ -60,7 +60,7 @@ class FwDynamicController extends FwController {
         return $ps;
     }
 
-    public function ShowAction($form_id) {
+    public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
         $item = $this->model->one($id);
         if (!$item) {
@@ -89,10 +89,10 @@ class FwDynamicController extends FwController {
         return $ps;
     }
 
-    public function ShowFormAction($form_id) {
+    public function ShowFormAction($form_id): ?array {
         $id = intval($form_id);
 
-        if ($this->fw->isGetRequest()) {
+        if ($this->isGet()) {
             if ($id > 0) {
                 $item = $this->model->one($id);
             } else {
@@ -128,7 +128,7 @@ class FwDynamicController extends FwController {
         return $ps;
     }
 
-    public function modelAddOrUpdate($id, $fields) {
+    public function modelAddOrUpdate(int $id, array $fields): int {
         if ($this->is_dynamic_showform) {
             $this->processSaveShowFormFields($id, $fields);
         }
@@ -142,7 +142,7 @@ class FwDynamicController extends FwController {
         return $id;
     }
 
-    public function SaveAction($form_id) {
+    public function SaveAction($form_id): ?array {
         $id   = intval($form_id);
         $item = reqh('item');
 
@@ -157,17 +157,15 @@ class FwDynamicController extends FwController {
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            $location = $this->getReturnLocation($id);
-
         } catch (ApplicationException $ex) {
             $success = false;
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
         }
 
-        return $this->afterSave($success, $location, $id, $is_new);
+        return $this->afterSave($success, $id, $is_new);
     }
 
-    public function Validate($id, $item) {
+    public function Validate($id, $item): void {
         $result = $this->validateRequiredDynamic($item);
 
         if ($result && $this->is_dynamic_showform) {
@@ -184,7 +182,7 @@ class FwDynamicController extends FwController {
         $this->validateCheckResult();
     }
 
-    protected function validateRequiredDynamic($item) {
+    protected function validateRequiredDynamic($item): bool {
         $result = true;
 
         if (!$this->required_fields && $this->is_dynamic_showform) {
@@ -206,7 +204,7 @@ class FwDynamicController extends FwController {
     }
 
     #simple validation via showform_fields
-    public function validateSimpleDynamic($id, $item) {
+    public function validateSimpleDynamic($id, $item): bool {
         $result = true;
 
         $fields = $this->config["showform_fields"];
@@ -244,7 +242,7 @@ class FwDynamicController extends FwController {
         return $result;
     }
 
-    public function ShowDeleteAction($id) {
+    public function ShowDeleteAction($id): ?array {
         $id += 0;
         $ps = array(
             'i'          => $this->model->one($id),
@@ -255,17 +253,18 @@ class FwDynamicController extends FwController {
 
         $this->fw->parser('/common/form/showdelete', $ps);
         //return $ps; #use this instead of parser if you created custom /showdelete templates
+        return null;
     }
 
-    public function DeleteAction($id) {
+    public function DeleteAction($id): ?array {
         $id += 0;
         $this->model->delete($id);
 
         $this->fw->flash("onedelete", 1);
-        fw::redirect($this->getReturnLocation());
+        return $this->afterSave(true);
     }
 
-    public function SaveMultiAction() {
+    public function SaveMultiAction(): ?array {
         $acb = req('cb');
         if (!is_array($acb)) {
             $acb = array();
@@ -302,11 +301,11 @@ class FwDynamicController extends FwController {
             $this->fw->flash("success", "$ctr records added to the list");
         }
 
-        fw::redirect($this->getReturnLocation());
+        return $this->afterSaveJson(true, ['ctr' => $ctr]);
     }
 
     ###################### support for autocomlete related items
-    public function AutocompleteAction() {
+    public function AutocompleteAction(): ?array {
         if (!$this->model_related) {
             throw new ApplicationException('No model_related defined');
         }
@@ -316,16 +315,17 @@ class FwDynamicController extends FwController {
     }
 
     ###################### support for customizable list screen
-    public function UserViewsAction($form_id) {
+    public function UserViewsAction($form_id): ?array {
 
         $ps = array(
             'rows' => $this->getViewListArr($this->getViewListUserFields(), true)
         );
 
         $this->fw->parser("/common/list/userviews", $ps);
+        return null;
     }
 
-    public function SaveUserViewsAction() {
+    public function SaveUserViewsAction(): ?array {
         $item    = reqh('item');
         $success = true;
 
@@ -349,10 +349,10 @@ class FwDynamicController extends FwController {
 
         } catch (Exception $ex) {
             $success = false;
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
         }
 
-        fw::redirect($this->return_url);
+        return fw::redirect($this->return_url);
     }
 
     ###################### HELPERS for dynamic fields
@@ -363,7 +363,7 @@ class FwDynamicController extends FwController {
      * @param array $ps for parsepage
      * @return array       array of hashtables to build fields in templates
      */
-    public function prepareShowFields($item, $ps) {
+    public function prepareShowFields($item, $ps): array {
         $id = intval($item['id']);
 
         $fields = $this->config["show_fields"];
@@ -534,7 +534,7 @@ class FwDynamicController extends FwController {
     }
 
     #auto-process fields BEFORE record saved to db
-    public function processSaveShowFormFields($id, &$fields) {
+    public function processSaveShowFormFields($id, &$fields): void {
         $item = reqh("item");
 
         $showform_fields = $this->_fieldsToHash($this->config["showform_fields"]);
@@ -563,7 +563,7 @@ class FwDynamicController extends FwController {
     }
 
     #auto-process fields AFTER record saved to db
-    protected function processSaveShowFormFieldsAfter($id, $fields) {
+    protected function processSaveShowFormFieldsAfter($id, $fields): void {
         #for now we just look if we have att_links_edit field and update att links
         foreach ($this->config['showform_fields'] as $def) {
             if ($def['type'] == 'att_links_edit') {
@@ -574,7 +574,7 @@ class FwDynamicController extends FwController {
 
     #convert config's fields list into hashtable as field => {}
     #if there are more than one field - just first field added to the hash
-    protected function _fieldsToHash($fields) {
+    protected function _fieldsToHash($fields): array {
         $result = array();
         foreach ($fields as $fldinfo) {
             if (array_key_exists('field', $fldinfo) && !array_key_exists($fldinfo['field'], $result)) {

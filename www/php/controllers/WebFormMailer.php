@@ -10,28 +10,30 @@
 
 
 class WebFormMailerController extends FwController {
-    const route_default_action = '';
+    const string route_default_action = '';
 
     public function __construct() {
         parent::__construct();
     }
 
     public function SaveAction() {
-        $mail_to = $this->fw->GLOBAL['SUPPORT_EMAIL'];
+        $mail_to      = $this->fw->GLOBAL['SUPPORT_EMAIL'];
         $mail_subject = reqs('subject');
-        $redirect_to = reqs('redirect');
+        $redirect_to  = reqs('redirect');
 
         $sys_fields = Utils::qh('form_format redirect subject submit RAWURL XSS');
-        $msg_body='';
+        $msg_body   = '';
         foreach ($_POST as $key => $value) {
-            if (array_key_exists($key, $sys_fields)) continue;
-            $msg_body.=$key.' = '.$value."\n";
+            if (array_key_exists($key, $sys_fields)) {
+                continue;
+            }
+            $msg_body .= $key . ' = ' . $value . "\n";
         }
 
         $this->fw->sendEmail($mail_to, $mail_subject, $msg_body);
 
         //need to add root_domain, so no one can use our redirector for bad purposes
-        fw::redirect($this->fw->GLOBAL['ROOT_DOMAIN'].$redirect_to);
+        fw::redirect($this->fw->GLOBAL['ROOT_DOMAIN'] . $redirect_to);
     }
 
 }

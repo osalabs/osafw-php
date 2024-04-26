@@ -126,6 +126,15 @@ class DateUtils {
         return $dt->format('Y-m-d');
     }
 
+    /**
+     * return true if string is date in format MM/DD/YYYY or DD/MM/YYYY
+     * @param string $str date string
+     * @return bool
+     */
+    public static function isDateStr($str): bool {
+        return (bool)preg_match("/^\d{1,2}\/\d{1,2}\/\d{4}$/", $str);
+    }
+
     public static function Date2Str(DateTime $dt): string {
         return $dt->format(self::$DATE_FORMAT_STR);
     }
@@ -146,6 +155,21 @@ class DateUtils {
         }
 
         return "$year-$month-$day";
+    }
+
+    /**
+     * convert datetime string to date only string
+     * Example: 1/17/2023 12:00:00 AM => 1/17/2023
+     * @param string $str datetime string
+     * @return string date only string
+     */
+    public static function Str2DateOnly(string $str): string {
+        $result = $str;
+        $dt     = self::f2date($str);
+        if ($dt) {
+            $result = $dt->format('Y-m-d');
+        }
+        return $result;
     }
 
     // anything to date, if not valid - return null

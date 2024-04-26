@@ -1030,6 +1030,24 @@ class DB {
     }
 
     /**
+     * Build and execute raw select statement with offset/limit according to server type (MySQL for now)
+     * !All parameters must be already properly enquoted
+     * @param string $fields
+     * @param string $from
+     * @param string $where
+     * @param array $where_params
+     * @param string $orderby
+     * @param int $offset
+     * @param int $limit
+     * @return array<int, array<string, mixed>>
+     * @throws DBException
+     */
+    public function selectRaw(string $fields, string $from, string $where, array $where_params, string $orderby, int $offset = 0, int $limit = -1): array {
+        $sql = "SELECT " . $fields . " FROM " . $from . " WHERE " . $where . " ORDER BY " . $orderby . " LIMIT " . $offset . ", " . $limit;
+        return $this->arrp($sql, $where_params);
+    }
+
+    /**
      * build delete query and params
      * @param string $table
      * @param array $where
@@ -1722,20 +1740,60 @@ class DB {
             '@TABLE_NAME'   => $table_name
         ]);
         foreach ($rows as &$row) {
-            $row["internal_type"] = $this->map_sqltype2internal($row["type"]);
+            $row["fw_type"]    = $this->mapTypeSQL2Fw($row["type"]);
+            $row["fw_subtype"] = strtolower($row["type"]);
         }
         unset($row);
 
         return $rows;
     }
 
-    public function map_sqltype2internal($type): string {
+    public function mapTypeSQL2Fw($type): string {
         return match (strtolower($type)) {
             "tinyint", "smallint", "int", "bigint", "bit" => "int",
             "real", "numeric", "decimal", "money", "smallmoney", "float" => "float",
             "datetime", "datetime2", "date", "smalldatetime" => "datetime",
             default => "varchar",
         };
+    }
+
+    /***
+     * load table schema from db
+     * @param string $table
+     * @return array field_name => fw_type
+     */
+    public function loadTableSchema(string $table): array {
+        $fields = $this->tableSchema($table);
+        $result = [];
+        foreach ($fields as $field) {
+            $result[strtolower($field['name'])] = $field['fw_type'];
+        }
+        return $result;
+    }
+
+
+    public function schemaFieldType(string $table, string $field_name): string {
+        $schema     = $this->loadTableSchema($table);
+        $field_name = strtolower($field_name);
+        if (!array_key_exists($field_name, $schema)) {
+            return "";
+        }
+        $field_type = $schema[$field_name];
+
+        $result = "";
+        if (str_contains($field_type, "int")) {
+            $result = "int";
+        } elseif ($field_type == "datetime") {
+            $result = $field_type;
+        } elseif ($field_type == "float") {
+            $result = $field_type;
+        } elseif ($field_type == "decimal") {
+            $result = $field_type;
+        } else {
+            $result = "varchar";
+        }
+
+        return $result;
     }
 
     /**

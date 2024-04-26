@@ -7,7 +7,7 @@
 */
 
 class ContactController extends FwController {
-    const route_default_action = '';
+    const string route_default_action = '';
 
     public function __construct() {
         parent::__construct();
@@ -18,7 +18,7 @@ class ContactController extends FwController {
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $ps = array();
 
         $page               = Spages::i()->oneByFullUrl($this->base_url);

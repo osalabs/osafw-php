@@ -83,16 +83,14 @@ $FW_CONFIG = array(
     "ui_theme"              => 0, #0 default theme
     "ui_mode"               => 0, #0 default mode(auto)
 
-    'MAX_PAGE_ITEMS' => 25,
-
     #prefixes for Dispatcher
-    'ROUTE_PREFIXES' => array(
+    'ROUTE_PREFIXES'        => array(
         '/Admin',
         '/My',
         '/Dev',
     ),
     #Controllers without need for XSS check
-    'NO_XSS'         => array(
+    'NO_XSS'                => array(
         'Login',
     ),
     #Allowed Access levels for Controllers
@@ -100,15 +98,15 @@ $FW_CONFIG = array(
     #0 - any visitor
     #1 - user must be logged in
     #100 - admin user
-    'ACCESS_LEVELS'  => array(
+    'ACCESS_LEVELS'         => array(
         '/Main'            => 1,
         '/AdminAtt/Select' => 1,
     ),
 
     #multilanguage support settings
-    'LANG_DEF'       => 'en',        #default language - en, ru, ua, ...
-    'LANG'           => 'en',        #to be updated according to user session
-    'IS_LANG_UPD'    => false,       #false - don't update lang files, true - update lang files with new strings
+    'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
+    'LANG'                  => 'en',        #to be updated according to user session
+    'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
 
     'IS_MFA_ENFORCES' => false, #true - enforce MFA for all users, false - use user settings
     'CRYPT_KEY'       => '', #define in site/dev specific config

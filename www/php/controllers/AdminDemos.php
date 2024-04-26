@@ -7,28 +7,28 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 */
 
 class AdminDemosController extends FwAdminController {
-    const access_level = Users::ACL_MANAGER;
-    public $base_url = '/Admin/Demos';
-    public $required_fields = 'iname email';
-    public $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
-    public $save_fields_checkboxes = 'is_checkbox';
-    public $save_fields_nullable = 'demo_dicts_id att_id';
-    public $model_name = 'Demos';
+    const int access_level = Users::ACL_MANAGER;
+    public string $base_url = '/Admin/Demos';
+    public string $required_fields = 'iname email';
+    public string $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
+    public string $save_fields_checkboxes = 'is_checkbox';
+    public string $save_fields_nullable = 'demo_dicts_id att_id';
+    public string $model_name = 'Demos';
     public $model_related;
 
     /*REMOVE OR OVERRIDE*/
-    public $related_field_name = 'demo_dicts_id';
-    public $search_fields = 'iname idesc';
-    public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
-                                 'id'            => 'id',
-                                 'iname'         => 'iname',
-                                 'add_time'      => 'add_time',
-                                 'demo_dicts_id' => 'demo_dicts_id',
-                                 'email'         => 'email',
-                                 'status'        => 'status',
+    public string $related_field_name = 'demo_dicts_id';
+    public string $search_fields = 'iname idesc';
+    public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
+    public array $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
+                                       'id'            => 'id',
+                                       'iname'         => 'iname',
+                                       'add_time'      => 'add_time',
+                                       'demo_dicts_id' => 'demo_dicts_id',
+                                       'email'         => 'email',
+                                       'status'        => 'status',
     );
-    public $form_new_defaults = array(
+    public array $form_new_defaults = array(
         'fint'   => 0,
         'ffloat' => 0,
     );
@@ -40,7 +40,7 @@ class AdminDemosController extends FwAdminController {
     }
 
     //override due to custom search filter on status
-    public function setListSearch() {
+    public function setListSearch(): void {
         parent::setListSearch();
 
         if ($this->list_filter['status'] > '') {
@@ -49,7 +49,7 @@ class AdminDemosController extends FwAdminController {
     }
 
     // override get list rows as list need to be modified
-    public function getListRows() {
+    public function getListRows(): void {
         parent::getListRows();
 
         #add/modify rows from db
@@ -59,7 +59,7 @@ class AdminDemosController extends FwAdminController {
     }
 
     //View item screen
-    public function ShowAction($form_id) {
+    public function ShowAction($form_id): ?array {
         $ps   = parent::ShowAction($form_id);
         $item = $ps['i'];
         $id   = intval($item['id']);
@@ -81,11 +81,11 @@ class AdminDemosController extends FwAdminController {
     }
 
     //Add/Edit item form screen
-    public function ShowFormAction($form_id) {
+    public function ShowFormAction($form_id): ?array {
         $id              = intval($form_id);
         $dict_link_multi = array();
 
-        if ($this->fw->isGetRequest()) {
+        if ($this->isGet()) {
             if ($id > 0) {
                 $item              = $this->model->one($id);
                 $item["ftime_str"] = DateUtils::int2timestr($item["ftime"]);
@@ -129,7 +129,7 @@ class AdminDemosController extends FwAdminController {
     }
 
     // override to modify some fields before save
-    public function getSaveFields($id, $item) {
+    public function getSaveFields($id, $item): array {
         $itemdb = parent::getSaveFields($id, $item);
 
         #load old record if necessary
@@ -145,7 +145,7 @@ class AdminDemosController extends FwAdminController {
     }
 
     // override because we need to update att links
-    public function modelAddOrUpdate($id, $fields) {
+    public function modelAddOrUpdate(int $id, array $fields): int {
         $id = parent::modelAddOrUpdate($id, $fields);
 
         Att::i()->updateAttLinks($this->model->table_name, $id, reqh('att'));
@@ -153,7 +153,7 @@ class AdminDemosController extends FwAdminController {
         return $id;
     }
 
-    public function Validate($id, $item) {
+    public function Validate($id, $item): void {
         $result = $this->validateRequired($item, $this->required_fields);
 
         //check $result here used only to disable further validation if required fields validation failed

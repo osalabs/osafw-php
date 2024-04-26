@@ -202,13 +202,22 @@ class Utils {
      * @var string|array $fields fields to export - string for qh or hash - (fieldname => field name in header), default - all export fields
      * @var string $filename human name of the file for browser, default "export.csv"
      */
-    public static function responseCSV($rows, $fields = '', $filename = 'export.csv') {
+    public static function responseCSV(array $rows, array|string $fields = '', string $filename = 'export.csv') {
         $filename = str_replace('"', "'", $filename); #quote filename
 
         header('Content-type: text/csv');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 
         static::exportCSV($rows, $fields);
+    }
+
+    public static function responseXLS(FW $fw, array $rows, array|string $fields = '', string $filename = 'export.xls'): void {
+        $filename = str_replace('"', "'", $filename); #quote filename
+
+        header('Content-type: application/vnd.ms-excel');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+
+        #TODO writeXLSExport
     }
 
 

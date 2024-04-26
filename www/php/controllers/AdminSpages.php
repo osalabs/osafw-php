@@ -7,21 +7,21 @@
 */
 
 class AdminSpagesController extends FwAdminController {
-    const access_level = Users::ACL_MANAGER;
-    public $base_url = '/Admin/Spages';
-    public $required_fields = 'iname';
-    public $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_css custom_js';
-    public $save_fields_checkboxes = '';
-    public $model_name = 'Spages';
+    const int access_level = Users::ACL_MANAGER;
+    public string $base_url = '/Admin/Spages';
+    public string $required_fields = 'iname';
+    public string $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_css custom_js';
+    public string $save_fields_checkboxes = '';
+    public string $model_name = 'Spages';
     /*REMOVE OR OVERRIDE*/
-    public $search_fields = 'url iname idesc';
-    public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
-                                 'id'       => 'id',
-                                 'iname'    => 'iname',
-                                 'pub_time' => 'pub_time',
-                                 'upd_time' => 'upd_time',
-                                 'status'   => 'status',
+    public string $search_fields = 'url iname idesc';
+    public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
+    public array $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
+                                       'id'       => 'id',
+                                       'iname'    => 'iname',
+                                       'pub_time' => 'pub_time',
+                                       'upd_time' => 'upd_time',
+                                       'status'   => 'status',
     );
 
     public function __construct() {
@@ -31,7 +31,7 @@ class AdminSpagesController extends FwAdminController {
     }
 
     //override list rows
-    public function getListRows() {
+    public function getListRows(): void {
         if ($this->list_filter['sortby'] == 'iname' && ($this->list_filter['s'] ?? '') == '') {
             $this->list_count = $this->db->valuep("select count(*) from " . $this->model->table_name . " where " . $this->list_where);
             if ($this->list_count > 0) {
@@ -71,7 +71,7 @@ class AdminSpagesController extends FwAdminController {
     //override if necessary: IndexAction, ShowAction, ShowFormAction, Validate, DeleteAction, Export, SaveMultiAction
     //or override just: setListSearch, set_list_rows, getSaveFields
 
-    public function ShowFormAction($form_id) {
+    public function ShowFormAction($form_id): ?array {
         #set new form defaults here if any
         if (reqs("parent_id") > "") {
             $this->form_new_defaults              = array();
@@ -103,7 +103,7 @@ class AdminSpagesController extends FwAdminController {
     }
 
 
-    public function SaveAction($form_id) {
+    public function SaveAction($form_id): ?array {
         $this->fw->checkXSS();
 
         $id   = intval($form_id);
@@ -142,14 +142,12 @@ class AdminSpagesController extends FwAdminController {
                 FwCache::remove("home_page");
             } #reset home page cache if Home page changed
 
-            $location = $this->getReturnLocation($id);
-
         } catch (ApplicationException $ex) {
             $success = false;
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
         }
 
-        return $this->afterSave($success, $location, $id, $is_new);
+        return $this->afterSave($success, $id, $is_new);
     }
 
 }//end of class

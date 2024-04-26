@@ -7,17 +7,17 @@
 */
 
 class AdminSettingsController extends FwAdminController {
-    public $base_url = '/Admin/Settings';
-    public $required_fields = 'ivalue';
-    public $save_fields = 'ivalue';
-    public $model_name = 'Settings';
+    public string $base_url = '/Admin/Settings';
+    public string $required_fields = 'ivalue';
+    public string $save_fields = 'ivalue';
+    public string $model_name = 'Settings';
 
-    public $search_fields = 'icode iname ivalue';
-    public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
-                                 'id'       => 'id',
-                                 'iname'    => 'iname',
-                                 'upd_time' => 'upd_time',
+    public string $search_fields = 'icode iname ivalue';
+    public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
+    public array $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
+                                       'id'       => 'id',
+                                       'iname'    => 'iname',
+                                       'upd_time' => 'upd_time',
     );
 
     public function __construct() {
@@ -25,7 +25,7 @@ class AdminSettingsController extends FwAdminController {
 
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         #get filters from the search form
         $f = $this->initFilter();
 
@@ -55,7 +55,7 @@ class AdminSettingsController extends FwAdminController {
         return $ps;
     }
 
-    public function SaveAction($form_id) {
+    public function SaveAction($form_id): ?array {
         $this->fw->checkXSS();
 
         $id   = intval($form_id);
@@ -78,12 +78,13 @@ class AdminSettingsController extends FwAdminController {
             fw::redirect($this->base_url . '/' . $id . '/edit');
 
         } catch (ApplicationException $ex) {
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
             $this->routeRedirect("ShowForm");
         }
+        return null;
     }
 
-    public function Validate($id, $item) {
+    public function Validate($id, $item): void {
         $result = $this->validateRequired($item, $this->required_fields);
 
         if ($id == 0) {

@@ -7,13 +7,13 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 class FwAdminController extends FwController {
-    const access_level         = Users::ACL_SITE_ADMIN; #by default Admin Controllers allowed only for Admins
-    const route_default_action = '';
-    public $base_url = '/Admin/FwAdmin';
-    public $required_fields = 'iname';
-    public $save_fields = 'iname status';
-    public $save_fields_checkboxes = '';
-    public $save_fields_nullable = '';
+    const int    access_level         = Users::ACL_SITE_ADMIN; #by default Admin Controllers allowed only for Admins
+    const string route_default_action = '';
+    public string $base_url = '/Admin/FwAdmin';
+    public string $required_fields = 'iname';
+    public string $save_fields = 'iname status';
+    public string $save_fields_checkboxes = '';
+    public string $save_fields_nullable = '';
     #public $model_name = 'DemoDicts'; #set in child class!
     /*REMOVE OR OVERRIDE
     public $search_fields = 'iname idesc';
@@ -32,7 +32,7 @@ class FwAdminController extends FwController {
         $this->list_view = $this->model->table_name ?? '';
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         #get filters from the search form
         $f = $this->initFilter();
 
@@ -64,7 +64,7 @@ class FwAdminController extends FwController {
         return $ps;
     }
 
-    public function ShowAction($form_id) {
+    public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
         $item = $this->model->one($id);
         if (!$item) {
@@ -87,10 +87,10 @@ class FwAdminController extends FwController {
         return $ps;
     }
 
-    public function ShowFormAction($form_id) {
+    public function ShowFormAction($form_id): ?array {
         $id = intval($form_id);
 
-        if ($this->fw->isGetRequest()) {
+        if ($this->isGet()) {
             if ($id > 0) {
                 $item = $this->model->one($id);
             } else {
@@ -114,7 +114,7 @@ class FwAdminController extends FwController {
         return $ps;
     }
 
-    public function SaveAction($form_id) {
+    public function SaveAction($form_id): ?array {
         $this->fw->checkXSS();
 
         $id   = intval($form_id);
@@ -131,16 +131,15 @@ class FwAdminController extends FwController {
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            $location = $this->getReturnLocation($id);
         } catch (ApplicationException $ex) {
             $success = false;
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
         }
 
-        return $this->afterSave($success, $location, $id, $is_new);
+        return $this->afterSave($success, $id, $is_new);
     }
 
-    public function Validate($id, $item) {
+    public function Validate($id, $item): void {
         $result = $this->validateRequired($item, $this->required_fields);
 
         /*
@@ -153,7 +152,7 @@ class FwAdminController extends FwController {
         $this->validateCheckResult();
     }
 
-    public function ShowDeleteAction($id) {
+    public function ShowDeleteAction($id): ?array {
         $id += 0;
         $ps = array(
             'i'          => $this->model->one($id),
@@ -164,19 +163,20 @@ class FwAdminController extends FwController {
 
         $this->fw->parser('/common/form/showdelete', $ps);
         //return $ps; #use this instead of parser if you created custom /showdelete templates
+        return null;
     }
 
-    public function DeleteAction($id) {
+    public function DeleteAction($id): ?array {
         $this->fw->checkXSS();
 
         $id += 0;
         $this->model->delete($id);
 
         $this->fw->flash("onedelete", 1);
-        fw::redirect($this->getReturnLocation());
+        return $this->afterSave(true);
     }
 
-    public function SaveMultiAction() {
+    public function SaveMultiAction(): ?array {
         $this->fw->checkXSS();
 
         $acb = req('cb');
@@ -216,6 +216,6 @@ class FwAdminController extends FwController {
             $this->fw->flash("success", "$ctr records added to the list");
         }
 
-        fw::redirect($this->getReturnLocation());
+        return $this->afterSaveJson(true, ['ctr' => $ctr]);
     }
 } //end of class

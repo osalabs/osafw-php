@@ -7,29 +7,29 @@
 */
 
 class AdminUsersController extends FwAdminController {
-    const route_default_action = '';
-    public $base_url = '/Admin/Users';
-    public $required_fields = 'email access_level';
-    public $save_fields = 'email pwd access_level fname lname title address1 address2 city state zip phone status att_id';
-    public $save_fields_nullable = 'att_id';
-    public $model_name = 'Users';
+    const string route_default_action = '';
+    public string $base_url = '/Admin/Users';
+    public string $required_fields = 'email access_level';
+    public string $save_fields = 'email pwd access_level fname lname title address1 address2 city state zip phone status att_id';
+    public string $save_fields_nullable = 'att_id';
+    public string $model_name = 'Users';
 
-    public $list_sortdef = 'iname asc';    //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
-                                 'id'           => 'id',
-                                 'iname'        => 'fname,lname',
-                                 'email'        => 'email',
-                                 'access_level' => 'access_level',
-                                 'status'       => 'status',
-                                 'add_time'     => 'add_time',
+    public string $list_sortdef = 'iname asc';    //default sorting - req param name, asc|desc direction
+    public array $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
+                                       'id'           => 'id',
+                                       'iname'        => 'fname,lname',
+                                       'email'        => 'email',
+                                       'access_level' => 'access_level',
+                                       'status'       => 'status',
+                                       'add_time'     => 'add_time',
     );
-    public $search_fields = 'email fname lname';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
+    public string $search_fields = 'email fname lname';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
 
     //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
 
     public function ShowFormAction($form_id): ?array {
         $ps = parent::ShowFormAction($form_id);
-        if (!$this->fw->isGetRequest()) {
+        if (!$this->isGet()) {
             $ps['i']["email"] = $ps['i']["ehack"];
         }
 
@@ -38,7 +38,7 @@ class AdminUsersController extends FwAdminController {
         return $ps;
     }
 
-    public function SaveAction($form_id): void {
+    public function SaveAction($form_id): ?array {
         $this->fw->checkXSS();
 
         $id   = intval($form_id);
@@ -66,7 +66,7 @@ class AdminUsersController extends FwAdminController {
             fw::redirect($this->base_url . '/' . $id . '/edit');
 
         } catch (ApplicationException $ex) {
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
             $this->routeRedirect("ShowForm");
         }
     }

@@ -5,6 +5,8 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 */
 
 class FormUtils {
+    public const int MAX_PAGE_ITEMS = 25; //default max number of items on list screen
+
     #simple email check
     public static function isEmail($email) {
         return preg_match("/[^@]+\@[^@]+/", $email);
@@ -95,7 +97,7 @@ class FormUtils {
     #RETURN: array of pages for pagination
     public static function getPager($count, $pagenum, $pagesize = NULL) {
         if (is_null($pagesize)) {
-            $pagesize = fw::i()->config->MAX_PAGE_ITEMS;
+            $pagesize = self::MAX_PAGE_ITEMS;
         }
 
         $PAD_PAGES = 5; #show up to this number of pages before/after current page
@@ -353,4 +355,40 @@ class FormUtils {
         return false;
     }
 
+    /**
+     * return sql for order by clause for the passed form name (sortby) and direction (sortdir) using defined mapping (sortmap)
+     * @param string $sortby form_name field to sort by
+     * @param string $sortdir desc|[asc]
+     * @param array $sortmap mapping form_name => field_name
+     * @return string sql order by clause
+     * @throws Exception
+     */
+    public static function sqlOrderBy(string $sortby, string $sortdir, array $sortmap): string {
+        $orderby = ($sortmap[$sortby] ?? '');
+        if (!$orderby) {
+            throw new Exception("No orderby defined for [$sortby], define in list_sortmap");
+        }
+
+        $aorderby = explode(',', $orderby);
+        if ($sortdir == "desc") {
+            // if sortdir is desc, i.e. opposite to default - invert order for orderby fields
+            // go thru each order field
+            foreach ($aorderby as $i => $orderby) {
+                list($field, $order) = Utils::split2('/\s+/', $orderby);
+                if ($order == "desc") {
+                    $order = "asc";
+                } else {
+                    $order = "desc";
+                }
+                $aorderby[$i] = dbqid($field) . " " . $order;
+            }
+        } else {
+            // quote
+            foreach ($aorderby as $i => $orderby) {
+                list($field, $order) = Utils::split2('/\s+/', $orderby);
+                $aorderby[$i] = dbqid($field) . " " . $order;
+            }
+        }
+        return implode(", ", $aorderby);
+    }
 }

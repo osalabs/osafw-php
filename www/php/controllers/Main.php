@@ -24,7 +24,7 @@ class MainController extends FwController {
         parent::checkAccess();
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $ps    = array();
         $panes = array();
 

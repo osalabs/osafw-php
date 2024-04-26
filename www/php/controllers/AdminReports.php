@@ -7,9 +7,9 @@
 */
 
 class AdminReportsController extends FwAdminController {
-    const access_level = Users::ACL_MANAGER;
-    public $base_url = '/Admin/Reports';
-    public $model_name = 'Reports';
+    const int access_level = Users::ACL_MANAGER;
+    public string $base_url = '/Admin/Reports';
+    public string $model_name = 'Reports';
     public $is_admin = false;
 
     public function __construct() {
@@ -19,12 +19,12 @@ class AdminReportsController extends FwAdminController {
         $this->is_admin = Users::i()->isAccessLevel(Users::ACL_MANAGER);
     }
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $ps = array();
         return $ps;
     }
 
-    public function ShowAction($repcode) {
+    public function ShowAction($repcode): ?array {
         $ps = array();
 
         $repcode      = $this->model->cleanupRepcode($repcode);
@@ -48,25 +48,28 @@ class AdminReportsController extends FwAdminController {
 
         #show or output report according format
         $report->render($ps);
+        return null;
     }
 
     #save changes from editable reports
-    public function SaveAction($repcode) {
+    public function SaveAction($form_id): ?array {
+        $repcode = $form_id;
         $repcode = $this->model->cleanupRepcode(reqs("repcode"));
 
         $report = $this->model->createInstance($repcode, reqh("f"));
 
         try {
             if ($report->saveChanges()) {
-                fw::redirect($base_url . "/" . $repcode . "?is_run=1");
+                fw::redirect($this->base_url . "/" . $repcode . "?is_run=1");
             } else {
                 $_REQUEST['is_run'] = 1;
                 $this->fw->routeRedirect("Show");
             }
-        } catch (ApplicationException $e) {
-            $this->setFormError($ex->getMessage());
+        } catch (ApplicationException $ex) {
+            $this->setFormError($ex);
             $this->routeRedirect("ShowForm");
         }
+        return null;
     }
 
 }//end of class

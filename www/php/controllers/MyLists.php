@@ -1,21 +1,21 @@
 <?php
 
 class MyListsController extends FwAdminController {
-    const access_level         = 0; #logged only
-    const route_default_action = '';
-    public $base_url = '/My/Lists';
-    public $required_fields = 'entity iname';
-    public $save_fields = 'entity iname idesc status';
-    public $save_fields_checkboxes = '';
-    public $model_name = 'UserLists';
+    const int    access_level         = 0; #logged only
+    const string route_default_action = '';
+    public string $base_url = '/My/Lists';
+    public string $required_fields = 'entity iname';
+    public string $save_fields = 'entity iname idesc status';
+    public string $save_fields_checkboxes = '';
+    public string $model_name = 'UserLists';
     /*REMOVE OR OVERRIDE*/
-    public $search_fields = 'iname idesc';
-    public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
-    public $list_sortmap = array(                   //sorting map: req param name => sql field name(s) asc|desc direction
-                                                    'id'       => 'id',
-                                                    'iname'    => 'iname',
-                                                    'add_time' => 'add_time',
-                                                    'status'   => 'status',
+    public string $search_fields = 'iname idesc';
+    public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
+    public array $list_sortmap = array(                   //sorting map: req param name => sql field name(s) asc|desc direction
+                                                          'id'       => 'id',
+                                                          'iname'    => 'iname',
+                                                          'add_time' => 'add_time',
+                                                          'status'   => 'status',
     );
 
     public function __construct() {
@@ -25,7 +25,7 @@ class MyListsController extends FwAdminController {
         $this->form_new_defaults["entity"] = $this->related_id;
     }
 
-    public function initFilter() {
+    public function initFilter(string $session_key = ''): array {
         $result = parent::initFilter();
         if (!array_key_exists('entity', $this->list_filter)) {
             $this->list_filter["entity"] = $this->related_id;
@@ -33,7 +33,7 @@ class MyListsController extends FwAdminController {
         return $this->list_filter;
     }
 
-    public function setListSearch() {
+    public function setListSearch(): void {
         $this->list_where = " status<>127 and add_users_id = " . dbqi($this->fw->userId()); #only logged user lists
 
         parent::setListSearch();
@@ -43,14 +43,14 @@ class MyListsController extends FwAdminController {
         }
     }
 
-    public function modelAddOrUpdate($id, $itemdb) {
+    public function modelAddOrUpdate(int $id, array $fields): int {
         $is_new = ($id == 0);
 
-        $id = parent::modelAddOrUpdate($id, $itemdb);
+        $id = parent::modelAddOrUpdate($id, $fields);
 
-        if ($is_new && array_key_exists('item_id', $item)) {
+        if ($is_new && array_key_exists('item_id', $fields)) {
             #item_id could contain comma-separated ids
-            $hids = Utils::commastr2hash(item["item_id"]);
+            $hids = Utils::commastr2hash($fields["item_id"]);
 
             if ($hids) {
                 #if item id passed - link item with the created list
@@ -62,6 +62,7 @@ class MyListsController extends FwAdminController {
                 }
             }
         }
+        return $id;
     }
 
     public function ToggleListAction($user_lists_id) {

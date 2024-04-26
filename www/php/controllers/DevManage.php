@@ -6,10 +6,10 @@
  */
 
 class DevManageController extends FwController {
-    const access_level = 100;
-    public $base_url = '/Dev/Manage';
+    const int access_level = 100;
+    public string $base_url = '/Dev/Manage';
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $ps = array();
 
         #table list
@@ -112,7 +112,7 @@ class DevManageController extends FwController {
             "DemoDicts"           => $model_name,
             "Demos"               => $model_name,
         );
-        if (!$this->_replaceInFile($path . "/AdminDemosDynamic.php", $replacements, $path . "/" . $controller_name . ".php", $mdemo)) {
+        if (!$this->_replaceInFile($path . "/AdminDemosDynamic.php", $replacements, $path . "/" . $controller_name . ".php")) {
             throw new ApplicationException("Can't open AdminDemosDynamic.php");
         }
 
@@ -179,7 +179,7 @@ class DevManageController extends FwController {
             if ($fld["maxlen"] > 0) {
                 $sff["maxlength"] = intval($fld["maxlen"]);
             }
-            if ($fld["internal_type"] == "varchar") {
+            if ($fld["fw_type"] == "varchar") {
                 if ($fld["maxlen"] == -1 || $fld["type"] == 'text') { #large text
                     $sf["type"]           = "markdown";
                     $sff["type"]          = "textarea";
@@ -189,8 +189,8 @@ class DevManageController extends FwController {
                     $sff["type"] = "input";
                 }
 
-            } elseif ($fld["internal_type"] == "int") {
-                if (substr($fld["name"], -3) == "_id" && $fld["name"] != "dict_link_auto_id") { #TODO remove dict_link_auto_id
+            } elseif ($fld["fw_type"] == "int") {
+                if (str_ends_with($fld["name"], "_id") && $fld["name"] != "dict_link_auto_id") { #TODO remove dict_link_auto_id
                     #TODO better detect if field has foreign key
                     #if link to other table - make type=select
                     $mname = $this->_tablename2model(substr($fld["name"], 0, strlen($fld["name"]) - 3));
@@ -216,12 +216,12 @@ class DevManageController extends FwController {
                     $sff["max"]            = 999999;
                     $sff["class_contents"] = "col-md-3";
                 }
-            } elseif ($fld["internal_type"] == "float") {
+            } elseif ($fld["fw_type"] == "float") {
                 $sff["type"]           = "number";
                 $sff["step"]           = 0.1;
                 $sff["class_contents"] = "col-md-3";
 
-            } elseif ($fld["internal_type"] == "datetime") {
+            } elseif ($fld["fw_type"] == "datetime") {
                 $sf["type"]            = "date";
                 $sff["type"]           = "date_popup";
                 $sff["class_contents"] = "col-md-3";

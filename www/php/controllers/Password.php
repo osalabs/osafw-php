@@ -1,9 +1,9 @@
 <?php
 
 class PasswordController extends FwController {
-    const route_default_action = '';
-    public $base_url = '/Password';
-    public $model_name = 'Users';
+    const string route_default_action = '';
+    public string $base_url = '/Password';
+    public string $model_name = 'Users';
 
     public function __construct() {
         parent::__construct();
@@ -13,46 +13,48 @@ class PasswordController extends FwController {
         throw new ApplicationException('Access Denied');
     }
 
-    public function IndexAction() {
-        if ($this->fw->isGetRequest()){
+    public function IndexAction(): ?array {
+        if ($this->isGet()) {
             #defaults
-            $item=array();
-        }else{
+            $item = array();
+        } else {
             $item = reqh('item');
         }
 
         $ps = array(
-            'i'     => $item,
-            'hide_sidebar'  => true,
+            'i'            => $item,
+            'hide_sidebar' => true,
         );
 
         return $ps;
     }
 
     public function SaveAction() {
-        $item = reqh('item');
-        $item['login']=trim($item['login']);
+        $item          = reqh('item');
+        $item['login'] = trim($item['login']);
 
-        try{
+        try {
             $this->Validate(0, $item);
             $user = $this->model->oneByEmail($item['login']);
 
             #$this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
 
-            fw::redirect($this->base_url.'/(Sent)');
+            fw::redirect($this->base_url . '/(Sent)');
 
-        }catch( ApplicationException $ex ){
-            $this->setFormError($ex->getMessage());
+        } catch (ApplicationException $ex) {
+            $this->setFormError($ex);
             $this->routeRedirect("Index");
         }
     }
 
     public function Validate($id, $item) {
-        $result= $this->validateRequired($item, "login");
+        $result = $this->validateRequired($item, "login");
 
-        if ($result){
+        if ($result) {
             $user = $this->model->oneByEmail($item['login']);
-            if (!count($user)) $this->setError('login', 'WRONG');
+            if (!count($user)) {
+                $this->setError('login', 'WRONG');
+            }
         }
 
         $this->validateCheckResult();

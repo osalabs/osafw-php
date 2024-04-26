@@ -1,19 +1,20 @@
 <?php
 
 class MySettingsController extends FwController {
-    const access_level         = 0; #logged only
-    const route_default_action = '';
-    public $base_url = '/My/Settings';
-    public $model_name = 'Users';
+    const int    access_level         = 0; #logged only
+    const string route_default_action = '';
+    public string $base_url = '/My/Settings';
+    public string $model_name = 'Users';
 
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         $this->routeRedirect("ShowForm");
+        return null;
     }
 
     public function ShowFormAction() {
         $id = $this->fw->userId();
 
-        if ($this->fw->isGetRequest()) {
+        if ($this->isGet()) {
             if ($id > 0) {
                 $item = $this->model->one($id);
             } else {
@@ -49,7 +50,7 @@ class MySettingsController extends FwController {
             fw::redirect($this->base_url);
 
         } catch (ApplicationException $ex) {
-            $this->setFormError($ex->getMessage());
+            $this->setFormError($ex);
             $this->routeRedirect("ShowForm");
         }
     }
