@@ -39,7 +39,7 @@ class HomeController extends FwController {
             'hide_sidebar' => true,
         );
 
-        $this->fw->parser('/home/' . Dispatcher::RouteFixChars(strtolower($id)), $ps);
+        $this->fw->parser('/home/' . Utils::routeFixChars(strtolower($id)), $ps);
     }
 
     #called if fw dispatcher can't find controller

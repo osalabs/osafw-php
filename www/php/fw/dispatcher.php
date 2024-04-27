@@ -78,13 +78,6 @@ class Dispatcher {
     public $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
     public $request_url; #last url processed by uriToRoute
 
-    # leave just allowed chars in string - for routers: controller, action
-    # IN: raw name of the controller or action
-    # OUT: normalized name with only allowed chars
-    public static function RouteFixChars($str) {
-        return preg_replace("/[^A-Za-z0-9_-]+/", "", $str);
-    }
-
     public function __construct($ROUTES = array(), $ROOT_URL = '', $ROUTE_PREFIXES = array()) {
         $this->ROUTES         = $ROUTES;
         $this->ROOT_URL       = $ROOT_URL;
@@ -283,7 +276,7 @@ class Dispatcher {
         foreach ($this->ROUTE_PREFIXES as $prefix) {
             $qprefix = preg_quote($prefix, '/');
             if (preg_match('/^' . $qprefix . '/i', $uri)) {
-                $controller_prefix = $this->RouteFixChars($prefix);
+                $controller_prefix = Utils::routeFixChars($prefix);
                 $uri               = preg_replace('/^' . $qprefix . '/', '', $uri);
                 break;
             }
@@ -333,7 +326,7 @@ class Dispatcher {
 
             if ($is_match) {
                 #foreach ($m[0] as $vv) { #go thru resourses
-                $cur_controller = $this->RouteFixChars($m[1]);
+                $cur_controller = Utils::routeFixChars($m[1]);
                 if (!strlen($cur_controller)) {
                     throw new Exception("Wrong request", 1);
                 }
@@ -369,7 +362,7 @@ class Dispatcher {
                     $cur_action      = $arr[2] ?? '';
                     $cur_id          = $arr[3] ?? '';
                     $cur_action_more = $arr[4] ?? '';
-                    $cur_controller  = $this->RouteFixChars($cur_controller);
+                    $cur_controller  = Utils::routeFixChars($cur_controller);
                 }
 
                 #call default method $ROUTES['']
@@ -379,7 +372,7 @@ class Dispatcher {
         }
 
         $cur_controller = $controller_prefix . $cur_controller;
-        $cur_action     = self::RouteFixChars($cur_action);
+        $cur_action     = Utils::routeFixChars($cur_action);
         if (!strlen($cur_action)) {
             $cur_action = 'Index';
         }

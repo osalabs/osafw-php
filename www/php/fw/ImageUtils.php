@@ -7,33 +7,44 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 */
 
 class ImageUtils {
-    public static $IMG_RESIZE_JPG_QUALITY = 90;
-    public static $IMG_EXT = array('jpeg' => 'jpg', 'jpg' => 'jpg', 'gif' => 'gif', 'png' => 'png');
-    public static $MAX_RESIZE_WH = array(
+    public const int   IMG_RESIZE_JPG_QUALITY = 90;
+    public const array IMG_EXT                = array('jpeg' => 'jpg', 'jpg' => 'jpg', 'gif' => 'gif', 'png' => 'png');
+    public const array MAX_RESIZE_WH          = array(
         #                  ''    =>  array(1024,1024), #resize original - no resize if commented
         's' => array(150, 150),
         'm' => array(600, 600),
         'l' => array(1800, 1800),
     );
 
-    //accept image file, max width, max height and out_file (default output to same file)
-    //return list(new_w, new_h)
-    public static function resize($in_file, $maxw = 0, $maxh = 0, $out_file = '') {
+    /**
+     * accept image file, max width, max height and out_file (default output to same file)
+     * @param string $in_file - input file
+     * @param int $maxw - max width
+     * @param int $maxh - max height
+     * @param string $out_file - output file
+     * @return int[] - new width and height
+     * @throws ApplicationException
+     */
+    public static function resize(string $in_file, int $maxw = 0, int $maxh = 0, string $out_file = ''): array {
 
-        if (!$out_file)
+        if (!$out_file) {
             $out_file = $in_file;
-        if (!$maxw)
-            $maxw = self::$MAX_RESIZE_WH[''][0];
-        if (!$maxh)
-            $maxh = self::$MAX_RESIZE_WH[''][1];
+        }
+        if (!$maxw) {
+            $maxw = self::MAX_RESIZE_WH[''][0];
+        }
+        if (!$maxh) {
+            $maxh = self::MAX_RESIZE_WH[''][1];
+        }
 
         # logger("resizing: [$in_file] $maxw/$maxh [$out_file]");
 
         $img_format = '';
         $img        = self::openImage($in_file, $img_format);
 
-        if ($img == -1)
-            return array(-1, -1); #no resize done because GD is not attached
+        if ($img == -1) {
+            return array(-1, -1);
+        } #no resize done because GD is not attached
 
         if (file_exists($in_file)) {
 
@@ -101,10 +112,14 @@ class ImageUtils {
 
     }
 
-    //********* opens gif, png, jpg image with check, return img format via ref $img_format
-    //throws exception if
-    //  no GD installed
-    public static function openImage($in_file, &$img_format) {
+    /**
+     * opens gif, png, jpg image with check, return img format via ref $img_format
+     * @param string $in_file
+     * @param string $img_format
+     * @return false|GdImage
+     * @throws Exception if no GD installed
+     */
+    public static function openImage(string $in_file, string $img_format): false|GdImage {
 
         if (($img_format == 'jpg' || preg_match("/\.jpe?g$/i", $in_file)) && function_exists('imagecreatefromjpeg')) {
             $img_format = 'jpg';
@@ -122,16 +137,24 @@ class ImageUtils {
         return $img;
     }
 
-    //******************** save img from memory to file
-    public static function saveImage($img, $out_file, $img_format = '') {
-        if (!$img_format)
+    /**
+     * save image to file
+     * @param GdImage $img
+     * @param string $out_file
+     * @param string $img_format - if not provided - will be determined from $out_file; or 'jpg', 'gif', 'png'
+     * @return void
+     * @throws ApplicationException
+     */
+    public static function saveImage(GdImage $img, string $out_file, string $img_format = ''): void {
+        if (!$img_format) {
             $img_format = self::imageType($out_file);
+        }
 
         # logger("saveImage as [$out_file] [$img_format]");
 
         if ($img_format == 'jpg') {
             imageinterlace($img, 1);          #make progressive jpeg
-            imagejpeg($img, $out_file, self::$IMG_RESIZE_JPG_QUALITY);  #80% quality should be enough?
+            imagejpeg($img, $out_file, self::IMG_RESIZE_JPG_QUALITY);  #80% quality should be enough?
         } elseif ($img_format == 'gif') {  # if GIF image - get only 1st image or not?
             imagegif($img, $out_file);
         } elseif ($img_format == 'png') {
@@ -143,12 +166,20 @@ class ImageUtils {
         }
     }
 
-    public static function imageType($path, $default_ext = '') {
-        $pp  = pathinfo($path);
-        $ext = self::$IMG_EXT[strtolower($pp['extension'])];
 
-        if (!strlen($ext))
+    /**
+     * return image type by file extension
+     * @param string $path
+     * @param string $default_ext
+     * @return string
+     */
+    public static function imageType(string $path, string $default_ext = ''): string {
+        $pp  = pathinfo($path);
+        $ext = self::IMG_EXT[strtolower($pp['extension'])] ?? '';
+
+        if (!strlen($ext)) {
             $ext = $default_ext;
+        }
 
         return $ext;
     }
@@ -161,24 +192,37 @@ class ImageUtils {
     //   0 - problem
     // throws exception if:
     //  no GD installed
-    public static function rotate($in_file, $dir, $out_file = '') {
-        if (!$dir || !file_exists($in_file))
-            return 0;
+    /**
+     * rotate image in file
+     * @param string $in_file - input file
+     * @param string $dir - direction: -1 - counterclockwise, 1 - clockwise
+     * @param string $out_file - output file
+     * @return bool - true - success, false - problem
+     * @throws ApplicationException
+     */
+    public static function rotate(string $in_file, string $dir, string $out_file = ''): bool {
+        if (!$dir || !file_exists($in_file)) {
+            return false;
+        }
 
         #logger("rotating: $in_file, $dir, $out_file");
 
-        if (!$out_file)
+        if (!$out_file) {
             $out_file = $in_file;
-        if ($dir == -1)
+        }
+        $angle = 0;
+        if ($dir == -1) {
             $angle = 90;
-        if ($dir == 1)
+        } elseif ($dir == 1) {
             $angle = -90;
+        }
 
         $img_format = '';
         $img        = self::openImage($in_file, $img_format);
 
-        if ($img == -1)
-            throw new Exception("no GD installed, required for rotate"); #not done because GD is not attached
+        if ($img == -1) {
+            throw new Exception("no GD installed, required for rotate");
+        } #not done because GD is not attached
 
         if (!function_exists('imagerotate')) {
             logger('WARN', "standard 'imagerotate' not exists, emulating...");
@@ -194,7 +238,7 @@ class ImageUtils {
 
         imagedestroy($img);
 
-        return 1;
+        return true;
     }
 
 
@@ -203,13 +247,12 @@ class ImageUtils {
         Also, have some standard functions for 90, 180 and 270 degrees.
         Rotation is clockwise
     */
-
     public static function imagerotateEmulate($srcImg, $angle, $bgcolor, $ignore_transparent = 0) {
-        function rotateX($x, $y, $theta) {
+        function rotateX($x, $y, $theta): float|int {
             return $x * cos($theta) - $y * sin($theta);
         }
 
-        function rotateY($x, $y, $theta) {
+        function rotateY($x, $y, $theta): float|int {
             return $x * sin($theta) + $y * cos($theta);
         }
 
@@ -299,24 +342,31 @@ class ImageUtils {
     }
 
 
-    /*
-    resize any image to fixed width/heigth with cropping if necessary!
-    return: 1 - success, 0 - failed
-    */
-    public static function resizeFixed($in_file, $w = 0, $h = 0, $out_file = '') {
-        if (!$out_file)
+    /**
+     * resize image to fixed width/heigth with cropping if necessary
+     * @param string $in_file - input file
+     * @param int $w - width
+     * @param int $h - height
+     * @param string $out_file - output file
+     * @return array|bool - true - success, false - failed or array with new width and height
+     * @throws ApplicationException
+     */
+    public static function resizeFixed(string $in_file, int $w = 0, int $h = 0, string $out_file = ''): array|bool {
+        if (!$out_file) {
             $out_file = $in_file;
+        }
 
         if (!file_exists($in_file)) {
             logger('WARN', "ERROR resizing image - file not exists: [$in_file]");
-            return 0;
+            return false;
         }
 
         $img_format = '';
         $img        = self::openImage($in_file, $img_format);
 
-        if ($img == -1)
-            return array(-1, -1); #no resize done because GD is not attached
+        if ($img == -1) {
+            return array(-1, -1);
+        } #no resize done because GD is not attached
 
         $old_w = imagesx($img);
         $old_h = imagesy($img);
@@ -376,7 +426,7 @@ class ImageUtils {
         self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format));
 
         imagedestroy($s_img);
-        return 1;
+        return true;
     }
 
 }

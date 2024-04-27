@@ -620,7 +620,7 @@ function tag_replace($page, $tag_full, $value, $attrs) {
         }
 
         if (array_key_exists('truncate', $attrs)) {
-            $value = str2truncate($value, $attrs);
+            $value = Utils::str2truncate($value, $attrs);
         }
 
         if (array_key_exists('strip_tags', $attrs)) {
@@ -964,7 +964,7 @@ function parse_cache_template($page, $hf, $out_filename = '') {
 
 ############## HELPER UTILS
 
-#############
+############# basically htmlspecialchars($str, ENT_QUOTES, 'UTF-8')
 function htmlescape($str) {
     if (!is_scalar($str)) {
         return $str;
@@ -1051,55 +1051,6 @@ function tpl_number_format($str, $attrs) {
     }
 
     return number_format($str, $nfdecimals, $nfpoint, $nfthousands);
-}
-
-# This truncates a variable to a character length, the default is 80.
-# As an optional second parameter, you can specify a string of text to display at the end if the variable was truncated.
-# The characters in the string are included with the original truncation length.
-# By default, truncate will attempt to cut off at a word boundary.
-# If you want to cut off at the exact character length, pass the optional third parameter of TRUE.
-#<~tag truncate="80" trchar="..." trword="1" trend="1">
-function str2truncate($str, $attrs) {
-    $len    = 80;
-    $trchar = '...';
-    $trword = 1;
-    $trend  = 1; #if trend=0 trword - ignored
-    if ($attrs['truncate'] > 0) {
-        $len = $attrs['truncate'];
-    }
-
-    if (array_key_exists('trchar', $attrs)) {
-        $trchar = $attrs['trchar'];
-    }
-
-    if (array_key_exists('trend', $attrs)) {
-        $trend = $attrs['trend'];
-    }
-
-    if (array_key_exists('trword', $attrs)) {
-        $trword = $attrs['trword'];
-    }
-
-    $orig_len = strlen($str);
-
-    if ($orig_len <= $len) {
-        return $str;
-    }
-
-    if ($trend) {
-        if ($trword) {
-            $str = preg_replace("/^(.{" . $len . ",}?)[\n \t\.\,\!\?]+(.*)$/s", "$1", $str);
-            if (strlen($str) < $orig_len) {
-                $str .= $trchar;
-            }
-        } else {
-            $str = mb_substr($str, 0, $len) . $trchar;
-        }
-    } else {
-        $str = mb_substr($str, 0, $len / 2) . $trchar . mb_substr($str, -$len / 2);
-    }
-
-    return $str;
 }
 
 #This is used to set a default value for a variable. If the variable is unset or an empty string, the given default value is printed instead.
