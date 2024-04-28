@@ -47,13 +47,13 @@ class FwActivityLogs extends FwModel {
             "log_types_id"  => $lt["id"],
             "fwentities_id" => $et_id,
             "idesc"         => $idesc,
-            "users_id"      => $this->fw->userId > 0 ? $this->fw->userId : null
+            "users_id"      => $this->fw->userId() > 0 ? $this->fw->userId() : null
         ];
         if ($item_id != 0) {
             $fields["item_id"] = $item_id;
         }
         if ($payload) {
-            $fields["payload"] = Utils::jsonEncode($payload);
+            $fields["payload"] = json_encode($payload);
         }
         return $this->add($fields);
     }

@@ -711,25 +711,19 @@ class DB {
      */
     public function queryInner(string $sql, array $params = null): null|bool|mysqli_result {
         $result = null;
-        $host   = $this->config['HOST'];
-        #for logger - just leave first name in domain
-        $dbhost_info = substr($host, 0, strpos($host, '.')) . '(' . $this->config['USER'] . '):' . $this->config['DBNAME'] . ' ';
 
         try {
             if (is_array($params) && count($params)) {
                 //use prepared query
-                if (count($params) > 2) {
-                    // log as separate params if more than 2
-                    $this->logger('NOTICE', $dbhost_info . $sql, $params);
-                } else {
-                    // more compact log if less than 3 params
-                    $this->logger('NOTICE', $dbhost_info . $sql . ' {' . implode(',', array_values($params)) . '}');
-                }
 
                 //check if params are named or positional
                 $pkeys = array_keys($params);
                 if (array_keys($pkeys) !== $pkeys) {
                     // this is an associative array, so we have named parameters
+
+                    $this->paramsExpand($sql, $params);
+                    $this->loggerInner($sql, $params);
+
                     //Prepare SQL and Params for positional binding
                     $paramValues = [];
                     $newSql      = preg_replace_callback('/[@:](\w+)/', function ($matches) use (&$params, &$paramValues) {
@@ -755,7 +749,9 @@ class DB {
                     //positional params
                     $newSql      = $sql;
                     $paramValues = $params;
+                    $this->loggerInner($newSql, $paramValues);
                 }
+
                 // Execute the query with the positional parameters
                 $result         = $this->dbh->execute_query($newSql, $paramValues);
                 $this->lastRows = $this->dbh->affected_rows;
@@ -767,8 +763,7 @@ class DB {
 
             } else {
                 //use direct query
-                $this->logger('NOTICE', $dbhost_info . $sql);
-
+                $this->loggerInner($sql);
                 $result         = $this->dbh->query($sql);
                 $this->lastRows = $this->dbh->affected_rows;
                 #no need to check for metadata here as query returns TRUE for non-select
@@ -779,6 +774,55 @@ class DB {
         }
 
         return $result;
+    }
+
+    /**
+     * in case @params contains an array (example: [1,2,3]) - then sql query has something like "id IN (@ids)"
+     * need to expand array into single params like: "id IN (@ids_0,@ids_1,@ids_2)"
+     * @param string $sql
+     * @param array $params
+     * @return void
+     */
+    protected function paramsExpand(string &$sql, array &$params): void {
+        foreach ($params as $p => $v) {
+            if (is_array($v)) {
+                $arrstr = [];
+                foreach ($v as $i => $item) {
+                    $pnew          = $p . "_" . $i;
+                    $params[$pnew] = $item;
+                    if ($i > 0) {
+                        $arrstr[] = ',';
+                    }
+                    $arrstr[] = "@" . $pnew;
+                }
+                $sql = str_replace("@" . $p, implode('', $arrstr), $sql);
+                unset($params[$p]);
+            }
+        }
+    }
+
+    /**
+     * log sql with params before query execution. Params logged only if passed
+     * @param string $sql
+     * @param array|null $params
+     * @return void
+     */
+    protected function loggerInner(string $sql, array $params = null): void {
+        $host = $this->config['HOST'];
+        #for logger - just leave first name in domain
+        $dbhost_info = substr($host, 0, strpos($host, '.')) . '(' . $this->config['USER'] . '):' . $this->config['DBNAME'] . ' ';
+
+        if ($params) {
+            if (count($params) > 2) {
+                // log as separate params if more than 2
+                $this->logger('NOTICE', $dbhost_info . $sql, $params);
+            } else {
+                // more compact log if less than 3 params
+                $this->logger('NOTICE', $dbhost_info . $sql . ' {' . implode(',', array_values($params)) . '}');
+            }
+        } else {
+            $this->logger('NOTICE', $dbhost_info . $sql);
+        }
     }
 
     /**
@@ -1298,9 +1342,9 @@ class DB {
                     // [NOT] IN (@p1,@p2,@p3...)
                     $sql .= '(' . (count($sql_params) > 0 ? implode(',', $sql_params) : 'NULL') . ')';
                 } else {
-                    if ($dbop->value === DB::NOW()) {
+                    if ($dbop->value instanceof DBSpecialValue) {
                         // if value is NOW object - don't add it to params, just use NOW()/GETDATE() in sql
-                        $sql .= 'NOW()';
+                        $sql .= $dbop->value;
                     } elseif ($dbop->value instanceof DateTime) {
                         $params[$param_name] = $dbop->value->format('Y-m-d H:i:s');
                         $sql                 .= '@' . $param_name;

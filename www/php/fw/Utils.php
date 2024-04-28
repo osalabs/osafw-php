@@ -719,7 +719,7 @@ class Utils {
         return Utils::crypt('decrypt', $value, fw::i()->config->CRYPT_V, fw::i()->config->CRYPT_KEY);
     }
 
-    public static function jsonEncode(string $data): false|string {
+    public static function jsonEncode(mixed $data): false|string {
         return json_encode($data);
     }
 

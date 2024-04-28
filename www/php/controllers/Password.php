@@ -38,7 +38,7 @@ class PasswordController extends FwController {
         $this->Validate(0, $item);
         $user = $this->model->oneByEmail($item['login']);
 
-        $this->model->sentPwdReset($user['id']);
+        $this->model->sendPwdReset($user['id']);
 
         fw::redirect($this->base_url . '/(Sent)');
 

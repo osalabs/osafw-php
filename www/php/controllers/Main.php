@@ -17,10 +17,11 @@ class MainController extends FwController {
 
     public function checkAccess(): void {
         // add custom actions to permissions mapping
-        $this->access_actions_to_permissions = [
-            "UITheme" => Permissions::PERMISSION_LIST,
-            "UIMode"  => Permissions::PERMISSION_LIST,
-        ];
+        // Uncomment if using RBAC permissions
+        //        $this->access_actions_to_permissions = [
+        //            "UITheme" => Permissions::PERMISSION_LIST,
+        //            "UIMode"  => Permissions::PERMISSION_LIST,
+        //        ];
         parent::checkAccess();
     }
 

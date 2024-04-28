@@ -299,7 +299,8 @@ class fw {
             return;
         } catch (NoClassMethodException) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
-            logger('WARN', "No method found for route", $this->route, ", checking route_default_action");
+            logger('DEBUG', "No method found for route, checking route_default_action");
+            logger('DEBUG', "Route: ", $this->route);
 
             $default_action = $this->dispatcher->getRouteDefaultAction($this->route->controller);
             if ($default_action == 'index') {
@@ -320,7 +321,7 @@ class fw {
                 $this->renderRoute($this->route);
             } catch (NoClassMethodException) {
                 #if no method - just call parser() - show template from /cur_controller/cur_action dir
-                logger('WARN', "Default parser");
+                logger('INFO', "Default parser " . strtolower("/{$this->route->controller}/{$this->route->action}"));
                 $this->parser();
             }
         } catch (ExitException) {
@@ -626,19 +627,19 @@ class fw {
             return; // no further processing for json
         }
 
-        if ($ps["_route_redirect"]) {
+        if (isset($ps["_route_redirect"])) {
             $rr = $ps["_route_redirect"];
             $this->routeRedirect($rr["method"], $rr["controller"], $rr["args"]);
             return; // no further processing
         }
 
-        if ($ps["_redirect"]) {
+        if (isset($ps["_redirect"])) {
             self::redirect($ps["_redirect"]);
             return; // no further processing
         }
 
         $layout = $out_format == 'pjax' ? $this->config->PAGE_LAYOUT_PJAX : $this->page_layout;
-        if (array_key_exists('_layout', $ps)) {
+        if (isset($ps['_layout'])) {
             #override layout from parse strings
             $layout = $ps['_layout'];
         }
@@ -707,18 +708,18 @@ class fw {
             $ToEmail = array($ToEmail);
         }
 
-        $from = $options['from'];
+        $from = $options['from'] ?? '';
         if (!$from) {
             $from = $this->config->FROM_EMAIL;
         }
 
-        $files = $options['files'];
-        if (!$files) {
+        $files = $options['files'] ?? [];
+        if (!is_array($files)) {
             $files = array();
         }
 
         logger('INFO', "Sending email. From=[$from], To=[" . implode(",", $ToEmail) . "], Subj=[$Subj]");
-        logger('TRACE', $Message);
+        logger('DEBUG', $Message);
 
         #detect if message is in html format - it should start with <!DOCTYPE or <html tag
         $is_html = false;
