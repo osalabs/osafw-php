@@ -174,11 +174,11 @@ class DateUtils {
 
     // anything to date, if not valid - return null
     public static function f2date($s): ?DateTime {
-        if (empty($s)) {
-            return null;
-        }
         if ($s instanceof DateTime) {
             return $s;
+        }
+        if (empty($s) || !is_string($s)) {
+            return null;
         }
         if (is_numeric($s) || preg_match('/^\d+$/', $s)) {
             return new DateTime('@' . $s); //unix timestamp

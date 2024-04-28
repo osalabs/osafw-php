@@ -153,21 +153,25 @@ class MainController extends FwController {
         return $ps;
     }
 
-    public function UIThemeAction($form_id) {
+    public function UIThemeAction(int $form_id): void {
+        session_start();
         $_SESSION["ui_theme"] = $form_id;
         $fields               = ["ui_theme" => $form_id];
         if ($form_id == "30") {
             $fields["ui_mode"]   = "10"; #for blue theme - enforce light color mode
             $_SESSION["ui_mode"] = "10";
         }
+        session_write_close();
 
         Users::i()->update($this->fw->userId(), $fields);
 
         $this->fw->redirect($this->base_url);
     }
 
-    public function UIModeAction($form_id) {
+    public function UIModeAction(int $form_id): void {
+        session_start();
         $_SESSION["ui_mode"] = $form_id;
+        session_write_close();
         Users::i()->update($this->fw->userId(), ["ui_mode" => $form_id]);
 
         $this->fw->redirect($this->base_url);

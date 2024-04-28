@@ -286,8 +286,9 @@ class FormUtils {
      * @param array $itemold
      * @return array
      */
-    public static function changesOnly(array $item, array $itemold) {
+    public static function changesOnly(array $item, array $itemold): array {
         $result = array();
+        #logger("changesOnly", $item, $itemold);
 
         foreach ($item as $key => $vnew) {
             $vold = $itemold[$key] ?? null;

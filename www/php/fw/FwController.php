@@ -461,10 +461,10 @@ abstract class FwController {
                 if ($status == FwModel::STATUS_DELETED && !Users::i()->isAccessLevel(Users::ACL_SITE_ADMIN)) {
                     $status = 0;
                 }
-                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "=:status";
+                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "=@status";
                 $this->list_where_params["status"] = $status;
             } else {
-                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "<>:status";
+                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "<>@status";
                 $this->list_where_params["status"] = FwModel::STATUS_DELETED; // by default - show all non-deleted
             }
         }

@@ -132,7 +132,8 @@ class Dispatcher {
             if (!method_exists($controller, $method_name)) {
                 throw new NoClassMethodException();
             }
-            $ps = $controller->{$method_name}($aparams);
+            //call controller's method in $method_name and expand $aparams array into method params
+            $ps = $controller->$method_name(...$aparams);
 
             //special case for export - IndexAction+export_format is set - call exportList without parser
             if ($method_name == FW::ACTION_INDEX . FW::ACTION_SUFFIX && $controller->export_format > '') {

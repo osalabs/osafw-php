@@ -90,6 +90,13 @@ class fw {
         if (isset($_SESSION['lang'])) {
             $fw->config->LANG = $_SESSION['lang'];
         }
+        // override default ui_theme/ui_mode with user's settings
+        if (!empty($_SESSION["ui_theme"])) {
+            $fw->GLOBAL["ui_theme"] = $_SESSION["ui_theme"];
+        }
+        if (!empty($_SESSION["ui_mode"])) {
+            $fw->GLOBAL["ui_mode"] = $_SESSION["ui_mode"];
+        }
 
         # and now run dispatcher
         FwHooks::initRequest($fw, $uri);
@@ -212,6 +219,7 @@ class fw {
         $this->GLOBAL                 = $CONFIG;
         $this->FormErrors             = []; #store form errors
         $this->GLOBAL['current_time'] = time(); #current time for the request
+        $this->GLOBAL['request_url']  = $_SERVER['REQUEST_URI'];
         $CONFIG['LANG']               = $CONFIG['LANG_DEF']; #use default language
 
         # fw vairables
