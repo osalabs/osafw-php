@@ -1236,7 +1236,7 @@ function parse_json($hf, $out_filename = '') {
         if ($out_filename == 'v') { #variable mode
             return $page;
         } else { #screen mode
-            print header("Content-Type: application/json");
+            header("Content-Type: application/json; charset=utf-8");
             print $page;
         }
     }

@@ -5,12 +5,13 @@ class PasswordController extends FwController {
     public string $base_url = '/Password';
     public string $model_name = 'Users';
 
+    protected const int PWD_RESET_EXPIRATION = 60; // minutes
+
     public function __construct() {
         parent::__construct();
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
-        throw new ApplicationException('Access Denied');
     }
 
     public function IndexAction(): ?array {
@@ -25,34 +26,31 @@ class PasswordController extends FwController {
             'i'            => $item,
             'hide_sidebar' => true,
         );
-
         return $ps;
     }
 
-    public function SaveAction() {
+    public function SaveAction(): ?array {
+        $this->route_onerror = FW::ACTION_INDEX;
+
         $item          = reqh('item');
         $item['login'] = trim($item['login']);
 
-        try {
-            $this->Validate(0, $item);
-            $user = $this->model->oneByEmail($item['login']);
+        $this->Validate(0, $item);
+        $user = $this->model->oneByEmail($item['login']);
 
-            #$this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
+        $this->model->sentPwdReset($user['id']);
 
-            fw::redirect($this->base_url . '/(Sent)');
+        fw::redirect($this->base_url . '/(Sent)');
 
-        } catch (ApplicationException $ex) {
-            $this->setFormError($ex);
-            $this->routeRedirect("Index");
-        }
+        return null;
     }
 
-    public function Validate($id, $item) {
+    public function Validate(int $id, array $item): void {
         $result = $this->validateRequired($item, "login");
 
         if ($result) {
             $user = $this->model->oneByEmail($item['login']);
-            if (!count($user)) {
+            if (!count($user) || $user['status'] != FwModel::STATUS_ACTIVE) {
                 $this->setError('login', 'WRONG');
             }
         }

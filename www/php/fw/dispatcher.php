@@ -96,44 +96,55 @@ class Dispatcher {
         return $route;
     }
 
-    public function runController($controller, $action, $aparams = array()) {
-        if (!$controller) {
+    /**
+     * run controller action
+     *  Also calls controller's checkAccess() before action
+     *  Also calls controller's actionError() in case of ApplicationException
+     * @param string $controller_name - controller class name "Controller" suffix is added automatically (ex: "Users" -> "UsersController")
+     * @param string $action_name - action name without suffix (ex: "Index" -> "IndexAction")
+     * @param array $aparams - additional params to pass to action
+     * @return array|null - array of params to pass to parser or null if no parser needed
+     * @throws AuthException
+     * @throws DBException
+     * @throws NoClassMethodException
+     * @throws NoControllerException
+     * @throws NoModelException
+     */
+    public function runController(string $controller_name, string $action_name, array $aparams = array()): ?array {
+        if (!$controller_name) {
             throw new NoControllerException();
         }
-
-        if (!$action) {
+        if (!$action_name) {
             throw new NoClassMethodException();
         }
-        return $this->callClassMethod($controller . 'Controller', $action . 'Action', $aparams);
-    }
+        $class_name = $controller_name . 'Controller';
+        if (!class_exists($class_name)) {
+            throw new NoControllerException();
+        }
+        $method_name = $action_name . FW::ACTION_SUFFIX;
 
-    # call functions and methods
-    # for classes - creates object instance first
-    # IN: class name, method, params
-    # OUT: throws NoControllerException/NoClassMethodException if no class/method exists
-    public function callClassMethod($class_name, $method, $aparams = array()) {
-        logger('TRACE', "calling $class_name->$method", $aparams);
+        /** @var FwController $controller */
+        $controller = new $class_name;
+        $ps         = [];
+
         try {
-            if ($class_name) {
-                if (!class_exists($class_name)) {
-                    throw new NoControllerException();
-                }
-
-                $obj  = new $class_name;
-                $func = array($obj, $method);
-            } else {
-                $func = $method;
-            }
-            if (!is_callable($func)) {
+            $controller->checkAccess();
+            if (!method_exists($controller, $method_name)) {
                 throw new NoClassMethodException();
             }
+            $ps = $controller->{$method_name}($aparams);
 
-            return call_user_func_array($func, $aparams);
-        } catch (NoControllerException $ex) {
-            throw $ex;
-        } catch (NoClassMethodException $ex) {
-            throw $ex;
+            //special case for export - IndexAction+export_format is set - call exportList without parser
+            if ($method_name == FW::ACTION_INDEX . FW::ACTION_SUFFIX && $controller->export_format > '') {
+                $controller->exportList($aparams);
+                $ps = null; // disable parser
+            }
+
+        } catch (ApplicationException $ex) {
+            $ps = $controller->actionError($ex, $aparams);
         }
+
+        return $ps;
     }
 
     public function getRouteDefaultAction($controller) {

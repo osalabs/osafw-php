@@ -162,7 +162,7 @@ class Users extends FwModel {
         $this->update($id, $vars);
     }
 
-    public function createPermCookie($id) {
+    public function createPermCookie(int $id): string {
         $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
 
         $cookie_id = substr(Utils::getRandStr(16) . time(), 0, 32);
@@ -171,7 +171,7 @@ class Users extends FwModel {
             'cookie_id' => $cookie_id,
             'users_id'  => $id,
         );
-        $this->db->insert('user_cookie', $vars, array('replace' => 1));
+        $this->db->insert('users_cookies', $vars, array('replace' => 1));
 
         setcookie(self::$PERM_COOKIE_NAME, $cookie_id, time() + 60 * 60 * 24 * self::$PERM_COOKIE_DAYS, "/", (preg_match('/\./', $root_domain0)) ? '.' . $root_domain0 : '');
         #rwe("[$root_domain0] ".self::$PERM_COOKIE_NAME.", $cookie_id, ".(time()+60*60*24*self::$PERM_COOKIE_DAYS));
@@ -218,7 +218,7 @@ class Users extends FwModel {
         setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
 
         #cleanup in DB (user's cookie and ALL old cookies)
-        $this->db->query("DELETE FROM user_cookie
+        $this->db->query("DELETE FROM users_cookies
             WHERE cookie_id=" . $this->db->quote($cookie_id) . "
                or add_time<FROM_DAYS(TO_DAYS(now())-" . self::$PERM_COOKIE_DAYS . ")
         ");

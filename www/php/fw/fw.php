@@ -563,9 +563,9 @@ class fw {
     # to return only specific content for json - set ps("_json")=array(...)
     # to override page template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
     #
-    # TODO: (not for json) to perform routeRedirect - set ps("_route_redirect"), ps("_route_redirect_controller"), ps("_route_redirect_args")
+    # (not for json) to perform route_redirect - set ps("_route_redirect") = ["method" => , "controller" => , "args" => ]
     # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
-    public function parser(): ?string {
+    public function parser(): void {
         $args       = func_get_args();
         $basedir    = '';
         $controller = $this->route->controller;
@@ -607,41 +607,49 @@ class fw {
             if (isset($ps['_json'])) {
                 if ($ps['_json'] === true) {
                     # just enable whole array as json
-                    parse_json($ps);
+                    unset($ps['_json']); // remove internal flag
+                    $this->parserJson($ps);
                 } else {
                     # or return data only from this element
-                    parse_json($ps['_json']);
+                    $this->parserJson($ps['_json']);
                 }
             } else {
                 $msg = "JSON response is not enabled for the Controller.Action (set ps[_json]=true to enable).";
                 logger("DEBUG", $msg);
 
-                parse_json(array(
+                $this->parserJson([
                     'success' => false,
                     'message' => $msg,
-                ));
-
-            }
-        } elseif ($out_format == 'html' || $out_format == 'pjax' || !$out_format) {
-            #html output based on ParsePage templates
-            if ($out_format == 'pjax') {
-                $layout = $this->config->PAGE_LAYOUT_PJAX;
+                ]);
             }
 
-            if (array_key_exists('_layout', $ps)) {
-                #override layout from parse strings
-                $layout = $ps['_layout'];
-            }
-
-            logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
-            return parse_page($basedir, $layout, $ps, $out_filename);
-        } else {
-            #any other formats - call controller's Export($out_format)
-            logger('TRACE', "export $out_format using " . $this->route->controller . "Controller.Export()");
-            $this->dispatcher->callClassMethod($this->route->controller . 'Controller', 'Export', array($ps, $out_format));
+            return; // no further processing for json
         }
 
-        return null;
+        if ($ps["_route_redirect"]) {
+            $rr = $ps["_route_redirect"];
+            $this->routeRedirect($rr["method"], $rr["controller"], $rr["args"]);
+            return; // no further processing
+        }
+
+        if ($ps["_redirect"]) {
+            self::redirect($ps["_redirect"]);
+            return; // no further processing
+        }
+
+        $layout = $out_format == 'pjax' ? $this->config->PAGE_LAYOUT_PJAX : $this->page_layout;
+        if (array_key_exists('_layout', $ps)) {
+            #override layout from parse strings
+            $layout = $ps['_layout'];
+        }
+
+        logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
+        parse_page($basedir, $layout, $ps, $out_filename);
+    }
+
+    public function parserJson(array $ps): void {
+        header("Content-Type: application/json; charset=utf-8");
+        echo json_encode($ps);
     }
 
     //flash - read/store flash data (available on the next request and only on it)
