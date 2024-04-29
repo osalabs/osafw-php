@@ -9,7 +9,13 @@
 class AdminUsersController extends FwDynamicController {
     const int access_level = Users::ACL_ADMIN;
 
+    public Users $model;
     public string $base_url = '/Admin/Users';
+
+    public function __construct() {
+        parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
+    }
 
     public function setListSearch(): void {
         parent::setListSearch();

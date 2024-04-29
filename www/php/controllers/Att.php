@@ -8,7 +8,14 @@
 
 class AttController extends FwController {
     const string route_default_action = 'show';
+
+    public Att $model;
     public string $model_name = 'Att';
+
+    public function __construct() {
+        parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
+    }
 
     public function IndexAction(): ?array {
         $ps = array();

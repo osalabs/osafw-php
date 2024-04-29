@@ -3,13 +3,18 @@
 class SignupController extends FwAdminController {
     const int    access_level         = Users::ACL_VISITOR;
     const string route_default_action = '';
+
+    public Users $model;
+    public string $model_name = 'Users';
+
     public string $base_url = '/Signup';
     public string $required_fields = 'email pwd pwd2';
     public string $save_fields = 'email fname lname pwd';
-    public string $model_name = 'Users';
+
 
     public function __construct() {
         parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;

@@ -8,11 +8,15 @@
 
 class AdminSpagesController extends FwAdminController {
     const int access_level = Users::ACL_MANAGER;
+
+    public Spages $model;
+    public string $model_name = 'Spages';
+
     public string $base_url = '/Admin/Spages';
     public string $required_fields = 'iname';
     public string $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_css custom_js';
     public string $save_fields_checkboxes = '';
-    public string $model_name = 'Spages';
+
     /*REMOVE OR OVERRIDE*/
     public string $search_fields = 'url iname idesc';
     public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
@@ -26,6 +30,7 @@ class AdminSpagesController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
+        $this->model = $this->model0;
 
         //optionally init controller
     }

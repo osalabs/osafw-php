@@ -8,6 +8,7 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 
 class AdminDemosController extends FwAdminController {
     const int access_level = Users::ACL_MANAGER;
+    public Demos $model;
     public string $base_url = '/Admin/Demos';
     public string $required_fields = 'iname email';
     public string $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
@@ -37,6 +38,7 @@ class AdminDemosController extends FwAdminController {
         parent::__construct();
 
         $this->model_related = DemoDicts::i();
+        $this->model         = $this->model0;
     }
 
     //override due to custom search filter on status

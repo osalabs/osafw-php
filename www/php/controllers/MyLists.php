@@ -3,11 +3,14 @@
 class MyListsController extends FwAdminController {
     const int    access_level         = 0; #logged only
     const string route_default_action = '';
+
+    public UserLists $model;
+    public string $model_name = 'UserLists';
+
     public string $base_url = '/My/Lists';
     public string $required_fields = 'entity iname';
     public string $save_fields = 'entity iname idesc status';
     public string $save_fields_checkboxes = '';
-    public string $model_name = 'UserLists';
     /*REMOVE OR OVERRIDE*/
     public string $search_fields = 'iname idesc';
     public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
@@ -20,6 +23,7 @@ class MyListsController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
 
         //optionally init controller
         $this->form_new_defaults["entity"] = $this->related_id;

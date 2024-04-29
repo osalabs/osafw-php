@@ -8,10 +8,13 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 
 class LoginController extends FwController {
     const string route_default_action = '';
+
+    public Users $model;
     public string $model_name = 'Users';
 
     public function __construct() {
         parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;

@@ -64,7 +64,7 @@ class FwDynamicController extends FwController {
 
     public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
-        $item = $this->model->one($id);
+        $item = $this->model0->one($id);
         if (!$item) {
             throw new ApplicationException("Not Found", 404);
         }
@@ -85,7 +85,7 @@ class FwDynamicController extends FwController {
         }
 
         #optional userlists support
-        $ps["list_view"] = $this->list_view ? $this->model->table_name : $this->list_view;
+        $ps["list_view"] = $this->list_view ? $this->model0->table_name : $this->list_view;
         $ps["mylists"]   = UserLists::i()->listForItem($ps["list_view"], $id);
 
         return $ps;
@@ -96,13 +96,13 @@ class FwDynamicController extends FwController {
 
         if ($this->isGet()) {
             if ($id > 0) {
-                $item = $this->model->one($id);
+                $item = $this->model0->one($id);
             } else {
                 #defaults
                 $item = $this->form_new_defaults;
             }
         } else {
-            $itemdb = $id ? $this->model->one($id) : array();
+            $itemdb = $id ? $this->model0->one($id) : array();
             $item   = array_merge($itemdb, reqh('item'));
         }
 
@@ -112,10 +112,10 @@ class FwDynamicController extends FwController {
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
         );
-        if ($this->model->field_add_users_id) {
+        if ($this->model0->field_add_users_id) {
             $ps['add_users_id_name'] = Users::i()->iname($item['add_users_id'] ?? 0);
         }
-        if ($this->model->field_upd_users_id) {
+        if ($this->model0->field_upd_users_id) {
             $ps['upd_users_id_name'] = Users::i()->iname($item['upd_users_id'] ?? 0);
         }
 
@@ -213,7 +213,7 @@ class FwDynamicController extends FwController {
             }
 
             $val = Utils::qh($def["validate"]);
-            if (array_key_exists('exists', $val) && $this->model->isExists($item[$field], $id)) {
+            if (array_key_exists('exists', $val) && $this->model0->isExists($item[$field], $id)) {
                 $this->setError($field, 'EXISTS');
                 $result = false;
             }
@@ -243,7 +243,7 @@ class FwDynamicController extends FwController {
     public function ShowDeleteAction($id): ?array {
         $id += 0;
         $ps = array(
-            'i'          => $this->model->one($id),
+            'i'          => $this->model0->one($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
             'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates
@@ -256,7 +256,7 @@ class FwDynamicController extends FwController {
 
     public function DeleteAction($id): ?array {
         $id += 0;
-        $this->model->delete($id);
+        $this->model0->delete($id);
 
         $this->fw->flash("onedelete", 1);
         return $this->afterSave(true);
@@ -281,7 +281,7 @@ class FwDynamicController extends FwController {
         $ctr = 0;
         foreach ($acb as $id => $value) {
             if ($is_delete) {
-                $this->model->delete($id);
+                $this->model0->delete($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
                 UserLists::i()->addItemList($user_lists_id, $id);
@@ -385,7 +385,7 @@ class FwDynamicController extends FwController {
                 $def["att"] = Att::i()->one($item[$field]);
 
             } elseif ($dtype == "att_links") {
-                $def["att_links"] = Att::i()->getAllLinked($this->model->table_name, $id);
+                $def["att_links"] = Att::i()->getAllLinked($this->model0->table_name, $id);
 
             } else {
                 #single values
@@ -474,7 +474,7 @@ class FwDynamicController extends FwController {
                 $def["value"] = $field_value;
 
             } elseif ($dtype == "att_links_edit") {
-                $def["att_links"] = Att::i()->getAllLinked($this->model->table_name, $id);
+                $def["att_links"] = Att::i()->getAllLinked($this->model0->table_name, $id);
 
             } else {
                 #single values
@@ -565,7 +565,7 @@ class FwDynamicController extends FwController {
         #for now we just look if we have att_links_edit field and update att links
         foreach ($this->config['showform_fields'] as $def) {
             if ($def['type'] == 'att_links_edit') {
-                Att::i()->updateAttLinks($this->model->table_name, $id, reqh("att")); #TODO make att configurable
+                Att::i()->updateAttLinks($this->model0->table_name, $id, reqh("att")); #TODO make att configurable
             }
         }
     }

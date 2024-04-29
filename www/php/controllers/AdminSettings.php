@@ -7,10 +7,13 @@
 */
 
 class AdminSettingsController extends FwAdminController {
+    public Settings $model;
+    public string $model_name = 'Settings';
+
     public string $base_url = '/Admin/Settings';
     public string $required_fields = 'ivalue';
     public string $save_fields = 'ivalue';
-    public string $model_name = 'Settings';
+
 
     public string $search_fields = 'icode iname ivalue';
     public string $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
@@ -22,7 +25,7 @@ class AdminSettingsController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
-
+        $this->model = $this->model0;
     }
 
     public function IndexAction(): ?array {

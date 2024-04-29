@@ -29,7 +29,7 @@ class FwAdminController extends FwController {
         parent::__construct();
 
         //optionally init controller
-        $this->list_view = $this->model->table_name ?? '';
+        $this->list_view = $this->model0->table_name ?? '';
     }
 
     public function IndexAction(): ?array {
@@ -66,7 +66,7 @@ class FwAdminController extends FwController {
 
     public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
-        $item = $this->model->one($id);
+        $item = $this->model0->one($id);
         if (!$item) {
             throw new ApplicationException("Not Found", 404);
         }
@@ -81,7 +81,7 @@ class FwAdminController extends FwController {
         );
 
         #userlists support
-        $ps["list_view"] = $this->list_view ? $this->list_view : $this->model->table_name;
+        $ps["list_view"] = $this->list_view ? $this->list_view : $this->model0->table_name;
         $ps["mylists"]   = UserLists::i()->listForItem($ps["list_view"], $id);
 
         return $ps;
@@ -92,13 +92,13 @@ class FwAdminController extends FwController {
 
         if ($this->isGet()) {
             if ($id > 0) {
-                $item = $this->model->one($id);
+                $item = $this->model0->one($id);
             } else {
                 #defaults
                 $item = $this->form_new_defaults;
             }
         } else {
-            $itemdb = $id ? $this->model->one($id) : array();
+            $itemdb = $id ? $this->model0->one($id) : array();
             $item   = array_merge($itemdb, reqh('item'));
         }
 
@@ -153,7 +153,7 @@ class FwAdminController extends FwController {
     public function ShowDeleteAction($id): ?array {
         $id += 0;
         $ps = array(
-            'i'          => $this->model->one($id),
+            'i'          => $this->model0->one($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
             'base_url'   => $this->fw->config->ROOT_URL . $this->base_url, #override default template url, remove if you created custom /showdelete templates
@@ -166,7 +166,7 @@ class FwAdminController extends FwController {
 
     public function DeleteAction($id): ?array {
         $id += 0;
-        $this->model->delete($id);
+        $this->model0->delete($id);
 
         $this->fw->flash("onedelete", 1);
         return $this->afterSave(true);
@@ -192,7 +192,7 @@ class FwAdminController extends FwController {
         $ctr = 0;
         foreach ($acb as $id => $value) {
             if ($is_delete) {
-                $this->model->delete($id);
+                $this->model0->delete($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
                 UserLists::i()->addItemList($user_lists_id, $id);

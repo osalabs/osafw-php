@@ -27,7 +27,7 @@ abstract class FwController {
     //not overridable
     protected FW $fw; //current app/framework object
     protected DB $db;
-    protected FwModel $model; //default model for the controller
+    protected FwModel $model0; //default model for the controller
     protected array $config = [];        // controller config, loaded from template dir/config.json
     protected array $access_actions_to_permissions = []; // optional, controller-level custom actions to permissions mapping for role-based access checks, e.g. "UIMain" => Permissions.PERMISSION_VIEW . Can also be used to override default actions to permissions
 
@@ -81,7 +81,7 @@ abstract class FwController {
         $this->export_format = reqs('export');
 
         if ($this->model_name) {
-            $this->model = fw::model($this->model_name);
+            $this->model0 = fw::model($this->model_name);
         }
 
         $this->is_readonly = Users::i()->isReadOnly();
@@ -105,7 +105,7 @@ abstract class FwController {
         $model_name = $this->config["model"] ?? '';
         if ($model_name) {
             $this->model_name = $model_name;
-            $this->model      = fw::model($model_name);
+            $this->model0     = fw::model($model_name);
         }
 
         $this->required_fields = $this->config["required_fields"] ?? '';
@@ -318,7 +318,7 @@ abstract class FwController {
             $is_subquery     = false;
             $list_table_name = $this->list_view;
             if (empty($list_table_name)) {
-                $list_table_name = $this->model->table_name;
+                $list_table_name = $this->model0->table_name;
             } else {
                 // list_table_name could contain subquery as "(...) t" - detect it (contains whitespace)
                 $is_subquery = preg_match("/\s/", $list_table_name);
@@ -454,17 +454,17 @@ abstract class FwController {
      * @throws NoModelException
      */
     public function setListSearchStatus(): void {
-        if (!empty($this->model->field_status)) {
+        if (!empty($this->model0->field_status)) {
             if (!empty($this->list_filter["status"])) {
                 $status = intval($this->list_filter["status"]);
                 // if want to see trashed and not admin - just show active
                 if ($status == FwModel::STATUS_DELETED && !Users::i()->isAccessLevel(Users::ACL_SITE_ADMIN)) {
                     $status = 0;
                 }
-                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "=@status";
+                $this->list_where                  .= " and " . $this->db->qid($this->model0->field_status) . "=@status";
                 $this->list_where_params["status"] = $status;
             } else {
-                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "<>@status";
+                $this->list_where                  .= " and " . $this->db->qid($this->model0->field_status) . "<>@status";
                 $this->list_where_params["status"] = FwModel::STATUS_DELETED; // by default - show all non-deleted
             }
         }
@@ -497,7 +497,7 @@ abstract class FwController {
         }
 
         if (empty($this->list_view)) {
-            $this->list_view = $this->model->table_name;
+            $this->list_view = $this->model0->table_name;
         }
         $list_view_name = (str_starts_with($this->list_view, "(") ? $this->list_view : $this->db->qid($this->list_view)); // don't quote if list_view is a subquery (starting with parentheses)
 
@@ -508,9 +508,9 @@ abstract class FwController {
 
             $this->list_rows = $this->db->selectRaw("*", $list_view_name, $this->list_where, $this->list_where_params, $this->list_orderby, $offset, $limit);
 
-            if ($this->model->is_normalize_names) {
+            if ($this->model0->is_normalize_names) {
                 foreach ($this->list_rows as &$row) {
-                    $this->model->normalizeNames($row);
+                    $this->model0->normalizeNames($row);
                 }
                 unset($row);
             }
@@ -665,10 +665,10 @@ abstract class FwController {
      */
     public function modelAddOrUpdate(int $id, array $fields): int {
         if ($id > 0) {
-            $this->model->update($id, $fields);
+            $this->model0->update($id, $fields);
             $this->fw->flash("record_updated", 1);
         } else {
-            $id = $this->model->add($fields);
+            $id = $this->model0->add($fields);
             $this->fw->flash("record_added", 1);
         }
         return $id;
@@ -879,11 +879,11 @@ abstract class FwController {
     }
 
     public function setAddUpdUser(array &$ps, array $item): void {
-        if ($this->model->field_add_users_id > '') {
-            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model->field_add_users_id]);
+        if ($this->model0->field_add_users_id > '') {
+            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model0->field_add_users_id]);
         }
-        if ($this->model->field_upd_users_id > '') {
-            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model->field_upd_users_id]);
+        if ($this->model0->field_upd_users_id > '') {
+            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model0->field_upd_users_id]);
         }
     }
 
@@ -959,7 +959,7 @@ abstract class FwController {
     public function getViewListConversions(array $afields): array {
         $result = array();
         //use table_name or list_view if it's not subquery
-        $list_view_name = $this->model->table_name;
+        $list_view_name = $this->model0->table_name;
         if ($this->list_view > '' && $this->list_view[0] != "(") {
             $list_view_name = $this->list_view;
         }

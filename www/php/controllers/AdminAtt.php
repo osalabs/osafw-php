@@ -3,10 +3,12 @@
 class AdminAttController extends FwAdminController {
     const int    access_level         = Users::ACL_MANAGER;
     const string route_default_action = '';
+    public Att $model;
+    public string $model_name = 'Att';
+
     public string $base_url = '/Admin/Att';
     public string $required_fields = 'iname';
     public string $save_fields = 'att_categories_id iname status';
-    public string $model_name = 'Att';
 
     /*REMOVE OR OVERRIDE*/
     public string $search_fields = 'iname idesc';
@@ -22,6 +24,8 @@ class AdminAttController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
+
+        $this->model = $this->model0;
     }
 
     public function IndexAction(): ?array {

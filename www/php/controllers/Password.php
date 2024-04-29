@@ -2,13 +2,17 @@
 
 class PasswordController extends FwController {
     const string route_default_action = '';
-    public string $base_url = '/Password';
+
+    public Users $model;
     public string $model_name = 'Users';
+
+    public string $base_url = '/Password';
 
     protected const int PWD_RESET_EXPIRATION = 60; // minutes
 
     public function __construct() {
         parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
