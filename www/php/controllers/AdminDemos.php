@@ -8,13 +8,16 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 
 class AdminDemosController extends FwAdminController {
     const int access_level = Users::ACL_MANAGER;
+
     public Demos $model;
+    public string $model_name = 'Demos';
+
     public string $base_url = '/Admin/Demos';
     public string $required_fields = 'iname email';
     public string $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
     public string $save_fields_checkboxes = 'is_checkbox';
     public string $save_fields_nullable = 'demo_dicts_id att_id fdate_pop fdatetime';
-    public string $model_name = 'Demos';
+
     public $model_related;
 
     /*REMOVE OR OVERRIDE*/

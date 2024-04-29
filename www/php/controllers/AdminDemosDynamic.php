@@ -9,10 +9,11 @@
 class AdminDemosDynamicController extends FwDynamicController {
     const int access_level = Users::ACL_MANAGER;
 
+    public string $base_url = '/Admin/DemosDynamic';
+
     public function __construct() {
         parent::__construct();
 
-        $this->base_url = '/Admin/DemosDynamic';
         $this->loadControllerConfig();
         $this->model_related = DemoDicts::i();
     }
