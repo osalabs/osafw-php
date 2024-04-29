@@ -1804,13 +1804,13 @@ class DB {
     /***
      * load table schema from db
      * @param string $table
-     * @return array field_name => fw_type
+     * @return array field_name => [field_schema from information_schema.COLUMNS, fw_type, fw_subtype
      */
     public function loadTableSchema(string $table): array {
         $fields = $this->tableSchema($table);
         $result = [];
         foreach ($fields as $field) {
-            $result[strtolower($field['name'])] = $field['fw_type'];
+            $result[strtolower($field['name'])] = $field;
         }
         return $result;
     }
@@ -1822,7 +1822,7 @@ class DB {
         if (!array_key_exists($field_name, $schema)) {
             return "";
         }
-        $field_type = $schema[$field_name];
+        $field_type = $schema[$field_name]['fw_type'] ?? '';
 
         $result = "";
         if (str_contains($field_type, "int")) {

@@ -115,8 +115,6 @@ class FwAdminController extends FwController {
     }
 
     public function SaveAction($form_id): ?array {
-        $this->fw->checkXSS();
-
         $id   = intval($form_id);
         $item = reqh('item');
 
@@ -167,8 +165,6 @@ class FwAdminController extends FwController {
     }
 
     public function DeleteAction($id): ?array {
-        $this->fw->checkXSS();
-
         $id += 0;
         $this->model->delete($id);
 
@@ -177,8 +173,6 @@ class FwAdminController extends FwController {
     }
 
     public function SaveMultiAction(): ?array {
-        $this->fw->checkXSS();
-
         $acb = req('cb');
         if (!is_array($acb)) {
             $acb = array();

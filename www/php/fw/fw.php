@@ -62,6 +62,8 @@ class fw {
     public bool $is_session = true; #if use session, can be set to false in initRequest to abort session use
     public bool $is_log_events = true; // can be set temporarly to false to prevent event logging (for batch process for ex)
 
+    public string $last_error_send_email = '';
+
     public static array $LOG_LEVELS = array(
         'OFF'    => 0, #no logging occurs
         'FATAL'  => 10, #severe error, current request (or even whole application) aborted (notify admin)
@@ -433,7 +435,14 @@ class fw {
         #XSS check for all requests that modify data
         $request_xss = reqs("XSS");
         $session_xss = $_SESSION["XSS"] ?? '';
-        if (($request_xss || $route->method == "POST" || $route->method == "PUT" || $route->method == "DELETE")
+        if (($request_xss
+                || $route->method == "POST"
+                || $route->method == "PUT"
+                || $route->method == "DELETE"
+                || $route->action == self::ACTION_SAVE
+                || $route->action == self::ACTION_DELETE
+                || $route->action == self::ACTION_SAVE_MULTI
+            )
             && $session_xss > "" && $session_xss != $request_xss
             && !in_array($route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
@@ -801,7 +810,8 @@ class fw {
                     logger('WARN', 'Error sending email via PHPMailer: ' . $mailer->ErrorInfo);
                 }
             } catch (Exception $e) {
-                logger('WARN', $e->getMessage());
+                $this->last_error_send_email = $e->getMessage();
+                logger('WARN', $this->last_error_send_email);
                 $result = false;
             }
         } else {
@@ -845,7 +855,8 @@ class fw {
             foreach ($ToEmail as $v) {
                 $res = mail($v, $Subj, $Message, $more);
                 if ($res === false) {
-                    logger('WARN', 'Error sending email via mail(): ' . error_get_last()['message']);
+                    $this->last_error_send_email = error_get_last()['message'];
+                    logger('WARN', 'Error sending email via mail(): ' . $this->last_error_send_email);
                     $result = false;
                 }
             }

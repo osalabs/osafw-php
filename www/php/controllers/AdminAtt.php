@@ -93,8 +93,6 @@ class AdminAttController extends FwAdminController {
     }
 
     public function SaveAction($form_id): ?array {
-        $this->fw->checkXSS();
-
         $id    = intval($form_id);
         $item  = reqh('item');
         $files = UploadUtils::getPostedFiles('file1');

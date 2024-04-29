@@ -35,8 +35,6 @@ class MySettingsController extends FwController {
     }
 
     public function SaveAction() {
-        $this->fw->checkXSS();
-
         $id   = $this->fw->userId();
         $item = reqh('item');
 

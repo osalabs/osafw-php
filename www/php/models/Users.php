@@ -69,10 +69,10 @@ class Users extends FwModel {
 
         // set ui_theme/ui_mode form the config if not set
         if (!array_key_exists('ui_theme', $item)) {
-            $item['ui_theme'] = $this->fw->config->UI_THEME ?? '';
+            $item['ui_theme'] = $this->fw->config->UI_THEME ?? 0;
         }
         if (!array_key_exists('ui_mode', $item)) {
-            $item['ui_mode'] = $this->fw->config->UI_MODE ?? '';
+            $item['ui_mode'] = $this->fw->config->UI_MODE ?? 0;
         }
 
         return parent::add($item);

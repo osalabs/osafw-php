@@ -56,8 +56,6 @@ class AdminSettingsController extends FwAdminController {
     }
 
     public function SaveAction($form_id): ?array {
-        $this->fw->checkXSS();
-
         $id   = intval($form_id);
         $item = reqh('item');
 

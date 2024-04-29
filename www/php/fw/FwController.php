@@ -118,7 +118,7 @@ abstract class FwController {
             $this->save_fields = $this->config["save_fields"] ?? '';
         }
 
-        $this->form_new_defaults = $this->config["form_new_defaults"] ?? '';
+        $this->form_new_defaults = $this->config["form_new_defaults"] ?? [];
 
         #save_fields_checkboxes could be defined as qw string - check and convert
         if (is_array($this->config["save_fields_checkboxes"])) {
@@ -138,7 +138,7 @@ abstract class FwController {
         $this->list_sortdef  = $this->config["list_sortdef"] ?? '';
 
         #list_sortmap could be defined as array or qw string - check and convert
-        if (is_array($this->config["list_sortmap"])) {
+        if (is_array($this->config["list_sortmap"] ?? false)) {
             $this->list_sortmap = $this->config["list_sortmap"]; #not optimal, but simplest for now
         } else {
             $this->list_sortmap = Utils::qh($this->config["list_sortmap"] ?? '');
@@ -284,7 +284,7 @@ abstract class FwController {
             throw new Exception('No sort order mapping defined, define in list_sortmap');
         }
 
-        list($sortdef_field, $sortdef_dir) = Utils::qw($this->list_sortdef);
+        list($sortdef_field, $sortdef_dir) = Utils::split2(" ", $this->list_sortdef);
 
         $sortby  = $this->list_filter['sortby'] ?? '';
         $sortdir = $this->list_filter['sortdir'] ?? '';
@@ -946,7 +946,7 @@ abstract class FwController {
 
     public function getViewListUserFields() {
         $item = UserViews::i()->oneByIcode($this->base_url); #base_url is screen identifier
-        return $item['fields'] > '' ? $item['fields'] : $this->view_list_defaults;
+        return empty($item['fields']) ? $this->view_list_defaults : $item['fields'];
     }
 
     /**
@@ -991,7 +991,7 @@ abstract class FwController {
      * @return string
      */
     public function applyViewListConversions(string $fieldname, array $row, array $hconversions): string {
-        $data = $row[$fieldname];
+        $data = $row[$fieldname] ?? '';
         if (array_key_exists($fieldname, $hconversions)) {
             $data = DateUtils::Str2DateOnly($data);
         }

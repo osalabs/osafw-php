@@ -8,14 +8,16 @@
 
 class FwDynamicController extends FwController {
     const int access_level = 100; #by default Admin Controllers allowed only for Admins
+
+    // public string $base_url = '/Admin/Controller'; # define in inherited controller for loadControllerConfig
+
     protected $model_related;
 
     public function __construct() {
         parent::__construct();
 
+        $this->loadControllerConfig();
         //uncomment in the interited controller
-        //$this->base_url='/Admin/DemosDynamic'; #base url must be defined for loadControllerConfig
-        //$this->loadControllerConfig();
         //$this->model_related = DemoDicts::i();
     }
 
@@ -119,10 +121,6 @@ class FwDynamicController extends FwController {
 
         if ($this->is_dynamic_showform) {
             $ps["fields"] = $this->prepareShowFormFields($item, $ps);
-        }
-
-        if ($this->fw->GLOBAL['ERR']) {
-            logger($this->fw->GLOBAL['ERR']);
         }
 
         return $ps;

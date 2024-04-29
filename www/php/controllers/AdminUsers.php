@@ -6,69 +6,70 @@
  (c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
-class AdminUsersController extends FwAdminController {
-    const string route_default_action = '';
+class AdminUsersController extends FwDynamicController {
+    const int access_level = Users::ACL_ADMIN;
+
     public string $base_url = '/Admin/Users';
-    public string $required_fields = 'email access_level';
-    public string $save_fields = 'email pwd access_level fname lname title address1 address2 city state zip phone status att_id';
-    public string $save_fields_nullable = 'att_id';
-    public string $model_name = 'Users';
 
-    public string $list_sortdef = 'iname asc';    //default sorting - req param name, asc|desc direction
-    public array $list_sortmap = array(//sorting map: req param name => sql field name(s) asc|desc direction
-                                       'id'           => 'id',
-                                       'iname'        => 'fname,lname',
-                                       'email'        => 'email',
-                                       'access_level' => 'access_level',
-                                       'status'       => 'status',
-                                       'add_time'     => 'add_time',
-    );
-    public string $search_fields = 'email fname lname';  //fields to search via $s$list_filter['s'], ! - means exact match, not "like"
+    public function setListSearch(): void {
+        parent::setListSearch();
 
-    //format: 'field1 field2,!field3 field4' => field1 LIKE '%$s%' or (field2 LIKE '%$s%' and field3='$s') or field4 LIKE '%$s%'
+        if (!empty($this->list_filter["access_level"])) {
+            $this->list_where                        .= " and access_level=@access_level";
+            $this->list_where_params["access_level"] = $this->list_filter["access_level"];
+        }
+    }
 
     public function ShowFormAction($form_id): ?array {
         $ps = parent::ShowFormAction($form_id);
-        if (!$this->isGet()) {
-            $ps['i']["email"] = $ps['i']["ehack"];
-        }
+        $id = $ps['id'];
 
         $att_id    = $ps['i']['att_id'] ?? 0;
         $ps['att'] = Att::i()->one($att_id);
+
+        $ps['is_roles']   = $this->model->isRoles();
+        $ps['roles_link'] = $this->model->listLinkedRoles($id);
         return $ps;
     }
 
     public function SaveAction($form_id): ?array {
-        $this->fw->checkXSS();
+        $this->route_onerror = FW::ACTION_SHOW_FORM;
 
-        $id   = intval($form_id);
-        $item = reqh('item');
+        if (empty($this->save_fields)) {
+            throw new Exception("No fields to save defined, define in Controller.save_fields");
+        }
+
+        if (reqi('refresh') == 1) {
+            $this->fw->routeRedirect(FW::ACTION_SHOW_FORM, null, [$form_id]);
+        }
+
+        $id      = intval($form_id);
+        $item    = reqh('item');
+        $is_new  = ($id == 0);
+        $success = true;
 
         $item["email"] = $item["ehack"]; // just because Chrome autofills fields too agressively
 
-        try {
-            $this->Validate($id, $item);
-            #load old record if necessary
-            #$item_old = $this->model->one($id);
+        $this->Validate($id, $item);
+        #load old record if necessary
+        #$item_old = $this->model->one($id);
 
-            $itemdb        = $this->getSaveFields($id, $item);
-            $itemdb['pwd'] = trim($itemdb['pwd']);
-            if (!strlen($itemdb['pwd'])) {
-                unset($itemdb['pwd']);
-            }
+        $itemdb = $this->getSaveFields($id, $item);
 
-            $id = $this->modelAddOrUpdate($id, $itemdb);
-
-            if ($id == $this->fw->userId()) {
-                $this->model->reloadSession();
-            }
-
-            fw::redirect($this->base_url . '/' . $id . '/edit');
-
-        } catch (ApplicationException $ex) {
-            $this->setFormError($ex);
-            $this->routeRedirect("ShowForm");
+        $itemdb['pwd'] = trim($itemdb['pwd']);
+        if (!strlen($itemdb['pwd'])) {
+            unset($itemdb['pwd']);
         }
+
+        $id = $this->modelAddOrUpdate($id, $itemdb);
+
+        $this->model->updateLinkedRoles($id, reqh('roles_link'));
+
+        if ($id == $this->fw->userId()) {
+            $this->model->reloadSession();
+        }
+
+        return $this->afterSave($success, $id, $is_new);
     }
 
     public function Validate($id, $item): void {
@@ -76,11 +77,11 @@ class AdminUsersController extends FwAdminController {
 
         //result here used only to disable further validation if required fields validation failed
         if ($result) {
-            if ($this->model->isExists($item['ehack'], $id)) {
+            if ($this->model->isExists($item['email'], $id)) {
                 $this->setError('ehack', 'EXISTS');
             }
 
-            if (!FormUtils::isEmail($item['ehack'])) {
+            if (!FormUtils::isEmail($item['email'])) {
                 $this->setError('ehack', 'WRONG');
             }
         }
@@ -88,34 +89,51 @@ class AdminUsersController extends FwAdminController {
         $this->validateCheckResult();
     }
 
-    public function Export($ps, $format) {
-        if ($format != 'csv') {
-            throw new ApplicationException("Unsupported format");
+    /**
+     * cleanup session for current user and re-login as user from id
+     * check access - only users with higher level may login as lower level
+     * @param $id
+     * @return void
+     * @throws AuthException
+     * @throws UserException
+     */
+    public function SimulateAction($id): void {
+        $user = $this->model->one($id);
+        if (empty($user)) {
+            throw new UserException("Wrong User ID");
+        }
+        if ($user['access_level'] >= $this->fw->userAccessLevel()) {
+            throw new AuthException("Access Denied. Cannot simulate user with higher access level");
         }
 
-        $fields = array(
-            'fname'    => 'First Name',
-            'lname'    => 'Last Name',
-            'email'    => 'Email',
-            'add_time' => 'Added',
-        );
-        Utils::responseCSV($ps['list_rows'], $fields, "members.csv");
+        $this->fw->logActivity(FwLogTypes::ICODE_USERS_SIMULATE, FwEntities::ICODE_USERS, $id);
+
+        $this->model->doLogin($id);
+
+        $this->fw->redirect((string)$this->fw->config->LOGGED_DEFAULT_URL);
     }
 
     //send email notification with password
-    public function SendPwdAction($form_id) {
-        $this->fw->checkXSS();
-
+    public function SendPwdAction($form_id): array {
         $id = intval($form_id);
 
-        $user = $this->model->one($id);
-        $this->fw->sendEmailTpl($user['email'], 'email_pwd.txt', $user);
-
+        $success = $this->model->sendPwdReset($id);
         return array(
             '_json' => array(
-                'success' => true,
+                'success' => $success,
+                'err_msg' => $this->fw->last_error_send_email
             ),
         );
+    }
+
+    public function ResetMFAAction($form_id): void {
+        $this->fw->checkXSS();
+        $id = intval($form_id);
+
+        $this->model->update($id, ['mfa_secret' => null]);
+
+        $this->fw->flash("success", "Multi-Factor Authentication Secret Reset");
+        $this->fw->redirect($this->base_url . "/ShowForm/{$id}/edit");
     }
 
 }//end of class
