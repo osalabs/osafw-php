@@ -24,17 +24,17 @@ class ReportSample extends Reports {
     public function getReportData($value = '') {
         $ps = array();
 
-        $list_orderby = 'el.id desc'; #TODO setListSorting
+        $list_orderby = 'al.id desc'; #TODO setListSorting
 
         #apply filters from Me.f
         $where        = ' ';
         $where_params = [];
         if ($this->f['from_date']) {
-            $where                     .= ' and el.add_time>=@from_date';
+            $where                     .= ' and al.add_time>=@from_date';
             $where_params['from_date'] = DateUtils::Str2SQL($this->f['from_date']);
         }
         if ($this->f['to_date']) {
-            $where                   .= ' and el.add_time<DATE_ADD(@to_date, INTERVAL 1 DAY)'; #+1 because less than equal
+            $where                   .= ' and al.add_time<DATE_ADD(@to_date, INTERVAL 1 DAY)'; #+1 because less than equal
             $where_params['to_date'] = DateUtils::Str2SQL($this->f['to_date']);
         }
 
