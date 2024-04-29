@@ -100,6 +100,9 @@ class Att extends FwModel {
     }
 
     public function getAttLinks($table_name, $id) {
+        #TODO
+        return [];
+
         if (!$id || !$table_name) {
             return array();
         }

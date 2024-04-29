@@ -206,14 +206,14 @@ class FormUtils {
         return $result;
     }
 
-    #return date for combo date selection or null if wrong date
+    #return sql date YYYY-MM-DD for combo date selection or null if wrong date
     #sample:
     # <select name="item[fdate_combo_day]">
     # <select name="item[fdate_combo_mon]">
     # <select name="item[fdate_combo_year]">
     # $itemdb["fdate_combo"] = FormUtils::dateForCombo($item, "fdate_combo")
-    public function dateForCombo($item, $field_prefix) {
-        $result = null;
+    public static function dateForCombo(array $item, string $field_prefix): string {
+        $result = '';
         $day    = intval($item[$field_prefix . "_day"]);
         $mon    = intval($item[$field_prefix . "_mon"]);
         $year   = intval($item[$field_prefix . "_year"]);
@@ -221,7 +221,9 @@ class FormUtils {
         if ($day > 0 && $mon > 0 && $year > 0) {
             $result = strtotime("$year-$mon-$day");
             if ($result === FALSE) {
-                $result = null;
+                $result = '';
+            } else {
+                $result = DateUtils::Unix2SQL($result, true);
             }
         }
 
@@ -229,7 +231,7 @@ class FormUtils {
     }
 
     # RETURN: true or false depending if $value is date and if it's date - add to $item 3 key/values for day/mon/year
-    public static function comboForDate($value, &$item, $field_prefix) {
+    public static function comboForDate(string $value, array &$item, string $field_prefix): bool {
         $t = strtotime($value);
         if ($t === FALSE) {
             return FALSE;

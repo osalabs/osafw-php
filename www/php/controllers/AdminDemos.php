@@ -13,7 +13,7 @@ class AdminDemosController extends FwAdminController {
     public string $required_fields = 'iname email';
     public string $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
     public string $save_fields_checkboxes = 'is_checkbox';
-    public string $save_fields_nullable = 'demo_dicts_id att_id';
+    public string $save_fields_nullable = 'demo_dicts_id att_id fdate_pop fdatetime';
     public string $model_name = 'Demos';
     public $model_related;
 
@@ -67,81 +67,83 @@ class AdminDemosController extends FwAdminController {
         $id   = intval($item['id']);
 
         $item["ftime_str"] = DateUtils::int2timestr($item["ftime"]);
-        $dict_link_multi   = FormUtils::ids2multi($item['dict_link_multi']);
 
         $ps = array_merge($ps, array(
-            'i'              => $item,
-            'parent'         => $this->model->one($item['parent_id']),
-            'demo_dicts'     => $this->model_related->one($item['demo_dicts_id']),
-            'dict_link_auto' => $this->model_related->one($item['dict_link_auto_id']),
-            'multi_datarow'  => $this->model_related->listWithChecked($dict_link_multi),
-            'att'            => Att::i()->one($item['att_id']),
-            'att_links'      => Att::i()->getAttLinks($this->model->table_name, $id),
+            'i'                  => $item,
+            'parent'             => $this->model->one($item['parent_id']),
+            'demo_dicts'         => $this->model_related->one($item['demo_dicts_id']),
+            'dict_link_auto'     => $this->model_related->one($item['dict_link_auto_id']),
+            'multi_datarow'      => $this->model_related->listWithChecked($item['dict_link_multi']),
+            'multi_datarow_link' => DemosDemoDicts::i()->listLinkedByMainId($id),
+            'att'                => Att::i()->one($item['att_id']),
+            'att_links'          => Att::i()->getAttLinks($this->model->table_name, $id),
         ));
+
+        if ($this->is_activity_logs) {
+            $this->initFilter();
+            $ps["list_filter"]["tab_activity"] = $ps["list_filter"]["tab_activity"] ?? FwActivityLogs::TAB_COMMENTS;
+            $ps["activity_entity"]             = $this->model0->table_name;
+            $ps["activity_rows"]               = FwActivityLogs::i()->listByEntityForUI($this->model->table_name, $id, $ps["list_filter"]["tab_activity"]);
+        }
 
         return $ps;
     }
 
-    //Add/Edit item form screen
-    public function ShowFormAction($form_id): ?array {
-        $id              = intval($form_id);
-        $dict_link_multi = array();
+    /*
+     *     public override Hashtable ShowFormAction(int id = 0)
+        {
+            // Me.form_new_defaults = New Hashtable 'set new form defaults here if any
+            // Me.form_new_defaults = reqh("item") 'OR optionally set defaults from request params
+            // item["field"]="default value"
+            Hashtable ps = base.ShowFormAction(id);
 
-        if ($this->isGet()) {
-            if ($id > 0) {
-                $item              = $this->model->one($id);
-                $item["ftime_str"] = DateUtils::int2timestr($item["ftime"]);
-                $dict_link_multi   = FormUtils::ids2multi($item['dict_link_multi']);
-            } else {
-                #defaults
-                $item = $this->form_new_defaults;
-                if ($this->related_id) {
-                    $item['demo_dicts_id'] = $this->related_id;
-                }
-            }
-        } else {
-            $itemdb          = $id ? $this->model->one($id) : array();
-            $item            = array_merge($itemdb, reqh('item'));
-            $dict_link_multi = req('dict_link_multi');
+            // read dropdowns lists from db
+            var item = (Hashtable)ps["i"];
+            ps["select_options_parent_id"] = model.listSelectOptionsParent();
+            ps["select_options_demo_dicts_id"] = model_related.listSelectOptions();
+            ps["dict_link_auto_id_iname"] = model_related.iname(item["dict_link_auto_id"]);
+            ps["multi_datarow"] = model_related.listWithChecked((string)item["dict_link_multi"]);
+            ps["multi_datarow_link"] = fw.model<DemosDemoDicts>().listLinkedByMainId(id);
+            FormUtils.comboForDate((string)item["fdate_combo"], ps, "fdate_combo");
+
+            ps["att"] = fw.model<Att>().one(Utils.f2int(item["att_id"])).toHashtable();
+            ps["att_links"] = fw.model<Att>().listLinked(model.table_name, id);
+
+            return ps;
         }
 
-        $ps = array(
-            'id'                           => $id,
-            'i'                            => $item,
-            'add_users_id_name'            => Users::i()->iname($item['add_users_id']),
-            'upd_users_id_name'            => Users::i()->iname($item['upd_users_id']),
-            'return_url'                   => $this->return_url,
-            'related_id'                   => $this->related_id,
+     * */
+    public function ShowFormAction($form_id): ?array {
+        $ps   = parent::ShowFormAction($form_id);
+        $id   = intval($ps['id']);
+        $item = $ps['i'];
 
-            #read dropdowns lists from db
+        $ps = array_merge($ps, array(
             'select_options_parent_id'     => $this->model->listSelectOptionsParent(),
             'select_options_demo_dicts_id' => $this->model_related->listSelectOptions(),
-            'dict_link_auto_id_iname'      => $item['dict_link_auto_id'] ? $this->model_related->iname($item['dict_link_auto_id']) : $item['dict_link_auto_id_iname'],
-            'multi_datarow'                => $this->model_related->listWithChecked($dict_link_multi),
-            'att'                          => Att::i()->one($item['att_id'] ?? 0),
+            'dict_link_auto_id_iname'      => $this->model_related->iname($item['dict_link_auto_id'] ?? 0),
+            'multi_datarow'                => $this->model_related->listWithChecked($item['dict_link_multi'] ?? ''),
+            'multi_datarow_link'           => DemosDemoDicts::i()->listLinkedByMainId($id),
+            'att'                          => Att::i()->one($item['att_id']),
             'att_links'                    => Att::i()->getAttLinks($this->model->table_name, $id),
-        );
-        if ($this->fw->GLOBAL['ERR']) {
-            logger($this->fw->GLOBAL['ERR']);
-        }
-        #combo date
-        #TODO FormUtils::comboForDate( $item['fdate_combo'], $ps, 'fdate_combo');
+        ));
+        FormUtils::comboForDate($item['fdate_combo'] ?? '', $ps, 'fdate_combo');
 
         return $ps;
     }
 
     // override to modify some fields before save
     public function getSaveFields($id, $item): array {
-        $itemdb = parent::getSaveFields($id, $item);
-
         #load old record if necessary
         #$item_old = $this->model->one($id);
 
         $itemdb['dict_link_auto_id'] = $this->model_related->findOrAddByIname($item['dict_link_auto_id_iname']);
-        $itemdb['dict_link_multi']   = FormUtils::multi2ids(req('dict_link_multi'));
-        $itemdb['fdate_pop']         = DateUtils::Str2SQL($itemdb['fdate_pop']);
-        #TODO $itemdb['fdate_combo'] = FormUtils::date4combo($item, 'fdate_combo');
-        $itemdb['ftime'] = DateUtils::timestr2int($item['ftime_str']); #ftime - convert from HH:MM to int (0-24h in seconds)
+        $itemdb['dict_link_multi']   = FormUtils::multi2ids(reqh('dict_link_multi'));
+        $itemdb["fdate_combo"]       = FormUtils::dateForCombo($item, "fdate_combo");
+        $itemdb['fdate_pop']         = DateUtils::Str2SQL($item['fdate_pop']);
+        $itemdb['ftime']             = DateUtils::timestr2int($item['ftime_str']); #ftime - convert from HH:MM to int (0-24h in seconds)
+
+        $itemdb = parent::getSaveFields($id, $item);
 
         return $itemdb;
     }
@@ -150,7 +152,9 @@ class AdminDemosController extends FwAdminController {
     public function modelAddOrUpdate(int $id, array $fields): int {
         $id = parent::modelAddOrUpdate($id, $fields);
 
-        Att::i()->updateAttLinks($this->model->table_name, $id, reqh('att'));
+        DemosDemoDicts::i()->updateJunctionByMainId($id, reqh('demo_dicts_link'));
+        #TODO AttLinks::i()->updateJunction($this->model->table_name, ;id, reqh("att"));
+        #Att::i()->updateAttLinks($this->model->table_name, $id, reqh('att'));
 
         return $id;
     }
@@ -172,13 +176,12 @@ class AdminDemosController extends FwAdminController {
         $this->validateCheckResult();
     }
 
-    public function AutocompleteAction() {
+    public function AutocompleteAction(): array {
         $query = reqs('q');
 
-        $ps = array(
+        return array(
             '_json' => $this->model_related->listAutocomplete($query),
         );
-        return $ps;
     }
 
 }//end of class

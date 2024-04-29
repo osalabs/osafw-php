@@ -207,7 +207,7 @@ abstract class FwModel {
 
     public function iname(string|int|null $id): string {
         $row = $this->one($id);
-        return $row[$this->field_iname];
+        return $row[$this->field_iname] ?? '';
     }
 
     /**

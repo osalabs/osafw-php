@@ -9,12 +9,15 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 class FwAdminController extends FwController {
     const int    access_level         = Users::ACL_SITE_ADMIN; #by default Admin Controllers allowed only for Admins
     const string route_default_action = '';
+
+    // set/override in child class:
+    #public $model_name = 'DemoDicts'; #set in child class!
     public string $base_url = '/Admin/FwAdmin';
     public string $required_fields = 'iname';
     public string $save_fields = 'iname status';
     public string $save_fields_checkboxes = '';
     public string $save_fields_nullable = '';
-    #public $model_name = 'DemoDicts'; #set in child class!
+
     /*REMOVE OR OVERRIDE
     public $search_fields = 'iname idesc';
     public $list_sortdef = 'iname asc';   //default sorting - req param name, asc|desc direction
@@ -34,7 +37,7 @@ class FwAdminController extends FwController {
 
     public function IndexAction(): ?array {
         #get filters from the search form
-        $f = $this->initFilter();
+        $this->initFilter();
 
         $this->setListSorting();
         $this->setListSearch();
@@ -43,23 +46,16 @@ class FwAdminController extends FwController {
 
         $this->getListRows();
         //add/modify rows from db
-        /*
-        foreach ($this->list_rows as $k => $row) {
-        $this->list_rows[$k]['field'] = 'value';
-        }
-         */
-        $ps = array(
-            'list_rows'  => $this->list_rows,
-            'count'      => $this->list_count,
-            'pager'      => $this->list_pager,
-            'f'          => $this->list_filter,
-            'related_id' => $this->related_id,
-        );
+        //        foreach ($this->list_rows as $k => $row) {
+        //            $this->list_rows[$k]['field'] = 'value';
+        //        }
 
-        #optional userlists support
-        $ps["select_userlists"] = UserLists::i()->listSelectByEntity($this->list_view);
-        $ps["mylists"]          = UserLists::i()->listForItem($this->list_view, 0);
-        $ps["list_view"]        = $this->list_view;
+        $ps = $this->setPS();
+
+        // userlists support if necessary
+        if ($this->is_userlists) {
+            $this->setUserLists($ps);
+        }
 
         return $ps;
     }
@@ -72,67 +68,79 @@ class FwAdminController extends FwController {
         }
 
         $ps = array(
-            'id'                => $id,
-            'i'                 => $item,
-            'add_users_id_name' => Users::i()->iname($item['add_users_id'] ?? 0),
-            'upd_users_id_name' => Users::i()->iname($item['upd_users_id'] ?? 0),
-            'return_url'        => $this->return_url,
-            'related_id'        => $this->related_id,
+            'id'               => $id,
+            'i'                => $item,
+            'return_url'       => $this->return_url,
+            'related_id'       => $this->related_id,
+            'base_url'         => $this->base_url,
+            'is_userlists'     => $this->is_userlists,
+            'is_activity_logs' => $this->is_activity_logs,
+            'is_readonly'      => $this->is_readonly,
         );
+        $this->setAddUpdUser($ps, $item);
 
-        #userlists support
-        $ps["list_view"] = $this->list_view ? $this->list_view : $this->model0->table_name;
-        $ps["mylists"]   = UserLists::i()->listForItem($ps["list_view"], $id);
+        // userlists support if necessary
+        if ($this->is_userlists) {
+            $this->setUserLists($ps);
+        }
 
         return $ps;
     }
 
     public function ShowFormAction($form_id): ?array {
-        $id = intval($form_id);
+        $id   = intval($form_id);
+        $item = reqh('item');
 
         if ($this->isGet()) {
             if ($id > 0) {
                 $item = $this->model0->one($id);
             } else {
-                #defaults
-                $item = $this->form_new_defaults;
+                # override any defaults here
+                $item = array_merge($item, $this->form_new_defaults);
             }
         } else {
-            $itemdb = $id ? $this->model0->one($id) : array();
-            $item   = array_merge($itemdb, reqh('item'));
+            $itemdb = $this->model0->one($id);
+            $item   = array_merge($itemdb, $item);
         }
 
         $ps = array(
-            'id'                => $id,
-            'i'                 => $item,
-            'add_users_id_name' => Users::i()->iname($item['add_users_id'] ?? 0),
-            'upd_users_id_name' => Users::i()->iname($item['upd_users_id'] ?? 0),
-            'return_url'        => $this->return_url,
-            'related_id'        => $this->related_id,
+            'id'               => $id,
+            'i'                => $item,
+            'return_url'       => $this->return_url,
+            'related_id'       => $this->related_id,
+            'base_url'         => $this->base_url,
+            'is_userlists'     => $this->is_userlists,
+            'is_activity_logs' => $this->is_activity_logs,
+            'is_readonly'      => $this->is_readonly,
         );
+        $this->setAddUpdUser($ps, $item);
 
         return $ps;
     }
 
     public function SaveAction($form_id): ?array {
+        $this->route_onerror = FW::ACTION_SHOW_FORM;
+        if (empty($this->save_fields)) {
+            throw new Exception("No fields to save defined, define in Controller.save_fields");
+        }
+
+        Users::i()->checkReadOnly();
+        if (reqi("refresh") == 1) {
+            $this->fw->routeRedirect(FW::ACTION_SHOW_FORM, null, [$form_id]);
+            return null;
+        }
+
         $id   = intval($form_id);
         $item = reqh('item');
 
-        $success  = true;
-        $is_new   = ($id == 0);
-        $location = '';
+        $success = true;
+        $is_new  = ($id == 0);
 
-        try {
-            $this->Validate($id, $item);
+        $this->Validate($id, $item);
 
-            $itemdb = $this->getSaveFields($id, $item);
+        $itemdb = $this->getSaveFields($id, $item);
 
-            $id = $this->modelAddOrUpdate($id, $itemdb);
-
-        } catch (ApplicationException $ex) {
-            $success = false;
-            $this->setFormError($ex);
-        }
+        $id = $this->modelAddOrUpdate($id, $itemdb);
 
         return $this->afterSave($success, $id, $is_new);
     }
@@ -140,23 +148,23 @@ class FwAdminController extends FwController {
     public function Validate($id, $item): void {
         $result = $this->validateRequired($item, $this->required_fields);
 
-        /*
-        if ($result){
-        if ($this->model->isExists( $item['iname'], $id ) ){
-        $this->setError('iname', 'EXISTS');
-        }
-        }
-         */
+        //        if ($result){
+        //            if ($this->model->isExists( $item['iname'], $id ) ){
+        //                $this->setError('iname', 'EXISTS');
+        //            }
+        //        }
         $this->validateCheckResult();
     }
 
-    public function ShowDeleteAction($id): ?array {
-        $id += 0;
+    public function ShowDeleteAction($form_id): ?array {
+        Users::i()->checkReadOnly();
+
+        $id = intval($form_id);
         $ps = array(
             'i'          => $this->model0->one($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
-            'base_url'   => $this->fw->config->ROOT_URL . $this->base_url, #override default template url, remove if you created custom /showdelete templates
+            'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates
         );
 
         $this->fw->parser('/common/form/showdelete', $ps);
@@ -164,35 +172,36 @@ class FwAdminController extends FwController {
         return null;
     }
 
-    public function DeleteAction($id): ?array {
-        $id += 0;
-        $this->model0->delete($id);
+    public function DeleteAction($form_id): ?array {
+        $id = intval($form_id);
+        $this->model0->deleteWithPermanentCheck($id);
 
         $this->fw->flash("onedelete", 1);
         return $this->afterSave(true);
     }
 
     public function SaveMultiAction(): ?array {
-        $acb = req('cb');
-        if (!is_array($acb)) {
-            $acb = array();
+        $acb = reqh('cb');
+
+        $is_delete = reqs('delete') > '';
+        if ($is_delete) {
+            Users::i()->checkReadOnly();
         }
 
-        $is_delete            = reqs('delete') > '';
         $user_lists_id        = reqi("addtolist");
         $remove_user_lists_id = reqi("removefromlist");
 
         if ($user_lists_id) {
             $user_lists = UserLists::i()->one($user_lists_id);
             if (!$user_lists || $user_lists["add_users_id"] <> $this->fw->userId()) {
-                throw new ApplicationException("Wrong Request");
+                throw new UserException("Wrong Request");
             }
         }
 
         $ctr = 0;
         foreach ($acb as $id => $value) {
             if ($is_delete) {
-                $this->model0->delete($id);
+                $this->model0->deleteWithPermanentCheck($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
                 UserLists::i()->addItemList($user_lists_id, $id);

@@ -820,7 +820,7 @@ abstract class FwController {
         }
     }
 
-    public function setPS(array &$ps): array {
+    public function setPS(array &$ps = null): array {
         if (empty($ps)) {
             $ps = array();
         }
@@ -880,10 +880,10 @@ abstract class FwController {
 
     public function setAddUpdUser(array &$ps, array $item): void {
         if ($this->model0->field_add_users_id > '') {
-            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model0->field_add_users_id]);
+            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model0->field_add_users_id] ?? 0);
         }
         if ($this->model0->field_upd_users_id > '') {
-            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model0->field_upd_users_id]);
+            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model0->field_upd_users_id] ?? 0);
         }
     }
 
