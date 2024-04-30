@@ -7,19 +7,31 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 */
 
 class FwApiController extends FwController {
-    #public $base_url = '/Api/SomeController'; #SET IN CHILD CLASS
+    #set in child class:
+    #public MODELCLASS $model;
+    #public string $model_name = 'MODELCLASS';
+    #public $base_url = '/Api/SomeController';
+
+    protected string $http_origin = '';
 
     public function __construct() {
         parent::__construct();
+
+        #$this->http_origin = $_SERVER['HTTP_ORIGIN']; #use this if API consumed by external sites
+        $this->http_origin = $this->fw->config->ROOT_DOMAIN; #use this if API consumed by the same site only
 
         if ($this->fw->route->method != 'OPTIONS') {
             $this->prepare(true); #auth+set headers
         }
 
-        #$this->model_name='SET IN CHILD CLASS';
     }
 
-    protected function prepare($is_auth = true) {
+    /**
+     * Prepare API call - set headers and auth
+     * @param bool $is_auth - if true - also check auth
+     * @throws AuthException
+     */
+    protected function prepare(bool $is_auth = true): void {
         $this->setHeaders();
 
         if ($is_auth) {
@@ -27,22 +39,33 @@ class FwApiController extends FwController {
         }
     }
 
-    protected function setHeaders() {
-        #$http_origin = $_SERVER['HTTP_ORIGIN'];
-        $http_origin = $this->fw->config->ROOT_DOMAIN;
-        header("Access-Control-Allow-Origin: $http_origin");
+    /**
+     * Set standard headers for API
+     * @return void
+     */
+    protected function setHeaders(): void {
+        header("Access-Control-Allow-Origin: {$this->http_origin}");
         header("Access-Control-Allow-Credentials: true");
     }
 
-    protected function setHeadersOptions() {
+    /**
+     * Set standard headers for API OPTIONS requests
+     * @return void
+     */
+    protected function setHeadersOptions(): void {
         header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-        header("Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept");
+        header("Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization");
         #header("Access-Control-Allow-Headers: Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
         #header("Access-Control-Max-Age: 86400");
     }
 
-    //auth by session key passed
-    protected function auth() {
+    /**
+     * authenticate by Session or API key or JWT
+     * TODO
+     * @return bool
+     * @throws AuthException
+     */
+    protected function auth(): bool {
         $result = false;
 
         #check if user logged
@@ -58,14 +81,16 @@ class FwApiController extends FwController {
         return $result;
     }
 
-    public function setApiError($ex, &$ps) {
+    public function setApiError($ex, &$ps): void {
         logger("FATAL", $ex);
         $ps['success'] = false;
         $ps['err_msg'] = $ex->getMessage();
+        header("HTTP/1.1 " . $ex->getCode() . " " . $ex->getMessage()); #also set HTTP status code
     }
 
-    public function OptionsAction() {
-        $this->setHeaders(); #set std headers
+    #used for prefight OPTIONS requests
+    public function OptionsAction(): void {
+        $this->setHeaders();
         $this->setHeadersOptions();
         echo "";
     }
@@ -74,7 +99,6 @@ class FwApiController extends FwController {
     // public function TestAction($form_id = '') {
     //     $id = intval($form_id);
     //     $ps = array(
-    //         '_json'   => true,
     //         'success' => true,
     //     );
 
@@ -85,6 +109,6 @@ class FwApiController extends FwController {
     //         $ps['err_msg'] = $ex->getMessage();
     //     }
 
-    //     return $ps;
+    //     return ['_json' => $ps];
     // }
 }
