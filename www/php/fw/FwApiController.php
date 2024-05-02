@@ -87,7 +87,10 @@ class FwApiController extends FwController {
         }
     }
 
-    #auth via session
+    /**
+     * Authenticate via session
+     * @return bool
+     */
     protected function authSession(): bool {
         if (!$this->fw->isLogged()) {
             return false;
@@ -95,7 +98,10 @@ class FwApiController extends FwController {
         return true;
     }
 
-    #auth via simple API key
+    /**
+     * Authenticate via API key
+     * @return bool
+     */
     protected function authApiKey(): bool {
         $result      = false;
         $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -108,7 +114,11 @@ class FwApiController extends FwController {
         return $result;
     }
 
-    #auth via JWT
+    /**
+     * Authenticate via JWT token
+     * @return bool
+     * @throws AuthException
+     */
     protected function authJWT(): bool {
         $result = false;
 
@@ -122,18 +132,16 @@ class FwApiController extends FwController {
         if (preg_match('/Bearer\s(\S+)/', $auth_header, $matches)) {
             $encoded_token = $matches[1];
 
-            $jwt = new \Firebase\JWT\JWT();
-            $jwt->setKey($this->fw->config->JWT_SECRET);
-            $jwt->setAllowedClockSkewInSeconds(30); #allow 30 seconds difference
+            \Firebase\JWT\JWT::$leeway = 30; # allow 30 seconds difference
             try {
-                $payload = $jwt->decode($encoded_token); //['HS256']
+                $payload = \Firebase\JWT\JWT::decode($encoded_token, $this->fw->config->JWT_SECRET, ['HS256']);
                 #validate payload
-                if (isset($payload->exp) && DateUtils::isExpired($payload->exp, 0)) {
-                    throw new AuthException("JWT token expired", 401); # exp - expiration time
-                }
-                if (isset($payload->nbf) && !DateUtils::isExpired($payload->nbf, 0)) {
-                    throw new AuthException("JWT token not yet valid", 401); # nbf - not before time
-                }
+                //                if (isset($payload->exp) && DateUtils::isExpired($payload->exp, 0)) {
+                //                    throw new AuthException("JWT token expired", 401); # exp - expiration time
+                //                }
+                //                if (isset($payload->nbf) && !DateUtils::isExpired($payload->nbf, 0)) {
+                //                    throw new AuthException("JWT token not yet valid", 401); # nbf - not before time
+                //                }
 
                 if (isset($payload->iss) && $payload->iss != $this->fw->config->JWT_ISSUER) {
                     throw new AuthException("JWT token issuer invalid", 401); # iss - issuer
@@ -144,12 +152,17 @@ class FwApiController extends FwController {
                 $this->jwt_payload = $payload;
 
                 $result = true;
+            } catch (\Firebase\JWT\BeforeValidException $e) {
+                throw new AuthException("JWT token not yet valid", 401);
             } catch (\Firebase\JWT\ExpiredException $e) {
-                throw new AuthException("JWT token expired", 401); #TODO check if this catch is needed (if yes - remove check above)
+                throw new AuthException("JWT token expired", 401);
             } catch (\Firebase\JWT\SignatureInvalidException $e) {
-                throw new AuthException("JWT token invalid", 401);
+                throw new AuthException("JWT signature invalid", 401);
             } catch (\Exception $e) {
-                throw new AuthException("JWT token error", 401);
+                // InvalidArgumentException
+                // DomainException
+                // UnexpectedValueException
+                throw new AuthException("JWT processing error", 401);
             }
         }
         return $result;
@@ -161,36 +174,37 @@ class FwApiController extends FwController {
      * @return string
      */
     public function generateJWT(array $user): string {
-        $jwt = new \Firebase\JWT\JWT();
-        $jwt->setKey($this->fw->config->JWT_SECRET);
+        $payload = array(
+            "sub"  => "API",
+            "user" => $user, #TODO check if accepts array or only scalar values
+            "iat"  => time(),
+            "nbf"  => time(),
+            "exp"  => time() + ($this->fw->config->JWT_EXPIRATION ?? 3600), # default 1h
+            #other options:
+            # "uid" => $user['id'],
+            # "uname" => $user['uname'],
+            # "email" => $user['email'],
+            # "roles" => $user['roles'],
+            # "ip" => $_SERVER['REMOTE_ADDR'],
+            # "ua" => $_SERVER['HTTP_USER_AGENT'],
+            # "jti" => uniqid(),
+        );
 
         if (isset($this->fw->config->JWT_ISSUER)) {
-            $jwt->setIssuer($this->fw->config->JWT_ISSUER);
+            $payload['iss'] = $this->fw->config->JWT_ISSUER;
         }
         if (isset($this->fw->config->JWT_AUDIENCE)) {
-            $jwt->setAudience($this->fw->config->JWT_AUDIENCE);
+            $payload['aud'] = $this->fw->config->JWT_AUDIENCE;
         }
 
-        $jwt->setExpiration(time() + ($this->fw->config->JWT_EXPIRATION ?? 3600)); # default 1h
-        $jwt->setNotBefore(time());
-        $jwt->setIssuedAt(time());
-        $jwt->setSubject('API');
-        $jwt->set('user', $user); #TODO check if accepts array or only scalar values
-
-        #other options:
-        #$jwt->set('uid', $user['id']);
-        #$jwt->set('uname', $user['uname']);
-        #$jwt->set('email', $user['email']);
-        #$jwt->set('roles', $user['roles']);
-        #$jwt->set('ip', $_SERVER['REMOTE_ADDR']);
-        #$jwt->set('ua', $_SERVER['HTTP_USER_AGENT']);
-        #$jwt->set('jti', uniqid());
-
-        $token = $jwt->encode();
+        $token = \Firebase\JWT\JWT::encode($payload, $this->fw->config->JWT_SECRET, 'HS256');
         return $token;
     }
 
-    #used for prefight OPTIONS requests
+    /**
+     * OPTIONS request handler
+     * @return void
+     */
     public function OptionsAction(): void {
         $this->setHeaders();
         $this->setHeadersOptions();

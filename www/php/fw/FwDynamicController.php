@@ -369,6 +369,7 @@ class FwDynamicController extends FwController {
             throw new ApplicationException("Controller config.json doesn't contain 'show_fields'");
         }
         foreach ($fields as &$def) {
+            logger("def", $def);
             $def['i'] = $item;
             $dtype    = $def["type"];
             $field    = $def["field"];
