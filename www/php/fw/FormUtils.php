@@ -17,7 +17,7 @@ class FormUtils {
     # xxx xxx xx xx
     # xxx-xxx-xx-xx
     # xxxxxxxxxx
-    public static function isPhone($phone) {
+    public static function isPhone($phone): bool {
         return preg_match("/^\(?\d{3}\)?[\- ]?\d{3}[\- ]?\d{2}[\- ]?\d{2}$/", $phone);
     }
 
@@ -33,8 +33,8 @@ class FormUtils {
     }
 
     #very simple float number validation
-    public function isFloat($str) {
-        return preg_match("'/^-?[0-9]+(\.[0-9]+)?$/'", $str);
+    public static function isFloat($str): bool {
+        return preg_match("/^-?\d+(\.\d+)?$/", $str);
     }
 
     /**
@@ -146,12 +146,12 @@ class FormUtils {
     /**
      * return <option>... html for $rows with selected $selected_id
      * @param array $rows array of assoc arrays with "id" and "iname" keys, for ex returned from db.array('select id, iname from ...')
-     * @param string $selected_id selected id, may contain multiple comma-separated values
+     * @param string|null $selected_id selected id, may contain multiple comma-separated values
      * @return string              html: <option value="id1">iname1</option>...
      *
      * "id" key is optional, if not present - iname will be used for values too
      */
-    public static function selectOptions($rows, $selected_id = NULL) {
+    public static function selectOptions(array $rows, string $selected_id = NULL): string {
         $result = '';
         if (is_null($selected_id)) {
             $selected_id = '';
@@ -172,7 +172,7 @@ class FormUtils {
             }
 
             $result .= "<option value=\"$val\"";
-            if (array_search(trim($val), $asel) !== FALSE) {
+            if (in_array(trim($val), $asel)) {
                 $result .= ' selected ';
             }
             $result .= ">$text</option>\n";
@@ -181,11 +181,42 @@ class FormUtils {
         return $result;
     }
 
-    public static function selectTplOptions($tpl_path, $sel_id, $is_multi = false) {
-        $result = array();
+    /**
+     * get name for the value from the select template
+     * ex: selectTplName('/common/sel/status.sel', 127) => 'Deleted'
+     * TODO: refactor to make common code with ParsePage?
+     * @param string $tpl_path
+     * @param string $sel_id
+     * @return string
+     */
+    public static function selectTplName(string $tpl_path, string $sel_id): string {
+        $result = "";
         if (!$sel_id) {
             $sel_id = '';
         }
+
+        $lines = file(fw::i()->config->SITE_TEMPLATES . $tpl_path);
+        foreach ($lines as $line) {
+            if (strlen($line) < 2) {
+                continue;
+            }
+
+            list($value, $desc) = explode('|', $line, 2);
+            #$desc = preg_replace("/`(.+?)`/", "", $desc);
+            parse_lang($desc); #from ParsePage
+
+            if ($desc && $value == $sel_id) {
+                $result = $desc;
+                break;
+            }
+        }
+
+        return $result;
+    }
+
+
+    public static function selectTplOptions($tpl_path): array {
+        $result = array();
 
         $lines = file(fw::i()->config->SITE_TEMPLATES . $tpl_path);
         foreach ($lines as $line) {
@@ -206,12 +237,17 @@ class FormUtils {
         return $result;
     }
 
-    #return sql date YYYY-MM-DD for combo date selection or null if wrong date
-    #sample:
-    # <select name="item[fdate_combo_day]">
-    # <select name="item[fdate_combo_mon]">
-    # <select name="item[fdate_combo_year]">
-    # $itemdb["fdate_combo"] = FormUtils::dateForCombo($item, "fdate_combo")
+    /**
+     * return sql date YYYY-MM-DD for combo date selection or null if wrong date
+     *  sample:
+     *  <select name="item[fdate_combo_day]">
+     *  <select name="item[fdate_combo_mon]">
+     *  <select name="item[fdate_combo_year]">
+     *  $itemdb["fdate_combo"] = FormUtils::dateForCombo($item, "fdate_combo")
+     * @param array $item array with keys fdate_combo_day, fdate_combo_mon, fdate_combo_year
+     * @param string $field_prefix prefix for keys
+     * @return string sql date YYYY-MM-DD or null if wrong date
+     */
     public static function dateForCombo(array $item, string $field_prefix): string {
         $result = '';
         $day    = intval($item[$field_prefix . "_day"]);
