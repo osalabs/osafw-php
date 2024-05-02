@@ -123,7 +123,7 @@ class AdminAttController extends FwAdminController {
 
             #Proceed upload
             if (count($files)) {
-                $this->model->upload($id, $files[0], $is_add);
+                $this->model->uploadOne($id, $files[0], $is_add);
             }
 
             if ($this->fw->isJsonExpected()) {
@@ -183,7 +183,7 @@ class AdminAttController extends FwAdminController {
             }
         }
 
-        $rows = $this->model->ilistByCategory($att_categories_id);
+        $rows = $this->model->listByCategory($att_categories_id);
         foreach ($rows as $key => $row) {
             $row['direct_url'] = $this->model->getUrlDirect($row);
         }

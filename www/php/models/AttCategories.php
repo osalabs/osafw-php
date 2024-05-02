@@ -11,7 +11,10 @@ class AttCategories extends FwModel {
         $this->table_name = 'att_categories';
     }
 
-    public function oneByIcode(string $icode): array {
-        return $this->db->row($this->table_name, array('icode' => $icode));
+    public function listSelectOptionsLikeIcode(string $icode_prefix): array {
+        return $this->db->arr($this->table_name, array(
+            'status' => self::STATUS_ACTIVE,
+            'icode'  => $this->db->opLIKE($icode_prefix . '[_]%')
+        ), 'id, iname');
     }
 }

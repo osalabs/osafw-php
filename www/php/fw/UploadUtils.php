@@ -43,7 +43,7 @@ class UploadUtils {
      * @param string $field_name posted form field name
      * @return array of assoc arrays (even if one file posted)
      */
-    public static function getPostedFiles($field_name) {
+    public static function getPostedFiles($field_name): array {
         $files = array();
         $fdata = $_FILES[$field_name];
 
@@ -67,7 +67,7 @@ class UploadUtils {
     }
 
     //return file extension with dot, lowercased, taking care of jpeg
-    public static function uploadExt($filename) {
+    public static function uploadExt($filename): string {
         $pp = pathinfo($filename);
         return '.' . self::jpeg2jpg(strtolower($pp['extension']));
     }
@@ -84,7 +84,7 @@ class UploadUtils {
      * @param string $ext extension with dot
      * @return boolean      true if
      */
-    public static function isImgExt($ext) {
+    public static function isImgExt($ext): bool {
         return in_array(strtolower($ext), self::$IMG_EXT);
     }
 
@@ -95,7 +95,7 @@ class UploadUtils {
     //      size (TODO?)
     // sample:
     // UploadUtils::isUploadValid($_FILES['file'], array(.jpg', '.png'))
-    public static function isUploadValid($file, $allowed_ext = array()) {
+    public static function isUploadValid($file, $allowed_ext = array()): bool {
         $result = false;
         if ($file && $file['name'] > '') {
             if (strlen($file['tmp_name']) && file_exists($file['tmp_name'])) {
@@ -128,14 +128,14 @@ class UploadUtils {
      * upload file to some directory ($module_basedir/0/0/0/0/$id.$ext) for related $id and options
      * @param int $item_id item id
      * @param string $module_basedir basedir for module $id related to, id2dir path will be added to this
-     * @param array $file one assoc array from getPostedFiles()
+     * @param array $file one assoc array from $_FILES
      * @param array $opt options:
      *                                   ext - force to save images in this format (example: .jpg instead of .jpeg)
      * @return string                ''(empty) if error (or no file or no $item_id), 'full path to uploaded file' if success
      */
-    public static function uploadFile($item_id, $module_basedir, $file, $opt = array()) {
+    public static function uploadFile(int $item_id, string $module_basedir, array $file, array $opt = array()): string {
         $result = '';
-        if (!$item_id || !is_array($file) || !$module_basedir) {
+        if (!$item_id || !$file || !$module_basedir) {
             return '';
         }
         logger('TRACE', "uploadFile: $item_id, $module_basedir", $file, $opt);
@@ -172,7 +172,7 @@ class UploadUtils {
      *                                'l' => array(w,h) or just 1 (defaults for l used)
      * @return none
      */
-    public static function uploadResize($filepath, $opt = array()) {
+    public static function uploadResize($filepath, $opt = array()): none {
         $pp      = pathinfo($filepath);
         $dir     = $pp['dirname'];
         $ext     = '.' . $pp['extension'];
@@ -196,7 +196,7 @@ class UploadUtils {
         }
     }
 
-    public static function mkdirTree($dir) {
+    public static function mkdirTree($dir): void {
         if (!file_exists($dir)) {
             mkdir($dir, 0777, true);
         }
@@ -212,7 +212,7 @@ class UploadUtils {
      * @param int $level optional, default in $DEFAULT_ID2DIR_LEVEL, dir deep level
      * @return string        path without trailing /
      */
-    public static function id2dir($id, $level = NULL) {
+    public static function id2dir($id, $level = NULL): string {
         if (is_null($level)) {
             $level = self::$DEFAULT_ID2DIR_LEVEL;
         }
@@ -240,7 +240,7 @@ class UploadUtils {
      * @param string $module_basedir basedir for module $id related to, id2dir path will be added to this
      * @return string               path to directory (no trailing /)
      */
-    public static function getUploadDir($id, $module_basedir) {
+    public static function getUploadDir($id, $module_basedir): string {
         $dir = $module_basedir . self::id2dir($id);
         self::mkdirTree($dir);
 
@@ -255,7 +255,7 @@ class UploadUtils {
      * @param string $size optional, s,m,l or ''(default) for original upload
      * @return string               absolute path to file
      */
-    public static function getUploadPath($id, $module_basedir, $ext, $size = '') {
+    public static function getUploadPath($id, $module_basedir, $ext, $size = ''): string {
         if ($size > '') {
             $size = '_' . $size;
         }
@@ -273,7 +273,7 @@ class UploadUtils {
      * @param string $size optional, s,m,l or ''(default) for original upload
      * @return string               direct url to file
      */
-    public static function getUploadUrl($id, $module_basedir, $module_baserul, $ext, $size = '') {
+    public static function getUploadUrl($id, $module_basedir, $module_baserul, $ext, $size = ''): string {
         if ($size > '') {
             $size = '_' . $size;
         }
@@ -291,7 +291,7 @@ class UploadUtils {
      * @param string $ext optional, explicit extension to cleanup
      * @return none
      */
-    public static function cleanupUpload($id, $module_basedir, $ext = '') {
+    public static function cleanupUpload($id, $module_basedir, $ext = ''): none {
         $diskpath = self::getUploadDir($id, $module_basedir) . "/" . $id;
 
         if ($ext > '') {
@@ -315,10 +315,67 @@ class UploadUtils {
      * @param string $size size for the uploaded file
      * @return string       size for the uploaded file
      */
-    public static function checkSize($size) {
+    public static function checkSize($size): string {
         if ($size <> 's' && $size <> 'm' && $size <> 'l') {
             $size = '';
         }
         return $size;
+    }
+
+    public static function removeUploadImgByPath(string $path): bool {
+        $dir  = dirname($path);
+        $path = $dir . "/" . pathinfo($path, PATHINFO_FILENAME); // cut extension if any
+
+        if (!file_exists($dir)) {
+            return false;
+        }
+
+        @unlink($path . "_l.png");
+        @unlink($path . "_l.gif");
+        @unlink($path . "_l.jpg");
+
+        @unlink($path . "_m.png");
+        @unlink($path . "_m.gif");
+        @unlink($path . "_m.jpg");
+
+        @unlink($path . "_s.png");
+        @unlink($path . "_s.gif");
+        @unlink($path . "_s.jpg");
+
+        @unlink($path . ".png");
+        @unlink($path . ".gif");
+        @unlink($path . ".jpg");
+        return true;
+    }
+
+
+    public static function getUploadImgUrl(FW $fw, string $module_name, int $id, string $size): string {
+        if ($size != "l" && $size != "m" && $size != "s") {
+            $size = ""; // armor +1
+        }
+
+        $part      = self::getUploadDir($fw, $module_name, $id) . "/" . $id;
+        $orig_file = $part;
+
+        if ($size > '') {
+            $orig_file = $orig_file . "_" . $size;
+        }
+
+        $ext = "";
+        if (file_exists($orig_file . ".gif")) {
+            $ext = ".gif";
+        }
+        if (file_exists($orig_file . ".png")) {
+            $ext = ".png";
+        }
+        if (file_exists($orig_file . ".jpg")) {
+            $ext = ".jpg";
+        }
+
+        if ($ext > '') {
+            return self::getUploadUrl($fw, $module_name, $id, $ext, $size);
+        } else {
+            return "";
+        }
     }
 }

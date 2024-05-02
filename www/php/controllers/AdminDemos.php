@@ -79,7 +79,7 @@ class AdminDemosController extends FwAdminController {
             'multi_datarow'      => $this->model_related->listWithChecked($item['dict_link_multi']),
             'multi_datarow_link' => DemosDemoDicts::i()->listLinkedByMainId($id),
             'att'                => Att::i()->one($item['att_id']),
-            'att_links'          => Att::i()->getAttLinks($this->model->table_name, $id),
+            'att_links'          => Att::i()->listLinked($this->model->table_name, $id),
         ));
 
         if ($this->is_activity_logs) {
@@ -128,7 +128,7 @@ class AdminDemosController extends FwAdminController {
             'multi_datarow'                => $this->model_related->listWithChecked($item['dict_link_multi'] ?? ''),
             'multi_datarow_link'           => DemosDemoDicts::i()->listLinkedByMainId($id),
             'att'                          => Att::i()->one($item['att_id']),
-            'att_links'                    => Att::i()->getAttLinks($this->model->table_name, $id),
+            'att_links'                    => Att::i()->listLinked($this->model->table_name, $id),
         ));
         FormUtils::comboForDate($item['fdate_combo'] ?? '', $ps, 'fdate_combo');
 

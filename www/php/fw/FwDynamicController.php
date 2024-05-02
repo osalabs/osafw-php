@@ -668,9 +668,15 @@ class FwDynamicController extends FwController {
             throw new ApplicationException("Controller config.json doesn't contain 'show_fields'");
         }
         foreach ($fields as &$def) {
-            $def['i']    = $item;  #ref to item
-            $def['ps']   = $ps;   #ref to whole ps
-            $dtype       = $def["type"]; #type is required
+            #logger("def:", $def);
+            $def['i']  = $item;  #ref to item
+            $def['ps'] = $ps;   #ref to whole ps
+
+            $dtype = $def["type"] ?? ''; #type is required, absent only for custom defs
+            if (!$dtype) {
+                continue; #skip custom defs
+            }
+
             $field       = $def["field"] ?? '';
             $field_value = $item[$field] ?? '';
 
@@ -683,7 +689,7 @@ class FwDynamicController extends FwController {
                 if (array_key_exists('lookup_model', $def)) {
                     $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($field_value, $def);
                 } else {
-                    if ($def["is_by_linked"]) {
+                    if ($def["is_by_linked"] ?? false) {
                         #list main items by linked id from junction model (i.e. list of Users(with checked) for Company from UsersCompanies model)
                         $def["multi_datarow"] = fw::model($def["model"])->listMainByLinkedId($id, $def); #junction model
                     } else {
@@ -719,11 +725,11 @@ class FwDynamicController extends FwController {
                     $lookup_field = $def["lookup_field"] ?? "iname";
 
                     $def["lookup_row"] = $this->db->row($def["lookup_table"], array($lookup_key => $field_value));
-                    $def["value"]      = $def["lookup_row"][$lookup_field];
+                    $def["value"]      = $def["lookup_row"][$lookup_field] ?? '';
 
                 } elseif (array_key_exists('lookup_model', $def)) {
                     $lookup_model      = fw::model($def["lookup_model"]);
-                    $def["lookup_id"]  = intval($item[$def["lookup_id"]]);
+                    $def["lookup_id"]  = intval($field_value);
                     $def["lookup_row"] = $lookup_model->one($def["lookup_id"]);
 
                     $lookup_field = $def["lookup_field"] ?? $lookup_model->field_iname;
@@ -762,9 +768,13 @@ class FwDynamicController extends FwController {
         }
         foreach ($fields as &$def) {
             // logger(def)
-            $def['i']    = $item; // ref to item
-            $def['ps']   = $ps; // ref to whole ps
-            $dtype       = $def["type"]; // type is required
+            $def['i']  = $item; // ref to item
+            $def['ps'] = $ps; // ref to whole ps
+            $dtype     = $def["type"] ?? ''; // type is required, absent only for custom defs
+            if (!$dtype) {
+                continue; // skip custom defs
+            }
+
             $field       = $def["field"] ?? '';
             $field_value = $item[$field] ?? '';
 
@@ -781,7 +791,7 @@ class FwDynamicController extends FwController {
                 if (array_key_exists('lookup_model', $def)) {
                     $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($field_value, $def);
                 } else {
-                    if ($def["is_by_linked"]) {
+                    if ($def["is_by_linked"] ?? false) {
                         // list main items by linked id from junction model (i.e. list of Users(with checked) for Company from UsersCompanies model)
                         $def["multi_datarow"] = fw::model($def["model"])->listMainByLinkedId($id, $def); //junction model
                     } else {
@@ -896,7 +906,7 @@ class FwDynamicController extends FwController {
                     } else {
                         // single value from lookup
                         $lookup_model      = fw::model($def["lookup_model"]);
-                        $def["lookup_id"]  = intval($item[$def["lookup_id"]]);
+                        $def["lookup_id"]  = intval($field_value);
                         $lookup_row        = $lookup_model->one($def["lookup_id"]);
                         $def["lookup_row"] = $lookup_row;
 
@@ -911,7 +921,7 @@ class FwDynamicController extends FwController {
                     $def["select_options"] = FormUtils::selectTplOptions($def["lookup_tpl"]);
                     $def["value"]          = $field_value;
                     foreach ($def["select_options"] as &$row) {
-                        $row["is_inline"] = $def["is_inline"];
+                        $row["is_inline"] = $def["is_inline"] ?? false;
                         $row["field"]     = $def["field"];
                         $row["value"]     = $field_value;
                     }
@@ -983,7 +993,7 @@ class FwDynamicController extends FwController {
         foreach ($showform_fields as $def) {
             $type = $def["type"];
             if ($type == "att_links_edit") {
-                AttLinks::i()->updateJunction($this->model0->table_name, $id, reqh("att")); // TODO make att configurable
+                AttLinks::i()->updateJunctionByKeys($this->model0->table_name, $id, reqh("att")); // TODO make att configurable
             } elseif ($type == "multicb") {
                 if (empty($def["model"])) {
                     $fields_update[$def["field"]] = FormUtils::multi2ids(reqh($def["field"] . "_multi")); // multiple checkboxes -> single comma-delimited field

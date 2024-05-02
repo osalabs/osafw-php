@@ -495,12 +495,16 @@ abstract class FwModel {
     //</editor-fold>
 
     //<editor-fold desc="Upload Utils">
-    //simple upload of the file related to item
-    public function uploadFile($id, $file): string {
+    /**
+     * simple upload of the file related to item
+     * @param int $id item id
+     * @param array $file one file array from $_FILES
+     * @return string uploaded file path
+     */
+    public function uploadFile(int $id, array $file): string {
         $filepath = UploadUtils::uploadFile($id, $this->getUploadBaseDir(), $file);
         logger('DEBUG', "file uploaded to [$filepath]");
 
-        UploadUtils::uploadResize($filepath, UploadUtils::$IMG_RESIZE_DEF);
         return $filepath;
     }
 
@@ -527,6 +531,43 @@ abstract class FwModel {
     public function removeUpload($id, $ext): void {
         UploadUtils::cleanupUpload($id, $this->getUploadBaseDir(), $ext);
     }
+
+    public function getUploadImgPath(int $id, string $size, string $ext = ""): string {
+        if ($size != "l" && $size != "m" && $size != "s") {
+            $size = ""; // armor +1
+        }
+
+        $part      = $this->getUploadDir($id) . "/" . $id;
+        $orig_file = $part;
+
+        if ($size > '') {
+            $orig_file = $orig_file . "_" . $size;
+        }
+
+        if ($ext == "") {
+            if (file_exists($orig_file . ".gif")) {
+                $ext = ".gif";
+            }
+            if (file_exists($orig_file . ".png")) {
+                $ext = ".png";
+            }
+            if (file_exists($orig_file . ".jpg")) {
+                $ext = ".jpg";
+            }
+        }
+
+        if ($ext > '') {
+            return $orig_file . $ext;
+        } else {
+            return "";
+        }
+    }
+
+    public function removeUploadImg(int $id): bool {
+        $dir = $this->getUploadDir($id) . "/" . $id;
+        return UploadUtils::removeUploadImgByPath($dir);
+    }
+
 
     //</editor-fold>
 
