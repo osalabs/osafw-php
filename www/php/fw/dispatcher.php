@@ -43,9 +43,7 @@ POST/DELETE  /controller/{id}     Delete    Note:$_POST should NOT contain any d
  */
 
 class Dispatcher {
-    const def_controller = 'Home';
-    const def_action     = 'Index';
-    public static $METHOD_ALLOWED = array(
+    public static array $METHOD_ALLOWED = array(
         'GET'    => true,
         'POST'   => true,
         'PUT'    => true,
@@ -53,7 +51,7 @@ class Dispatcher {
     );
 
     # public static $table_name = '';
-    public static $REST2METHOD_MAP = array(
+    public static array $REST2METHOD_MAP = array(
         'view'        => 'Show',
         'create'      => 'Save',
         'update'      => 'Save',
@@ -66,26 +64,26 @@ class Dispatcher {
         'options'     => 'Options',
     );
 
-    public static $HTTP_CODE = array(
+    public static array $HTTP_CODE = array(
         401 => 'Unauthorized',
         403 => 'Forbidden',
         404 => 'Not Found',
         500 => 'Internal server error',
     );
 
-    public $ROUTES = array();
-    public $ROOT_URL;
-    public $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
-    public $request_url; #last url processed by uriToRoute
+    public array $ROUTES = array();
+    public string $ROOT_URL;
+    public array $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
+    public string $request_url; #last url processed by uriToRoute
 
-    public function __construct($ROUTES = array(), $ROOT_URL = '', $ROUTE_PREFIXES = array()) {
+    public function __construct(array $ROUTES = array(), string $ROOT_URL = '', array $ROUTE_PREFIXES = array()) {
         $this->ROUTES         = $ROUTES;
         $this->ROOT_URL       = $ROOT_URL;
         $this->ROUTE_PREFIXES = $ROUTE_PREFIXES;
     }
 
     # get route for method/uri with defaults
-    public function getRoute() {
+    public function getRoute(): stdClass {
         $method = $_SERVER['REQUEST_METHOD']; #ex: POST, GET
         $uri    = $_SERVER['REQUEST_URI']; #ex: /add/post/12390/alksjdla?qoeewlkj
 
@@ -148,7 +146,7 @@ class Dispatcher {
         return $ps;
     }
 
-    public function getRouteDefaultAction($controller) {
+    public function getRouteDefaultAction(string $controller) {
         $class_name = $controller . 'Controller';
         if (!class_exists($class_name)) {
             throw new NoControllerException();
@@ -157,7 +155,7 @@ class Dispatcher {
         return $class_name::route_default_action;
     }
 
-    public function getRouteAccessLevel($controller) {
+    public function getRouteAccessLevel(string $controller) {
         $class_name = $controller . 'Controller';
         if (!class_exists($class_name)) {
             throw new NoControllerException();
@@ -168,7 +166,7 @@ class Dispatcher {
 
     #IN: controller::action
     #OUT: array(controller, action)
-    public function splitRoute($route) {
+    public function splitRoute(string $route): array {
         list($controller, $action) = explode('::', $route);
         if (!$controller) {
             #TODO - global
@@ -181,7 +179,7 @@ class Dispatcher {
 
     # string to route
     # ususally string is from $ROUTES
-    public function str2route($str) {
+    public function str2route(string $str): stdClass {
         list($controller, $action) = $this->splitRoute($str);
 
         #TODO handle controller prefix?
@@ -199,7 +197,7 @@ class Dispatcher {
         return $result;
     }
 
-    public function detectOperation($method, $id, $action_more) {
+    public function detectOperation(string $method, string $id, string $action_more): string {
         //$oper= $uri1=='new'?'new':( isset($uri2)?$uri2:'' );
         $result = '';
 
@@ -263,7 +261,7 @@ class Dispatcher {
     #       action_more
     #       format
     #       params
-    public function uriToRoute($method, $uri, $ROUTES) {
+    public function uriToRoute(string $method, string $uri, array $ROUTES): stdClass {
         $root_url = $this->ROOT_URL;
 
         $result = array();
@@ -302,7 +300,7 @@ class Dispatcher {
         $cur_aparams     = array(); #stores additional resourse/id  i.e. /user/999/notes/888/attachments/777
 
         #process ROUTES to find matching routes
-        $is_route_found = 0;
+        $is_route_found = false;
         if (count($ROUTES)) {
             while (!$is_route_found) {
                 if (array_key_exists($uri, $ROUTES)) {
@@ -312,7 +310,7 @@ class Dispatcher {
                     } else {
                         #otherwise - it's a direct class-method to call
                         list($cur_controller, $cur_action) = $this->splitRoute($ROUTES[$uri]);
-                        $is_route_found = 1;
+                        $is_route_found = true;
                         break;
                     }
                 } else {

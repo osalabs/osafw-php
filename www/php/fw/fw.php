@@ -337,6 +337,8 @@ class fw {
         } catch (ExitException) {
             #not a problem - just graceful exit
             logger('TRACE', "Exit Exception (normal behaviour, usually due to redirect)");
+        } catch (UserException $ex) {
+            $this->handlePageError(($ex->getCode() ?: 400), $ex->getMessage(), $ex);
         } catch (ApplicationException $ex) {
             $this->handlePageError(($ex->getCode() ?: 500), $ex->getMessage(), $ex);
         } catch (Exception $ex) {
@@ -533,7 +535,7 @@ class fw {
 
         if (!$is_error_processed) {
             $uri           = $_SERVER['REQUEST_URI'];
-            $err_code_desc = Dispatcher::$HTTP_CODE[$error_code];
+            $err_code_desc = Dispatcher::$HTTP_CODE[$error_code] ?? 'Server error';
 
             header("HTTP/1.0 $error_code $err_code_desc", true, $error_code);
 

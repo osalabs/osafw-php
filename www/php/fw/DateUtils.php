@@ -5,20 +5,20 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
  */
 
 class DateUtils {
-    public const MINUTE_SECONDS   = 60; #seconds in one minute
-    public const HALFHOUR_SECONDS = 1800; #seconds in 30 minutes
-    public const HOUR_SECONDS     = 3600; #seconds in one hour
-    public const DAY_SECONDS      = 86400; #seconds in one day
-    public const WEEK_SECONDS     = 604800; #seconds in one day
+    public const int MINUTE_SECONDS   = 60; #seconds in one minute
+    public const int HALFHOUR_SECONDS = 1800; #seconds in 30 minutes
+    public const int HOUR_SECONDS     = 3600; #seconds in one hour
+    public const int DAY_SECONDS      = 86400; #seconds in one day
+    public const int WEEK_SECONDS     = 604800; #seconds in one day
 
-    public static $DATE_FORMAT = 1; //0 - DD/MM/YYYY (Europe), 1-MM/DD/YYYY (USA)
-    public static $DATE_FORMAT_STR = 'MM/DD/YY'; #or DD/MM/YY
-    public static $TIME_FORMAT = 1; #0 - HH:MM (Europe), 1-HH:MM AM/PM (USA)
-    public static $TIME_FORMAT_STR = 'HH:MM'; #or HH:MM AM/PM
+    public static int $DATE_FORMAT = 1; //0 - DD/MM/YYYY (Europe), 1-MM/DD/YYYY (USA)
+    public static string $DATE_FORMAT_STR = 'MM/DD/YY'; #or DD/MM/YY
+    public static int $TIME_FORMAT = 1; #0 - HH:MM (Europe), 1-HH:MM AM/PM (USA)
+    public static string $TIME_FORMAT_STR = 'HH:MM'; #or HH:MM AM/PM
 
     ##### from UNIX time (epoch seconds) to YYYY-MM-DD HH:MM:SS
     # if $is_date_only - return only year-mon-day (no hh mm ss)
-    public static function Unix2SQL($unixtime = null, $is_date_only = false) {
+    public static function Unix2SQL($unixtime = null, $is_date_only = false): string {
         if (is_null($unixtime)) {
             $unixtime = time();
         }
@@ -56,12 +56,12 @@ class DateUtils {
 
     # return current datetime in SQL format YYYY-MM-DD HH:MM:SS
     # convenience alias of Unix2SQL()
-    public static function now() {
+    public static function now(): string {
         return self::Unix2SQL();
     }
 
     ##### from YYYY-MM-DD to UNIX time (epoch seconds)
-    public static function SQL2Unix($s) {
+    public static function SQL2Unix($s): false|int {
         if (empty($s)) {
             return 0;
         }
@@ -85,12 +85,12 @@ class DateUtils {
     // *****************************************
     // from YYYY-MM-DD to date string
     // params: SQL Date, Format (if 1 - better human format), Add HH:MM:SS
-    public static function SQL2Str($s, $human_format = 0, $add_hms = 0) {
+    public static function SQL2Str($s, $human_format = 0, $add_hms = 0): string {
         if (!strlen($s) || $s == '0000-00-00' || $s == '0000-00-00 00:00:00') {
             return '';
         }
 
-        $unixtime = self::SQLDate2Unix($s);
+        $unixtime = self::SQL2Unix($s);
 
         $time_format_str = '';
         if ($add_hms) {
@@ -131,7 +131,7 @@ class DateUtils {
      * @param string $str date string
      * @return bool
      */
-    public static function isDateStr($str): bool {
+    public static function isDateStr(string $str): bool {
         return (bool)preg_match("/^\d{1,2}\/\d{1,2}\/\d{4}$/", $str);
     }
 
@@ -140,7 +140,7 @@ class DateUtils {
     }
 
     // from date string to YYYY-MM-DD
-    public static function Str2SQL($s) {
+    public static function Str2SQL($s): string {
         if (!strlen($s)) {
             return '';
         }
@@ -191,7 +191,7 @@ class DateUtils {
     }
 
     // from date string to array (day, month, year)
-    public static function ParseStrToDate($inDate, $date_format = '') {
+    public static function ParseStrToDate($inDate, $date_format = ''): array {
 
         if (!strlen($date_format)) {
             $date_format = self::$DATE_FORMAT; //set global format if date_format not provided
@@ -202,17 +202,17 @@ class DateUtils {
 
         if ($date_format) {
             // MM/DD/YYYY
-            return array($matches[2] + 0, $matches[1] + 0, $matches[3] + 0);
+            return array(intval($matches[2]), intval($matches[1]), intval($matches[3]));
 
         } else {
             // DD/MM/YYYY
-            return array($matches[1] + 0, $matches[2] + 0, $matches[3] + 0);
+            return array(intval($matches[1]), intval($matches[2]), intval($matches[3]));
         }
     }
 
     #input: 0-86400 (daily time in seconds)
     #output: HH:MM or empty string if 0
-    public static function int2timestr($i) {
+    public static function int2timestr(int $i): string {
         if (!$i) {
             return '';
         }
@@ -228,7 +228,7 @@ class DateUtils {
 
     #input: HH:MM or HH
     #output: 0-86400 (daily time in seconds)
-    public static function timestr2int($hhmm) {
+    public static function timestr2int(string $hhmm): float|int {
         $result = 0;
         $ahhmm  = explode(':', $hhmm);
         if (count($ahhmm) == 2) {
@@ -242,11 +242,11 @@ class DateUtils {
 
     /**
      * return true if datetime(in unix format) earlier than now-$seconds
-     * @param string $unixtime epoch seconds
+     * @param int $unixtime epoch seconds
      * @param int $seconds
      * @return boolean
      */
-    public static function isExpired($unixtime, $seconds) {
+    public static function isExpired(int $unixtime, int $seconds): bool {
         return $unixtime < (time() - $seconds);
     }
 
@@ -256,12 +256,12 @@ class DateUtils {
      * @param int $seconds
      * @return boolean
      */
-    public static function isSQLExpired($sql_datetime, $seconds) {
+    public static function isSQLExpired(string $sql_datetime, int $seconds): bool {
         return self::isExpired(self::SQL2Unix($sql_datetime), $seconds);
     }
 
     // return time difference between two second values
-    public static function difference($from, $to) {
+    public static function difference($from, $to): string {
         $from       = new DateTime($from);
         $to         = new DateTime($to);
         $difference = $from->diff($to);
@@ -284,7 +284,7 @@ class DateUtils {
     // if less than 60s - XXs
     // if less than 60m - XXm
     // if more than 1h - XXh
-    public static function differenceShort($from, $to) {
+    public static function differenceShort($from, $to): string {
         $from       = new DateTime($from);
         $to         = new DateTime($to);
         $difference = $from->diff($to);
@@ -308,7 +308,7 @@ class DateUtils {
     #    DateUtils::differenceDays(DateUtils::Unix2SQL($from_seconds), DateUtils::Unix2SQL($to_seconds))
     # to count calendar difference convert to dates without time (returns 1 if dates are diff even time diff 1 sec like 23:59:59 and 00:00:00):
     #    DateUtils::differenceDays(DateUtils::Unix2SQL($from_seconds, true), DateUtils::Unix2SQL($to_seconds, true))
-    public static function differenceDays($from, $to) {
+    public static function differenceDays($from, $to): false|int {
         $from     = new DateTime($from);
         $to       = new DateTime($to);
         $interval = $from->diff($to);
