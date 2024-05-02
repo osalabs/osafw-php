@@ -18,41 +18,50 @@ class AttController extends FwController {
     }
 
     public function IndexAction(): ?array {
-        $ps = array();
-
-        return $ps;
+        return $this->redirect($this->fw->config->ASSETS_URL . Att::IMGURL_0);
     }
 
-    public function DownloadAction($id = '') {
-        $id += 0;
+    public function DownloadAction($form_id): void {
+        $id = intval($form_id);
         if (!$id) {
             throw new ApplicationException("404 File Not Found");
         }
         $size = reqs('size');
 
-        $this->model->transmitFile($id, $size);
+        $item = $this->model->one($id);
+        if (!$item) {
+            throw new ApplicationException("404 File Not Found");
+        }
+        if ($item['is_s3']) {
+            $this->model->redirectS3($id, $size);
+        } else {
+            $this->model->transmitFile($id, $size);
+        }
     }
 
-    public function ShowAction($id = '') {
-        $id += 0;
+    public function ShowAction($form_id): void {
+        $id = intval($form_id);
         if (!$id) {
             throw new ApplicationException("404 File Not Found");
         }
         $size       = reqs('size');
-        $is_preview = reqi('preview');
+        $is_preview = reqb('preview');
+
+        $item = $this->model->one($id);
+        if (!$item) {
+            throw new ApplicationException("404 File Not Found");
+        }
+        if ($item['is_s3']) {
+            $this->model->redirectS3($id, $size);
+            return;
+        }
 
         if ($is_preview) {
-            $item = $this->model->one($id);
             if ($item['is_image']) {
                 $this->model->transmitFile($id, $size, 'inline');
             } else {
                 #if it's not an image and requested preview - return std image
-                header('location: ' . $this->fw->config->ASSETS_URL . '/img/att_file.png');
-
-                // $filepath = $this->fw->config->site_root.'/img/att_file.png'; # TODO move to web.config or to model?
-                // header('Content-type: '.UploadUtils::getMimeForExt($item['ext']));
-                // $fp = fopen($filepath, 'rb');
-                // fpassthru($fp);
+                header('location: ' . $this->fw->config->ASSETS_URL . Att::IMGURL_FILE);
             }
         } else {
             $this->model->transmitFile($id, $size, 'inline');

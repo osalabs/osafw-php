@@ -4,20 +4,18 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 (c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
-require_once dirname(__FILE__) . "/ImageUtils.php";
-
 class UploadUtils {
-    public static $DEFAULT_ID2DIR_LEVEL = 1;
+    public static int $DEFAULT_ID2DIR_LEVEL = 1;
     //extensions upload functions check for (ondisk)
-    public static $UPLOAD_EXT = array('.jpg', '.gif', '.png');
-    public static $IMG_EXT = array('.jpg', '.gif', '.png'); //image extensions
-    public static $IMG_RESIZE_DEF = array( //default options for upload resize
-                                           ''  => 1,
-                                           's' => 1,
-                                           'm' => 1,
-                                           'l' => 1,
+    public static array $UPLOAD_EXT = array('.jpg', '.gif', '.png');
+    public static array $IMG_EXT = array('.jpg', '.gif', '.png'); //image extensions
+    public static array $IMG_RESIZE_DEF = array( //default options for upload resize
+                                                 ''  => 1,
+                                                 's' => 1,
+                                                 'm' => 1,
+                                                 'l' => 1,
     );
-    public static $MIME_MAP = "doc|application/msword docx|application/msword xls|application/vnd.ms-excel xlsx|application/vnd.ms-excel ppt|application/vnd.ms-powerpoint pptx|application/vnd.ms-powerpoint pdf|application/pdf html|text/html zip|application/x-zip-compressed jpg|image/jpeg jpeg|image/jpeg gif|image/gif png|image/png wmv|video/x-ms-wmv avi|video/x-msvideo";
+    public static string $MIME_MAP = "doc|application/msword docx|application/msword xls|application/vnd.ms-excel xlsx|application/vnd.ms-excel ppt|application/vnd.ms-powerpoint pptx|application/vnd.ms-powerpoint pdf|application/pdf html|text/html zip|application/x-zip-compressed jpg|image/jpeg jpeg|image/jpeg gif|image/gif png|image/png wmv|video/x-ms-wmv avi|video/x-msvideo";
 
     public static function getMimeForExt($ext = '') {
         $map = Utils::qh(self::$MIME_MAP);
@@ -43,9 +41,12 @@ class UploadUtils {
      * @param string $field_name posted form field name
      * @return array of assoc arrays (even if one file posted)
      */
-    public static function getPostedFiles($field_name): array {
+    public static function getPostedFiles(string $field_name): array {
         $files = array();
-        $fdata = $_FILES[$field_name];
+        $fdata = $_FILES[$field_name] ?? null;
+        if (!isset($fdata)) {
+            return $files;
+        }
 
         if (is_array($fdata['name'])) {
             for ($i = 0; $i < count($fdata['name']); ++$i) {
@@ -58,21 +59,19 @@ class UploadUtils {
                 );
             }
         } else {
-            if (isset($fdata)) {
-                $files[] = $fdata;
-            }
+            $files[] = $fdata;
         }
 
         return $files;
     }
 
     //return file extension with dot, lowercased, taking care of jpeg
-    public static function uploadExt($filename): string {
+    public static function uploadExt(string $filename): string {
         $pp = pathinfo($filename);
         return '.' . self::jpeg2jpg(strtolower($pp['extension']));
     }
 
-    public static function jpeg2jpg($str) {
+    public static function jpeg2jpg(string $str) {
         if ($str == 'jpeg') {
             $str = 'jpg';
         }
@@ -84,7 +83,7 @@ class UploadUtils {
      * @param string $ext extension with dot
      * @return boolean      true if
      */
-    public static function isImgExt($ext): bool {
+    public static function isImgExt(string $ext): bool {
         return in_array(strtolower($ext), self::$IMG_EXT);
     }
 
@@ -161,41 +160,6 @@ class UploadUtils {
         return $result;
     }
 
-    /**
-     * resize uploaded image and/or create thumbnails in same dir
-     *
-     * @param int $item_id item id
-     * @param array $opt assocarray for resizing original and/or creating previews
-     *                                ''  => array(w,h) or just 1 (defaults for original used)
-     *                                's' => array(w,h) or just 1 (defaults for s used)
-     *                                'm' => array(w,h) or just 1 (defaults for l used)
-     *                                'l' => array(w,h) or just 1 (defaults for l used)
-     * @return none
-     */
-    public static function uploadResize($filepath, $opt = array()): none {
-        $pp      = pathinfo($filepath);
-        $dir     = $pp['dirname'];
-        $ext     = '.' . $pp['extension'];
-        $item_id = $pp['filename']; //file name without ext
-        if (!self::isImgExt($ext)) {
-            return;
-        }
-
-        foreach ($opt as $size => $wh) {
-            if (!is_array($wh)) {
-                $wh = ImageUtils::MAX_RESIZE_WH[$size];
-            } #use defaults
-            if (!is_array($wh)) {
-                continue;
-            } #if no resize width/heigh for the $size - skip resize for this $size
-
-            $_size       = ($size > '' ? '_' . $size : '');
-            $filepath_to = $dir . '/' . $item_id . $_size . $ext;
-            #logger("resize: $filepath => $filepath_to, $wh[0], $wh[1]");
-            ImageUtils::resize($filepath, $wh[0], $wh[1], $filepath_to);
-        }
-    }
-
     public static function mkdirTree($dir): void {
         if (!file_exists($dir)) {
             mkdir($dir, 0777, true);
@@ -209,10 +173,10 @@ class UploadUtils {
      * level 3: 1,000,000,001 => /1/0/0
      *
      * @param int $id item id
-     * @param int $level optional, default in $DEFAULT_ID2DIR_LEVEL, dir deep level
+     * @param int|null $level optional, default in $DEFAULT_ID2DIR_LEVEL, dir deep level
      * @return string        path without trailing /
      */
-    public static function id2dir($id, $level = NULL): string {
+    public static function id2dir(int $id, int $level = NULL): string {
         if (is_null($level)) {
             $level = self::$DEFAULT_ID2DIR_LEVEL;
         }
@@ -240,7 +204,7 @@ class UploadUtils {
      * @param string $module_basedir basedir for module $id related to, id2dir path will be added to this
      * @return string               path to directory (no trailing /)
      */
-    public static function getUploadDir($id, $module_basedir): string {
+    public static function getUploadDir(int $id, string $module_basedir): string {
         $dir = $module_basedir . self::id2dir($id);
         self::mkdirTree($dir);
 
@@ -255,7 +219,7 @@ class UploadUtils {
      * @param string $size optional, s,m,l or ''(default) for original upload
      * @return string               absolute path to file
      */
-    public static function getUploadPath($id, $module_basedir, $ext, $size = ''): string {
+    public static function getUploadPath(int $id, string $module_basedir, string $ext, string $size = ''): string {
         if ($size > '') {
             $size = '_' . $size;
         }
@@ -266,14 +230,14 @@ class UploadUtils {
 
     /**
      * return url for the item
-     * @param string $module_name name of the module $id related to, used in upload path
      * @param int $id item id
-     * @param string $module_baseurl base url for module $id related to, id2dir path will be added to this
+     * @param string $module_basedir
+     * @param string $module_baserul
      * @param string $ext optional, file extension with dot, if not passed - all self::$UPLOAD_EXT checked for file existence (if $nocheck not set to true)
      * @param string $size optional, s,m,l or ''(default) for original upload
      * @return string               direct url to file
      */
-    public static function getUploadUrl($id, $module_basedir, $module_baserul, $ext, $size = ''): string {
+    public static function getUploadUrl(int $id, string $module_basedir, string $module_baserul, string $ext, string $size = ''): string {
         if ($size > '') {
             $size = '_' . $size;
         }
@@ -287,11 +251,11 @@ class UploadUtils {
      * sample usage: UploadUtils::cleanupUpload($id, UploadUtils::getUploadDir('avatars',$id))
      *
      * @param int $id item id
-     * @param string $dir destination dir
+     * @param string $module_basedir destination directory
      * @param string $ext optional, explicit extension to cleanup
-     * @return none
+     * @return void
      */
-    public static function cleanupUpload($id, $module_basedir, $ext = ''): none {
+    public static function cleanupUpload(int $id, string $module_basedir, string $ext = ''): void {
         $diskpath = self::getUploadDir($id, $module_basedir) . "/" . $id;
 
         if ($ext > '') {
@@ -315,7 +279,7 @@ class UploadUtils {
      * @param string $size size for the uploaded file
      * @return string       size for the uploaded file
      */
-    public static function checkSize($size): string {
+    public static function checkSize(string $size): string {
         if ($size <> 's' && $size <> 'm' && $size <> 'l') {
             $size = '';
         }
@@ -348,34 +312,4 @@ class UploadUtils {
         return true;
     }
 
-
-    public static function getUploadImgUrl(FW $fw, string $module_name, int $id, string $size): string {
-        if ($size != "l" && $size != "m" && $size != "s") {
-            $size = ""; // armor +1
-        }
-
-        $part      = self::getUploadDir($fw, $module_name, $id) . "/" . $id;
-        $orig_file = $part;
-
-        if ($size > '') {
-            $orig_file = $orig_file . "_" . $size;
-        }
-
-        $ext = "";
-        if (file_exists($orig_file . ".gif")) {
-            $ext = ".gif";
-        }
-        if (file_exists($orig_file . ".png")) {
-            $ext = ".png";
-        }
-        if (file_exists($orig_file . ".jpg")) {
-            $ext = ".jpg";
-        }
-
-        if ($ext > '') {
-            return self::getUploadUrl($fw, $module_name, $id, $ext, $size);
-        } else {
-            return "";
-        }
-    }
 }

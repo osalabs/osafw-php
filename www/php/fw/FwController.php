@@ -773,7 +773,7 @@ abstract class FwController {
                 'id'       => $id,
                 'is_new'   => $is_new,
                 'location' => $location,
-                'err_msg'  => $this->fw->GLOBAL['err_msg'],
+                'err_msg'  => $this->fw->GLOBAL['err_msg'] ?? '',
             );
             // add ERR field errors to response if any
             if (!empty($this->fw->FormErrors)) {

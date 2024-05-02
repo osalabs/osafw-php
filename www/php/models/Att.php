@@ -55,9 +55,9 @@ class Att extends FwModel {
                 // if it's an image - turn on flag and resize for thumbs
                 $fields["is_image"] = 1;
 
-                ImageUtils::resize($filepath, $this->getUploadImgPath($id, "s", $ext), self::MAX_THUMB_W_S, self::MAX_THUMB_H_S);
-                ImageUtils::resize($filepath, $this->getUploadImgPath($id, "m", $ext), self::MAX_THUMB_W_M, self::MAX_THUMB_H_M);
-                ImageUtils::resize($filepath, $this->getUploadImgPath($id, "l", $ext), self::MAX_THUMB_W_L, self::MAX_THUMB_H_L);
+                ImageUtils::resize($filepath, self::MAX_THUMB_W_S, self::MAX_THUMB_H_S, $this->getUploadImgPath($id, "s", $ext));
+                ImageUtils::resize($filepath, self::MAX_THUMB_W_M, self::MAX_THUMB_H_M, $this->getUploadImgPath($id, "m", $ext));
+                ImageUtils::resize($filepath, self::MAX_THUMB_W_L, self::MAX_THUMB_H_L, $this->getUploadImgPath($id, "l", $ext));
             }
 
             $this->update($id, $fields);
