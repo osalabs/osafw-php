@@ -13,17 +13,20 @@ class Settings extends FwModel {
     Settings::write('icode', $var);
     */
 
-    public static function read($icode){
-        return fw::model('Settings')->getValue($icode);
+    public static function read($icode) {
+        return Settings::i()->getValue($icode);
     }
-    public static function readi($icode){
-        return (fw::model('Settings')->getValue($icode))+0;
+
+    public static function readi($icode) {
+        return intval(Settings::i()->getValue($icode));
     }
-    public static function readd($icode){
-        return Utils::f2date(fw::model('Settings')->getValue($icode));
+
+    public static function readd($icode) {
+        return Utils::f2date(Settings::i()->getValue($icode));
     }
-    public static function write($icode, $value){
-        return fw::model('Settings')->setValue($icode, $value);
+
+    public static function write($icode, $value) {
+        return Settings::i()->setValue($icode, $value);
     }
 
     public function __construct() {
@@ -32,41 +35,40 @@ class Settings extends FwModel {
         $this->table_name = 'settings';
     }
 
-    public function oneByIcode($icode, $is_force=false) {
-        $cache_key = $this->CACHE_PREFIX.$this->table_name.'*'.$icode;
+    public function oneByIcode($icode, $is_force = false): array {
+        $cache_key = $this->cache_prefix . $icode;
         if (!$is_force) {
             $row = FwCache::getValue($cache_key);
         }
-        if ($is_force || is_null($row)){
-            $row = $this->db->row($this->table_name, array('icode'=>$icode));
+        if ($is_force || is_null($row)) {
+            $row = $this->db->row($this->table_name, array('icode' => $icode));
             FwCache::setValue($cache_key, $row);
         }
         return $row;
     }
 
-    public function getValue($icode){
+    public function getValue($icode) {
         return $this->oneByIcode($icode)['ivalue'];
     }
-    public function setValue($icode, $ivalue){
-        $item = $this->oneByIcode($icode);
-        $fields=array(
-            'ivalue'    => $ivalue
+
+    public function setValue($icode, $ivalue) {
+        $item   = $this->oneByIcode($icode);
+        $fields = array(
+            'ivalue' => $ivalue
         );
-        if ($item){
+        if ($item) {
             #exists - update
             $this->update($item['id'], $fields);
 
-        }else{
-            $fields['icode'] = $icode;
+        } else {
+            $fields['icode']        = $icode;
             $fields['is_user_edit'] = 0; #all auto-added settings is not user-editable by default
             $this->add($fields);
         }
     }
 
-    public function isExists($icode, $not_id=NULL) {
+    public function isExists($icode, $not_id = NULL): bool {
         return parent::isExists($icode, 'icode', $not_id);
     }
 
 }
-
-?>

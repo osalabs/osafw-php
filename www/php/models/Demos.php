@@ -11,14 +11,12 @@ class Demos extends FwModel {
         $this->table_name = 'demos';
     }
 
-    public function isExists($email, $not_id=NULL) {
-        return parent::isExists($email, 'email', $not_id);
+    public function isExists($uniq_key, $not_id = NULL): bool {
+        return parent::isExists($uniq_key, 'email', $not_id);
     }
 
-    public function listSelectOptionsParent(){
-        return $this->db->arr("SELECT id, iname FROM {$this->table_name} WHERE parent_id=0 and status<>127 ORDER BY iname");
+    public function listSelectOptionsParent(): array {
+        return $this->db->arrp("SELECT id, iname FROM {$this->table_name} WHERE parent_id=0 and status<>127 ORDER BY iname");
     }
 
 }
-
-?>

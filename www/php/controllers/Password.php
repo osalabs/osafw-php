@@ -1,63 +1,65 @@
 <?php
 
 class PasswordController extends FwController {
-    const route_default_action = '';
-    public $base_url = '/Password';
-    public $model_name = 'Users';
+    const string route_default_action = '';
+
+    public Users $model;
+    public string $model_name = 'Users';
+
+    public string $base_url = '/Password';
+
+    protected const int PWD_RESET_EXPIRATION = 60; // minutes
 
     public function __construct() {
         parent::__construct();
+        $this->model = $this->model0; // use then $this->model in code for proper type hinting
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
-        throw new ApplicationException('Access Denied - TODO');
     }
 
-    public function IndexAction() {
-        if ($this->fw->isGetRequest()){
+    public function IndexAction(): ?array {
+        if ($this->isGet()) {
             #defaults
-            $item=array();
-        }else{
+            $item = array();
+        } else {
             $item = reqh('item');
         }
 
         $ps = array(
-            'i'     => $item,
-            'hide_sidebar'  => true,
+            'i'            => $item,
+            'hide_sidebar' => true,
         );
-
         return $ps;
     }
 
-    public function SaveAction() {
-        $item = reqh('item');
-        $item['login']=trim($item['login']);
+    public function SaveAction(): ?array {
+        $this->route_onerror = FW::ACTION_INDEX;
 
-        try{
-            $this->Validate($id, $item);
-            $user = $this->model->oneByEmail($item['login']);
+        $item          = reqh('item');
+        $item['login'] = trim($item['login']);
 
-            #$this->fw->sendEmailTpl( $user['email'], 'email_pwd.txt', $user);
+        $this->Validate(0, $item);
+        $user = $this->model->oneByEmail($item['login']);
 
-            fw::redirect($this->base_url.'/(Sent)');
+        $this->model->sendPwdReset($user['id']);
 
-        }catch( ApplicationException $ex ){
-            $this->setFormError($ex->getMessage());
-            $this->routeRedirect("Index");
-        }
+        fw::redirect($this->base_url . '/(Sent)');
+
+        return null;
     }
 
-    public function Validate($id, $item) {
-        $result= $this->validateRequired($item, "login");
+    public function Validate(int $id, array $item): void {
+        $result = $this->validateRequired($item, "login");
 
-        if ($result){
+        if ($result) {
             $user = $this->model->oneByEmail($item['login']);
-            if (!count($user)) $this->setError('login', 'WRONG');
+            if (!count($user) || $user['status'] != FwModel::STATUS_ACTIVE) {
+                $this->setError('login', 'WRONG');
+            }
         }
 
         $this->validateCheckResult();
     }
 
 }//end of class
-
-?>

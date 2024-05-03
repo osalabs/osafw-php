@@ -4,7 +4,7 @@ Hello <~nick>,
 you invited to be a member on the <~GLOBAL[ROOT_DOMAIN]><~ROOT_URL> :
 
 login: <~email>
-password: <~pwdX>
+password: <~pwd>
 
 
 Have a nice day,

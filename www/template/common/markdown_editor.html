@@ -1,11 +1,35 @@
+ <!--
+  Documentation is here:
+  https://www.jqueryscript.net/text/Easy-WYSIWYG-Markdown-Rditor-For-Bootstrap-Bootstrap-Markdown.html
+-->
+
+<link href="<~GLOBAL[ASSETS_URL]>/css/glyphicons.css" rel="stylesheet">
 <link href="<~GLOBAL[ASSETS_URL]>/css/bootstrap-markdown.min.css" rel="stylesheet">
 <style>
+.md-editor,
+.md-editor.activeX
+{
+ border: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color);
+ border-radius: var(--bs-border-radius)
+}
+.md-editor .md-footer
+, .md-editor>.md-header {
+ background-color: var(--fw-pane-bg);
+}
 .md-editor > textarea {
  padding:10px;
- background-color: #fff;
+ background-color: var(--bs-body-bg);
+ border-bottom:none;
+ color: var(--bs-body-color);
  overflow: hidden;
 }
+.md-editor > textarea:focus {
+ background-color: var(--bs-body-bg);
+ color: var(--bs-body-color);
+}
 .md-editor > .md-preview {
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
   padding:10px;
   height: auto !important;
 }
@@ -71,6 +95,7 @@
       //hide&disable default add image btn
       hiddenButtons: 'cmdImage',
       disabledButtons: 'cmdImage',
+      resize: 'vertical', //by default manual textarea resize is disabled
       //iconlibrary: 'glyph',
       parser: function (v) {
         return md.render(v);
@@ -93,7 +118,8 @@
               // Replace selection with some drinks
               var chunk, cursor, selected = e.getSelection(), content = e.getContent();
 
-              modal_att_open('general', function (e2, id, iname, url) {
+              var att_category = e.$textarea.data('att-category') ?? 'general';
+              modal_att_open(att_category, function (e2, id, iname, url) {
                 chunk="![]("+url+")";
 
                 // transform selection and set the cursor into chunked text
@@ -101,7 +127,14 @@
                 cursor = selected.start;
 
                 // Set the cursor
-                e.setSelection(cursor,cursor+chunk.length);
+                // vlad: we need a small timeout because "blur" is triggered when att is selected and it can revert the "focus". Textarea needs focus for setSelection to work.
+                setTimeout(function(){
+                  e.$element.focus();
+                  e.setSelection(cursor,cursor+chunk.length);
+                }, 100)
+
+                //handle autosave
+                if (!e.$element.is('[data-noautosave]')) e.$element.closest('form[data-autosave]').trigger('change');
               });
             }//end callback
           },{
@@ -129,7 +162,18 @@
             }
           }]
         }]
-      ]
+      ],
+      onChange: function(e){
+        // handle autosave forms on content change
+        if (!e.$element.is('[data-noautosave]')) {
+          if (e.$element.data('md-save-content') === undefined) e.$element.data('md-save-content', e.$oldContent);
+
+          if (e.$element.data('md-save-content') !== e.getContent()) {
+            e.$element.data('md-save-content', e.getContent());
+            e.$element.closest('form[data-autosave]').trigger('change');
+          }
+        }
+      }
       // ,onPreview: function(e) {
       // }
     });

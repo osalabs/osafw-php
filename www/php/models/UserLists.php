@@ -3,7 +3,7 @@
  UserLists model class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2019 Oleg Savchuk www.osalabs.com
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
 */
 
 class UserLists extends FwModel {
@@ -19,56 +19,67 @@ class UserLists extends FwModel {
     }
 
     #list for select by entity and for only logged user
-    public function listSelectByEntity($entity){
-        return $this->db->arr("SELECT id, iname FROM $this->table_name WHERE status=0 and entity=".dbq($entity)." and add_users_id=".Utils::me()." ORDER BY iname");
+    public function listSelectByEntity($entity): array {
+        $where = [
+            'status'       => 0,
+            'entity'       => $entity,
+            'add_users_id' => $this->fw->userId()
+        ];
+        return $this->db->arr($this->getTable(), $where, 'iname', '', ['id', 'iname']);
     }
 
-    public function listForItem($entity, $item_id){
-        return $this->db->arr("SELECT t.id, t.iname, ".dbqi($item_id)." as item_id, ti.id as is_checked FROM $this->table_name t
-                        LEFT OUTER JOIN $this->table_items ti ON (ti.user_lists_id=t.id and ti.item_id=".dbqi($item_id)." )
-                        WHERE t.status=0 and t.entity=".dbq($entity)."
-                        and t.add_users_id=".Utils::me()."
-                        ORDER BY t.iname");
+    public function listForItem($entity, $item_id): array {
+        return $this->db->arrp("SELECT t.id, t.iname, " . dbqi($item_id) . " as item_id, ti.id as is_checked FROM $this->table_name t
+                        LEFT OUTER JOIN $this->table_items ti ON (ti.user_lists_id=t.id and ti.item_id=@item_id )
+                        WHERE t.status=0 and t.entity=@entity
+                        and t.add_users_id=@users_id
+                        ORDER BY t.iname",
+            [
+                'item_id'  => $item_id,
+                'entity'   => $entity,
+                'users_id' => $this->fw->userId()
+
+            ]);
     }
 
-    public function delete($id, $is_perm = false){
-        if ($is_perm){
+    public function delete($id, $is_perm = false): bool {
+        if ($is_perm) {
             #delete list items first
-            $this->db->delete($this->table_items, $id, $user_lists_id);
+            $this->db->delete($this->table_items, [$this->field_id => $id]);
         }
 
         return parent::delete($id, $is_perm);
     }
 
-    public function oneItemsByUK($user_lists_id, $item_id){
+    public function oneItemsByUK($user_lists_id, $item_id): array {
         return $this->db->row($this->table_items, array("user_lists_id" => $user_lists_id, "item_id" => $item_id));
     }
 
-    public function deleteItems($id){
-        $this->db->delete($this->table_items, $id);
-        $this->fw->model('FwEvents')->log($this->table_items.'_del', $id);
+    public function deleteItems($id): void {
+        $this->db->delete($this->table_items, ['id' => $id]);
+        $this->fw->logActivity(FwLogTypes::ICODE_DELETED, $this->table_items, $id);
     }
 
     #add new record and return new record id
-    public function addItems($user_lists_id, $item_id){
-        $item=array(
+    public function addItems($user_lists_id, $item_id): int {
+        $item = array(
             "user_lists_id" => $user_lists_id,
-            "item_id"   => $item_id,
-            "add_users_id"  => Utils::me()
+            "item_id"       => $item_id,
+            "add_users_id"  => $this->fw->userId()
         );
-        $id = $this->db->insert($this->table_items, $item);
-        $this->fw->model('FwEvents')->log($this->table_items.'_add', $id);
+        $id   = $this->db->insert($this->table_items, $item);
+        $this->fw->logActivity(FwLogTypes::ICODE_ADDED, $this->table_items, $id);
         return $id;
     }
 
     #add or remove item from the list
-    public function toggleItemList($user_lists_id, $item_id){
+    public function toggleItemList($user_lists_id, $item_id): bool {
         $result = false;
-        $litem = $this->oneItemsByUK($user_lists_id, $item_id);
-        if ($litem){
+        $litem  = $this->oneItemsByUK($user_lists_id, $item_id);
+        if ($litem) {
             #remove
             $this->deleteItems($litem["id"]);
-        }else{
+        } else {
             #add new
             $this->addItems($user_lists_id, $item_id);
             $result = true;
@@ -78,12 +89,12 @@ class UserLists extends FwModel {
     }
 
     #add item to the list, if item not yet in the list
-    public function addItemList($user_lists_id, $item_id){
+    public function addItemList($user_lists_id, $item_id) {
         $result = false;
-        $litem = $this->oneItemsByUK($user_lists_id, $item_id);
-        if ($litem){
+        $litem  = $this->oneItemsByUK($user_lists_id, $item_id);
+        if ($litem) {
             #do nothing
-        }else{
+        } else {
             #add new
             $this->addItems($user_lists_id, $item_id);
             $result = true;
@@ -92,10 +103,10 @@ class UserLists extends FwModel {
         return $result;
     }
 
-    public function delItemList($user_lists_id, $item_id){
+    public function delItemList($user_lists_id, $item_id) {
         $result = false;
-        $litem = $this->oneItemsByUK($user_lists_id, $item_id);
-        if ($litem){
+        $litem  = $this->oneItemsByUK($user_lists_id, $item_id);
+        if ($litem) {
             $this->deleteItems($litem["id"]);
             $result = true;
         }
@@ -104,5 +115,3 @@ class UserLists extends FwModel {
     }
 
 }
-
-?>

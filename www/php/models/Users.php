@@ -1,233 +1,631 @@
 <?php
+/*
+ Users model class
+
+ Part of PHP osa framework  www.osalabs.com/osafw/php
+ (c) 2009-2024 Oleg Savchuk www.osalabs.com
+*/
+
+#if using Roles - UNCOMMENT
+#require_once dirname(__FILE__) . "/Roles/Permissions.php";
+#require_once dirname(__FILE__) . "/Roles/Resources.php";
+#require_once dirname(__FILE__) . "/Roles/Roles.php";
+#require_once dirname(__FILE__) . "/Roles/RolesResourcesPermissions.php";
+#require_once dirname(__FILE__) . "/Roles/UsersRoles.php";
 
 class Users extends FwModel {
-    public static $ACL=array(
-                        'ADMIN' => 100,
-                        'MODER' => 80,
-                        'USER'  => 0,
-                    );
-    public static $PERM_COOKIE_NAME='perm';
-    public static $PERM_COOKIE_DAYS=356;
+    public const ACL_SITE_ADMIN = 100;
+    public const ACL_ADMIN      = 90;
+    public const ACL_MANAGER    = 80;
+    public const ACL_EMPLOYEE   = 50;
+    public const ACL_USER       = 1; //min access level for users
+    public const ACL_VISITOR    = 0; //non-logged visitor
+
+    public static $PERM_COOKIE_NAME = 'perm';
+    public static $PERM_COOKIE_DAYS = 356;
     public static $order_by = 'fname, lname';
+
     public function __construct() {
         parent::__construct();
 
         $this->table_name = 'users';
     }
 
-    public function oneByEmail($email) {
-        return $this->db->row("SELECT * FROM ".$this->table_name." WHERE email=".$this->db->quote($email));
+    //<editor-fold defaultstate="collapsed" desc="standard one/add/update overrides">
+    public function oneByEmail(string $email): array {
+        return $this->db->row($this->getTable(), ['email' => $email]);
     }
 
-    public function getFullName($id) {
-        $result='';
-        $item = $this->one($id);
-        if ($item['id']){
-            $result=$item['fname'].' '.$item['lname'];
+    /**
+     * return user full name by id
+     * @param string|int|null $id
+     * @return string
+     */
+    public function iname(string|int|null $id): string {
+        $result = '';
+        $item   = $this->one($id);
+        if ($item) {
+            $result = $item['fname'] . ' ' . $item['lname'];
         }
         return $result;
     }
 
-    #return standard list of id,iname where status=0 order by iname
-    public function ilist($min_acl=null) {
-        $where='';
-        if (!is_null($min_acl)) $where=' and access_level>='.dbqi($min_acl);
-        $sql  = "SELECT *, (fname+' '+lname) as iname FROM $this->table_name WHERE status=0 $where ORDER BY fname,lname";
-        return $this->db->arr($sql);
+    /**
+     * return true if email exists in the table
+     * @param mixed $uniq_key email
+     * @param $not_id
+     * @return bool
+     */
+    public function isExists($uniq_key, $not_id = null): bool {
+        return $this->isExistsByField($uniq_key, 'email', $not_id);
     }
 
-    public function getMultiList($hsel_ids, $min_acl=null){
-        $rows = $this->ilist($min_acl);
-        if (is_array($hsel_ids) && count($hsel_ids)){
-            foreach ($rows as $k => $row) {
-                $rows[$k]['is_checked'] = array_key_exists($row['id'], $hsel_ids)!==FALSE;
-            }
+    // overridden to generate and hash password if not provided
+    public function add($item): int {
+        if (!array_key_exists('pwd', $item)) {
+            $item['pwd'] = Utils::getRandStr(8); #generate password
+        }
+        $item['pwd'] = $this->hashPwd($item['pwd']);
+
+        // set ui_theme/ui_mode form the config if not set
+        if (!array_key_exists('ui_theme', $item)) {
+            $item['ui_theme'] = $this->fw->config->UI_THEME ?? 0;
+        }
+        if (!array_key_exists('ui_mode', $item)) {
+            $item['ui_mode'] = $this->fw->config->UI_MODE ?? 0;
         }
 
-        return $rows;
+        return parent::add($item);
     }
 
-    public function add($item) {
-        if (!array_key_exists('pwd', $item)) $item['pwd']=Utils::getRandStr(8); #generate password
-        $item['pwd']=$this->hashPwd($item['pwd']);
-        $id=parent::add($item);
-        return $id;
-    }
+    public function update(int $id, array $item): bool {
+        if ($id == 0) {
+            return false; //no anonymous updates
+        }
 
-    public function update($id, $item){
-        if (array_key_exists('pwd', $item)) $item['pwd']=$this->hashPwd($item['pwd']);
+        if (array_key_exists('pwd', $item)) {
+            $item['pwd'] = $this->hashPwd($item['pwd']);
+        }
         return parent::update($id, $item);
     }
 
-    public function isExists($email, $not_id=NULL) {
-        return $this->isExistsByField($email, 'email', $not_id);
+    public function getOrderBy(): string {
+        return "fname, lname";
     }
 
+    #return standard list of id,iname where status=0 order by iname
+    public function ilist(array $statuses = null): array {
+        if (is_null($statuses)) {
+            $statuses = [FwModel::STATUS_ACTIVE];
+        }
+        return parent::ilist($statuses);
+    }
+
+    public function ilistByACL(int $min_acl = null): array {
+        $where = '';
+        if (!is_null($min_acl)) {
+            $where = ' and access_level>=' . dbqi($min_acl);
+
+        }
+
+        $sql = "SELECT *, (fname+' '+lname) as iname FROM {$this->qTable()} WHERE status=@status $where ORDER BY " . $this->getOrderBy();
+        return $this->db->arrp($sql, ['status' => FwModel::STATUS_ACTIVE]);
+    }
+
+    public function listSelectOptions(array $def = null): array {
+        $sql = "SELECT id, (fname+' '+lname) as iname FROM {$this->qTable()} WHERE status=@status ORDER BY " . $this->getOrderBy();
+        return $this->db->col($sql, ['status' => FwModel::STATUS_ACTIVE]);
+    }
+    //</editor-fold>
+
+
+    //<editor-fold defaultstate="collapsed" desc="Work with Passwords/MFA">
     /**
      * generate password hash from plain password
-     * @param  string $plain_pwd plain pwd
+     * @param string $plain_pwd plain pwd
      * @return string            hash
      */
-    public function hashPwd($plain_pwd){
+    public function hashPwd(string $plain_pwd): string {
         return password_hash($plain_pwd, PASSWORD_DEFAULT);
     }
 
     /**
      * return true if plain password has the same hash as provided
-     * @param  string $plain_pwd plain pwd
-     * @param  string $pwd_hash  password hash previously generated by hashPwd
+     * @param string $plain_pwd plain pwd
+     * @param string $pwd_hash password hash previously generated by hashPwd
      * @return bool            true or false
      */
-    public function checkPwd($plain_pwd, $pwd_hash){
+    public function checkPwd(string $plain_pwd, string $pwd_hash): bool {
         return password_verify($plain_pwd, $pwd_hash);
     }
 
-    public function doLogin($id) {
-        $is_just_registered=$_SESSION['is_just_registered']+0;
+    /**
+     * generate reset token, save to users and send pwd reset link to the user
+     * @param int $id
+     * @return bool
+     * @throws DBException
+     * @throws \Random\RandomException
+     */
+    public function sendPwdReset(int $id): bool {
+        $pwd_reset_token = Utils::getRandStr(50);
+
+        $item = [
+            'pwd_reset'      => $this->hashPwd($pwd_reset_token),
+            'pwd_reset_time' => DB::NOW(),
+        ];
+        $this->update($id, $item);
+
+        $user                    = $this->one($id);
+        $user['pwd_reset_token'] = $pwd_reset_token;
+
+        return $this->fw->sendEmailTpl($user['email'], "email_pwd.txt", $user);
+    }
+
+    /**
+     * evaluate password's stength and return a score (>60 good, >80 strong)
+     * @param string $pwd
+     * @return float
+     */
+    public function scorePwd(string $pwd): float {
+        $result = 0;
+        if (empty($pwd)) {
+            return $result;
+        }
+
+        // award every unique letter until 5 repetitions
+        $chars = [];
+        for ($i = 0; $i <= strlen($pwd) - 1; $i++) {
+            $chars[$pwd[$i]] = intval($chars[$pwd[$i]]) + 1;
+            $result          += (int)(5.0 / (double)$chars[$pwd[$i]]);
+        }
+
+        // bonus points for mixing it up
+        $vars = [
+            "digits" => preg_match('/\d/', $pwd),
+            "lower"  => preg_match('/[a-z]/', $pwd),
+            "upper"  => preg_match('/[A-Z]/', $pwd),
+            "other"  => preg_match('/\W/', $pwd),
+        ];
+        $ctr  = 0;
+        foreach ($vars as $value) {
+            if ($value) {
+                $ctr += 1;
+            }
+        }
+        $result += ($ctr - 1) * 10;
+
+        // adjust for length
+        return (int)(log(strlen($pwd)) / log(8)) * $result;
+    }
+
+    /**
+     * generate a new MFA secret
+     * @return string
+     */
+    public function generateMFASecret(): string {
+        // TODO
+        // return Base32Encoding.ToString(KeyGeneration.GenerateRandomKey());
+    }
+
+    public function generateMFAQRCode(string $mfa_secret, string $user = "user@company", string $issuer = "osafw"): string {
+        // TODO
+        // $uriString = new OtpUri(OtpType.Totp, mfa_secret, user, issuer).ToString();
+        // $IMG_SIZE = 5;
+        // return "data:image/png;base64," . Convert.ToBase64String(PngByteQRCodeHelper.GetQRCode(uriString, QRCodeGenerator.ECCLevel.Q, IMG_SIZE));
+        return '';
+    }
+
+    /**
+     * check if code is valid against user's MFA secret
+     * @param string $mfa_secret
+     * @param string $code
+     * @return bool
+     */
+    public function isValidMFACode(string $mfa_secret, string $code): bool {
+        if (empty($mfa_secret)) {
+            return false;
+        }
+
+        // TODO
+        // $totp = new Totp(Base32Encoding.ToBytes(mfa_secret));
+        // Generate the current TOTP value from the secret and compare it to the user's value.
+        // return totp.VerifyTotp(code, out _, new VerificationWindow(2, 2)); // use 1,1 for stricter time check
+        return false;
+    }
+
+    /**
+     * check if code is valid against user's MFA secret
+     * @param int $id
+     * @param string $code
+     * @return bool
+     */
+    public function isValidMFA(int $id, string $code): bool {
+        $user = $this->one($id);
+        return $this->isValidMFACode($user["mfa_secret"] ?? "", $code);
+    }
+
+    /**
+     * check if code is a MFA recovery code, if yes - remove that code from user's recovery codes
+     * @param int $id
+     * @param string $code
+     * @return bool true if code is a recovery code
+     * @throws DBException
+     */
+    public function checkMFARecovery(int $id, string $code): bool {
+        $result             = false;
+        $user               = $this->one($id);
+        $recovery_codes     = explode(' ', $user["mfa_recovery"] ?? ''); // space-separated hashed codes
+        $new_recovery_codes = "";
+        //split by space and check each code
+        foreach ($recovery_codes as $recovery_code) {
+            if ($this->checkPwd($code, $recovery_code)) {
+                $result = true;
+            } else {
+                $new_recovery_codes .= $recovery_code . " "; // not found codes - add to new list
+            }
+        }
+
+        if ($result) {
+            //if found - update user's recovery codes (as we removed matched one)
+            $item = [
+                "mfa_recovery" => trim($new_recovery_codes),
+            ];
+            $this->update($id, $item);
+        }
+
+        return $result;
+    }
+
+    //</editor-fold>
+
+    //<editor-fold defaultstate="collapsed" desc="Login/Session">
+
+    public function doLogin(int $id): void {
+        $is_just_registered = intval($_SESSION['is_just_registered'] ?? 0);
 
         @session_destroy();
-        session_start();
-        $_SESSION['is_logged']=true;
-        $_SESSION['XSS']=Utils::getRandStr(16);  #setup XSS code
+        @session_start();
+        $_SESSION['XSS'] = Utils::getRandStr(16); #setup XSS code
 
         #fill up session data
         $this->reloadSession($id);
-        $_SESSION['just_logged']=1;
-        $_SESSION['is_just_registered']=$is_just_registered;
+
+        $_SESSION['just_logged']        = 1;
+        $_SESSION['is_just_registered'] = $is_just_registered;
         session_write_close();
 
-        $this->fw->model('FwEvents')->log('login', $id);
+        $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGIN, FwEntities::ICODE_USERS, $id);
 
         //set permanent login if requested
         //if ($_REQUEST['is_remember']) createPermCookie($id);
-        $this->createPermCookie($id);  #in this project no need is_remember
+        $this->createPermCookie($id); #in this project no need is_remember
 
         $this->updateAfterLogin($id);
     }
 
-    public function reloadSession($id=0){
-        if (!$id) $id=Utils::me();
-        $hU=$this->one($id);
+    public function reloadSession(int $id = 0): void {
+        if (!$id) {
+            $id = $this->fw->userId();
+        }
 
-        $_SESSION['user_id']=$id;
-        $_SESSION['login']=$hU['email'];
-        $fname = trim($hU['fname']);
-        $lname = trim($hU['lname']);
-        $_SESSION['user_name']=$fname.($fname?' ':'').$lname; #will be empty if no user name set
-        $_SESSION['access_level']=$hU['access_level'];
+        $user = $this->one($id);
+
+        $_SESSION['user_id']      = $id;
+        $_SESSION['login']        = $user['email'];
+        $_SESSION['access_level'] = $user['access_level'];
+        $_SESSION['lang']         = $user['lang'];
+        $_SESSION['ui_theme']     = $user['ui_theme'];
+        $_SESSION['ui_mode']      = $user['ui_mode'];
+
+        $fname                 = trim($user['fname']);
+        $lname                 = trim($user['lname']);
+        $_SESSION['user_name'] = $fname . ($fname ? ' ' : '') . $lname; #will be empty if no user name set
+
+        /*
+         *         var avatar_link = "";
+        if (Utils.f2int(user["att_id"]) > 0)
+            avatar_link = fw.model<Att>().getUrl(Utils.f2int(user["att_id"]), "s");
+        fw.Session("user_avatar_link", avatar_link);
+
+         * */
+        $avatar_link = "";
+        if ($user["att_id"] > 0) {
+            $avatar_link = Att::i()->getUrl($user["att_id"], "s");
+        }
+        $_SESSION['user_avatar_link'] = $avatar_link;
     }
 
-    private function updateAfterLogin($id) {
-        $hU=$this->one($id);
-        #TODO add_notify_log($GLOBAL['NOTIFY_LOG_LOGIN'], $id, 0, $hU);
-
+    private function updateAfterLogin(int $id): void {
         #update login vars
-        $ip=getenv("REMOTE_ADDR");
+        #$ip   = getenv("REMOTE_ADDR");
+        #$host = gethostbyaddr($ip);
 
-        /*TODO
-        $vars=array(
-           'users_id'     => $id,
-           'login_ip' => $ip,
-           'add_time' => '~!now()',
+        $vars = array(
+            'login_time' => DB::NOW(),
+            //            'login_ip'   => $ip,
+            //            'login_host' => $host,
         );
-        $this->db->insert('users_log', $vars);
-        */
-
-        $host=gethostbyaddr($ip);
-
-        $vars=array(
-            'login_time'    => '~!now()',
-            'login_ip'      => $ip,
-            'login_host'    => $host,
-        );
-        $this->db->update($this->table_name, $vars, $id);
+        $this->update($id, $vars);
     }
 
-    public function createPermCookie($id){
-        $root_domain0=$this->fw->config->ROOT_DOMAIN0;
+    //</editor-fold>
 
-        $cookie_id=substr(Utils::getRandStr(16).time(),0,32);
 
-        $vars=array(
+    public function createPermCookie(int $id): string {
+        $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
+
+        $cookie_id = substr(Utils::getRandStr(16) . time(), 0, 32);
+
+        $vars = array(
             'cookie_id' => $cookie_id,
-            'users_id'  => $id
+            'users_id'  => $id,
         );
-        $this->db->insert('user_cookie', $vars, array('replace' => 1));
+        $this->db->insert('users_cookies', $vars, array('replace' => 1));
 
-        setcookie(self::$PERM_COOKIE_NAME, $cookie_id, time()+60*60*24*self::$PERM_COOKIE_DAYS, "/", (preg_match('/\./',$root_domain0))?'.'.$root_domain0:'');
+        setcookie(self::$PERM_COOKIE_NAME, $cookie_id, time() + 60 * 60 * 24 * self::$PERM_COOKIE_DAYS, "/", (preg_match('/\./', $root_domain0)) ? '.' . $root_domain0 : '');
         #rwe("[$root_domain0] ".self::$PERM_COOKIE_NAME.", $cookie_id, ".(time()+60*60*24*self::$PERM_COOKIE_DAYS));
 
         return $cookie_id;
     }
 
     # check for permanent login cookie and if it's present - doLogin
-    public function checkPermanentLogin(){
-        $root_domain0=$this->fw->config->ROOT_DOMAIN0;
+    public function checkPermanentLogin(): bool {
+        $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
 
         $result = false;
 
-        $cookie_id=@$_COOKIE[ self::$PERM_COOKIE_NAME ];
+        $cookie_id = @$_COOKIE[self::$PERM_COOKIE_NAME];
         #rw("cookies:");
         #print_r($_COOKIE);
         #exit;
 
         if ($cookie_id) {
-            $u_id=$this->db->value("SELECT users_id
-                  FROM user_cookie
-                 WHERE cookie_id=".$this->db->quote($cookie_id)."
-                   and add_time>=FROM_DAYS(TO_DAYS(now())-".self::$PERM_COOKIE_DAYS.")
-            ");
+            $u_id = $this->db->valuep("SELECT users_id
+                  FROM users_cookies
+                 WHERE cookie_id=@cookie_id
+                   and add_time>=FROM_DAYS(TO_DAYS(now())-@days)
+            ", [
+                'cookie_id' => $cookie_id,
+                'days'      => self::$PERM_COOKIE_DAYS,
+            ]);
 
-            if ($u_id>0){
-                $result=true;
+            if ($u_id > 0) {
+                $result = true;
                 #logger("PERMANENT LOGIN");
                 $this->doLogin($u_id);
-            }else{
+            } else {
                 #cookie is not found in DB - clean it (so it will not put load on DB during next pages)
-                setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/", (preg_match('/\./',$root_domain0))?'.'.$root_domain0:'' );
+                setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/", (preg_match('/\./', $root_domain0)) ? '.' . $root_domain0 : '');
             }
         }
         return $result;
     }
 
-    public function removePermCookie(){
-        $cookie_id=$_COOKIE[ self::$PERM_COOKIE_NAME ];
+    public function removePermCookie() {
+        $cookie_id = $_COOKIE[self::$PERM_COOKIE_NAME];
 
         setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
 
         #cleanup in DB (user's cookie and ALL old cookies)
-        $this->db->query("DELETE FROM user_cookie
-            WHERE cookie_id=".$this->db->quote($cookie_id)."
-               or add_time<FROM_DAYS(TO_DAYS(now())-".self::$PERM_COOKIE_DAYS.")
+        $this->db->query("DELETE FROM users_cookies
+            WHERE cookie_id=" . $this->db->quote($cookie_id) . "
+               or add_time<FROM_DAYS(TO_DAYS(now())-" . self::$PERM_COOKIE_DAYS . ")
         ");
 
     }
 
-    public function isAccess($access_str) {
-        $req_level=self::$ACL[$access_str]+0;
+    //<editor-fold defaultstate="collapsed" desc="Access Control">
 
-        return $_SESSION['access_level']>=$req_level ? true : false;
+    #check access for "exact" level
+    public function isAccessExact($acl): bool {
+        $req_level = intval($acl);
+        return $this->fw->userAccessLevel() == $req_level;
     }
 
-    /**
-     * return sql for limiting access according to current user ACL
-     * @param  string $alias optional, add_users_id field alias with dot. Example: 'c.'. If not provided - no alias used
-     * @param  string $field optional, add_users_id field name
-     * @return string        sql query string like " and add_users_id=".Utils::me()
-     */
-    public function sql_acl($alias='', $field=''){
-        $result='';
-        if (self::isAccess('MODER')){
-            //if we are admin user - allow access to all records
-        }else{
-            //if we are normal user - allows access only records we created
-            if (!$field) $field = 'add_users_id';
-
-            $result=' and '.$alias.$field.'='.dbqi(Utils::me()).' ';
+    public function checkAccessExact($acl, $is_die = true): bool {
+        $result = $this->isAccessExact($acl);
+        if (!$result && $is_die) {
+            throw new AuthException("Access Denied");
         }
         return $result;
     }
 
-}
+    /**
+     * return true if currently logged user has at least minimum requested access level
+     * @param int $req_level
+     * @return bool
+     */
+    public function isAccessLevel(int $req_level): bool {
+        return $this->fw->userAccessLevel() >= $req_level;
+    }
 
-?>
+    /**
+     * if currently logged user has at least minimum requested access level.
+     * @param int $req_level
+     * @param bool $is_die
+     * @return bool
+     * @throws AuthException if user's acl is not enough
+     */
+    public function checkAccessLevel(int $req_level, bool $is_die = true): bool {
+        $result = $this->isAccessLevel($req_level);
+        if (!$result && $is_die) {
+            throw new AuthException("Access Denied");
+        }
+        return $result;
+    }
+
+    /**
+     * return true if user is ReadOnly user
+     * @param int $id optional, if not passed - currently logged user checked
+     * @return bool
+     */
+    public function isReadOnly(int $id = -1): bool {
+        $result = false;
+        if ($id == -1) {
+            $id = $this->fw->userId();
+        }
+
+        if ($id <= 0) {
+            return true; //if no user logged - readonly
+        }
+
+        $user = $this->one($id);
+        if ($user["is_readonly"]) {
+            $result = true;
+        }
+
+        return $result;
+    }
+
+    /**
+     * check if logged user is readonly, if yes - throws AuthEception
+     * @param int $id optional, if not passed - currently logged user checked
+     * @return void
+     * @throws AuthException
+     */
+    public function checkReadOnly(int $id = -1): void {
+        if ($this->isReadOnly($id)) {
+            throw new AuthException();
+        }
+    }
+
+    /**
+     * return sql for limiting access according to current user ACL
+     * @param string $alias optional, add_users_id field alias with dot. Example: 'c.'. If not provided - no alias used
+     * @param string $field optional, add_users_id field name
+     * @return string        sql query string like " and add_users_id=".$this->fw->userId()
+     */
+    public function sqlACL(string $alias = '', string $field = ''): string {
+        $result = '';
+        if (self::isAccessLevel(self::ACL_SITE_ADMIN)) {
+            //if we are admin user - allow access to all records
+        } else {
+            //if we are normal user - allows access only records we created
+            if (!$field) {
+                $field = 'add_users_id';
+            }
+
+            $result = ' and ' . $alias . $field . '=' . dbqi($this->fw->userId()) . ' ';
+        }
+        return $result;
+    }
+
+    /**
+     * return true if roles support enabled
+     * @return bool
+     */
+    public function isRoles(): bool {
+        return false; #change to true if roles enabled
+    }
+
+    /**
+     * check if currently logged user roles has access to controller/action
+     * @param int $users_id - usually currently logged user - fw.userId
+     * @param string $resource_icode - resource code like controller name 'AdminUsers'
+     * @param string $resource_action - resource action like controller's action 'Index' or ''
+     * @param string $resource_action_more - optional additional action string, usually route.action_more to help distinguish sub-actions
+     * @param array|null $access_actions_to_permissions - optional list of permissions to override for the action
+     * @return bool
+     * @throws ApplicationException|DBException|NoModelException
+     */
+    public function isAccessByRolesResourceAction(int $users_id, string $resource_icode, string $resource_action, string $resource_action_more = "", array $access_actions_to_permissions = null): bool {
+        if ($this->isRoles()) {
+            // determine permission by resource action
+            $permission_icode = Permissions::i()->mapActionToPermission($resource_action, $resource_action_more);
+
+            if ($access_actions_to_permissions) {
+                //check if we have controller's permission's override for the action
+                if (array_key_exists($permission_icode, $access_actions_to_permissions)) {
+                    $permission_icode = $access_actions_to_permissions[$permission_icode];
+                }
+            }
+
+            $result = $this->isAccessByRolesResourcePermission($users_id, $resource_icode, $permission_icode);
+            if (!$result) {
+                logger('DEBUG', "Access by Roles denied", [
+                    "resource_icode"                => $resource_icode,
+                    "resource_action"               => $resource_action,
+                    "resource_action_more"          => $resource_action_more,
+                    "permission_icode"              => $permission_icode,
+                    "access_actions_to_permissions" => $access_actions_to_permissions,
+                ]);
+            }
+        } else {
+            $result = true; //if no Roles support - always allow
+        }
+        return $result;
+    }
+
+    /**
+     * check if currently logged user roles has access to resource with specific permission
+     * @param int $users_id
+     * @param string $resource_icode
+     * @param string $permission_icode
+     * @return bool
+     * @throws ApplicationException|DBException|NoModelException
+     */
+    public function isAccessByRolesResourcePermission(int $users_id, string $resource_icode, string $permission_icode): bool {
+        if ($this->isRoles()) {
+            // read resource id
+            $resource = Resources::i()->oneByIcode($resource_icode);
+            if (empty($resource)) {
+                return false; //if no resource defined - access denied
+            }
+            $resources_id = intval($resource["id"]);
+
+            $permission = Permissions::i()->oneByIcode($permission_icode);
+            if (empty($permission)) {
+                return false; //if no permission defined - access denied
+            }
+            $permissions_id = intval($permission["id"]);
+
+            // read all roles for user
+            $roles_ids = UsersRoles::i()->colLinkedIdsByMainId($users_id);
+
+            // check if any of user's roles has access to resource/permission
+            $result = RolesResourcesPermissions::i()->isExistsByResourcePermissionRoles($resources_id, $permissions_id, $roles_ids);
+            if (!$result) {
+                logger('DEBUG', "Access by Roles denied", [
+                    "resource_icode"   => $resource_icode,
+                    "permission_icode" => $permission_icode,
+                    "resources_id"     => $resources_id,
+                    "permissions_id"   => $permissions_id,
+                    "roles_ids"        => $roles_ids,
+                ]);
+            }
+        } else {
+            $result = true; //if no Roles support - always allow
+        }
+        return $result;
+    }
+
+    /**
+     * shortcut to avoid calling UsersRoles directly
+     * @param int $users_id
+     * @return array
+     * @throws ApplicationException|DBException|NoModelException
+     */
+    public function listLinkedRoles(int $users_id): array {
+        if ($this->isRoles()) {
+            return UsersRoles::i()->listLinkedByMainId($users_id);
+        } else {
+            return [];
+        }
+    }
+
+    /**
+     * shortcut to avoid calling UsersRoles directly
+     * @param int $users_id
+     * @param array $linked_keys
+     * @return void
+     * @throws DBException|NoModelException
+     */
+    public function updateLinkedRoles(int $users_id, array $linked_keys): void {
+        if ($this->isRoles()) {
+            UsersRoles::i()->updateJunctionByMainId($users_id, $linked_keys);
+        }
+    }
+
+    //</editor-fold>
+
+}

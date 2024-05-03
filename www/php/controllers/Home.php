@@ -1,7 +1,7 @@
 <?php
 
 class HomeController extends FwController {
-    const route_default_action = 'show';
+    const string route_default_action = 'show';
 
     public function __construct() {
         parent::__construct();
@@ -11,7 +11,7 @@ class HomeController extends FwController {
     }
 
     #CACHED as home_page
-    public function IndexAction() {
+    public function IndexAction(): ?array {
         #fw::redirect('/Login'); #uncomment to always show login instead of Home
 
         /*cached version
@@ -28,25 +28,23 @@ class HomeController extends FwController {
         */
 
         $ps = array(
-            'hide_sidebar'  => true,
+            'hide_sidebar' => true,
         );
         return $ps;
     }
 
     #show home subpage page from hardcoded template
-    public function ShowAction($id='') {
+    public function ShowAction($id = '') {
         $ps = array(
-            'hide_sidebar'  => true,
+            'hide_sidebar' => true,
         );
 
-        $this->fw->parser('/home/'.Dispatcher::RouteFixChars(strtolower($id)), $ps);
-        return false;
+        $this->fw->parser('/home/' . Utils::routeFixChars(strtolower($id)), $ps);
     }
 
     #called if fw dispatcher can't find controller
-    public function NotFoundAction(){
-        $this->fw->model('Spages')->showPageByFullUrl($this->fw->request_url);
+    public function NotFoundAction() {
+        Spages::i()->showPageByFullUrl($this->fw->request_url);
     }
 
 }
-?>
