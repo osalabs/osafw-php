@@ -14,5 +14,3 @@
  fw::run($ROUTES);
 
  exit;
-
-?>

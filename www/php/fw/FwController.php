@@ -9,7 +9,7 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 abstract class FwController {
     //overridable
     const int    access_level         = Users::ACL_VISITOR; // access level for the controller. $CONFIG['ACCESS_LEVELS'] overrides this. 0 (public access), 1(min logged level), 100(max admin level)
-    const string route_default_action = ''; //empty, "index", "show" - default action for controller, dispatcher will use it if no requested action found
+    const string route_default_action = ''; //empty, FW::ACTION_INDEX, FW::ACTION_SHOW - default action for controller, dispatcher will use it if no requested action found
     //if no default action set - this is special case action - this mean action should be got form REST's 'id'
 
     public string $route_onerror = ""; //route redirect action name in case ApplicationException occurs in current route, if empty - 500 error page returned
@@ -27,7 +27,7 @@ abstract class FwController {
     //not overridable
     protected FW $fw; //current app/framework object
     protected DB $db;
-    protected FwModel $model0; //default model for the controller
+    protected FwModel $model; //default model for the controller
     protected array $config = [];        // controller config, loaded from template dir/config.json
     protected array $access_actions_to_permissions = []; // optional, controller-level custom actions to permissions mapping for role-based access checks, e.g. "UIMain" => Permissions.PERMISSION_VIEW . Can also be used to override default actions to permissions
 
@@ -81,7 +81,7 @@ abstract class FwController {
         $this->export_format = reqs('export');
 
         if ($this->model_name) {
-            $this->model0 = fw::model($this->model_name);
+            $this->model = fw::model($this->model_name);
         }
 
         $this->is_readonly = Users::i()->isReadOnly();
@@ -105,7 +105,7 @@ abstract class FwController {
         $model_name = $this->config["model"] ?? '';
         if ($model_name) {
             $this->model_name = $model_name;
-            $this->model0     = fw::model($model_name);
+            $this->model      = fw::model($model_name);
         }
 
         $this->required_fields = $this->config["required_fields"] ?? '';
@@ -230,7 +230,7 @@ abstract class FwController {
                     $f['userfilter']     = $uf;
                 }
             } else {
-                $userfilters_id = intval($f['userfilters_id']);
+                $userfilters_id = intval($f['userfilters_id'] ?? 0);
                 if ($userfilters_id > 0) {
                     $uf              = UserFilters::i()->one($userfilters_id);
                     $f['userfilter'] = $uf;
@@ -242,6 +242,7 @@ abstract class FwController {
         $f['pagenum']  = intval($f['pagenum'] ?? 0);
         $f['pagesize'] = intval($f['pagesize'] ?? FormUtils::MAX_PAGE_ITEMS);
 
+        @session_start();
         $_SESSION[$session_key] = $f;
 
         $this->list_filter = $f;
@@ -258,6 +259,7 @@ abstract class FwController {
             //remember in session
             $_SESSION[$session_key_search] = $this->list_filter_search;
         }
+        @session_write_close();
 
         return $f;
     }
@@ -318,7 +320,7 @@ abstract class FwController {
             $is_subquery     = false;
             $list_table_name = $this->list_view;
             if (empty($list_table_name)) {
-                $list_table_name = $this->model0->table_name;
+                $list_table_name = $this->model->table_name;
             } else {
                 // list_table_name could contain subquery as "(...) t" - detect it (contains whitespace)
                 $is_subquery = preg_match("/\s/", $list_table_name);
@@ -454,17 +456,17 @@ abstract class FwController {
      * @throws NoModelException
      */
     public function setListSearchStatus(): void {
-        if (!empty($this->model0->field_status)) {
-            if (!empty($this->list_filter["status"])) {
+        if (!empty($this->model->field_status)) {
+            if (strlen($this->list_filter["status"] ?? '')) {
                 $status = intval($this->list_filter["status"]);
                 // if want to see trashed and not admin - just show active
                 if ($status == FwModel::STATUS_DELETED && !Users::i()->isAccessLevel(Users::ACL_SITE_ADMIN)) {
                     $status = 0;
                 }
-                $this->list_where                  .= " and " . $this->db->qid($this->model0->field_status) . "=@status";
+                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "=@status";
                 $this->list_where_params["status"] = $status;
             } else {
-                $this->list_where                  .= " and " . $this->db->qid($this->model0->field_status) . "<>@status";
+                $this->list_where                  .= " and " . $this->db->qid($this->model->field_status) . "<>@status";
                 $this->list_where_params["status"] = FwModel::STATUS_DELETED; // by default - show all non-deleted
             }
         }
@@ -497,7 +499,7 @@ abstract class FwController {
         }
 
         if (empty($this->list_view)) {
-            $this->list_view = $this->model0->table_name;
+            $this->list_view = $this->model->table_name;
         }
         $list_view_name = (str_starts_with($this->list_view, "(") ? $this->list_view : $this->db->qid($this->list_view)); // don't quote if list_view is a subquery (starting with parentheses)
 
@@ -508,9 +510,9 @@ abstract class FwController {
 
             $this->list_rows = $this->db->selectRaw("*", $list_view_name, $this->list_where, $this->list_where_params, $this->list_orderby, $offset, $limit);
 
-            if ($this->model0->is_normalize_names) {
+            if ($this->model->is_normalize_names) {
                 foreach ($this->list_rows as &$row) {
-                    $this->model0->normalizeNames($row);
+                    $this->model->normalizeNames($row);
                 }
                 unset($row);
             }
@@ -606,13 +608,13 @@ abstract class FwController {
      * @throws ValidationException if global ERR non-empty, Also set global ERR[INVALID] if ERR non-empty, but ERR[REQUIRED] not true
      */
     public function validateCheckResult(bool $result = true): void {
-        if (isset($this->fw->FormErrors['REQUIRED']) && $this->fw->FormErrors['REQUIRED']) {
+        if ($this->fw->FormErrors['REQUIRED'] ?? false) {
             $result = false;
         }
 
-        if (is_array($this->fw->FormErrors) && !empty($this->fw->FormErrors) && (!isset($this->fw->FormErrors['REQUIRED']) || !$this->fw->FormErrors['REQUIRED'])) {
-            $this->fw->FormErrors['INVALID'] = true;
-            $result                          = false;
+        if (!empty($this->fw->FormErrors) && empty($this->fw->FormErrors['REQUIRED'])) {
+            $this->setError('INVALID');
+            $result = false;
         }
 
         if (!$result) {
@@ -665,15 +667,14 @@ abstract class FwController {
      */
     public function modelAddOrUpdate(int $id, array $fields): int {
         if ($id > 0) {
-            $this->model0->update($id, $fields);
+            $this->model->update($id, $fields);
             $this->fw->flash("record_updated", 1);
         } else {
-            $id = $this->model0->add($fields);
+            $id = $this->model->add($fields);
             $this->fw->flash("record_added", 1);
         }
         return $id;
     }
-
 
     /**
      * return URL for location after successful Save action
@@ -694,22 +695,22 @@ abstract class FwController {
         $is_add_new = false;
 
         if ($id > '') {
-            $request_route_return = reqh('route_return');
+            $request_route_return = reqs('route_return');
             $to                   = ($request_route_return > '' ? $request_route_return : $this->route_return);
-            if ($to == 'show') {
+            if ($to == FW::ACTION_SHOW) {
                 // or return to view screen
                 $url = $this->base_url . '/' . $id;
-            } elseif ($to == 'index') {
+            } elseif ($to == FW::ACTION_INDEX) {
                 // or return to list screen
                 $url = $this->base_url;
-            } elseif ($to == 'show_form_new') {
+            } elseif ($to == FW::ACTION_SHOW_FORM_NEW) {
                 // or return to add new form
-                $url        = $this->base_url . '/new';
+                $url        = $this->base_url . '/' . FW::ACTION_MORE_NEW;
                 $url_q      .= '&copy_id=' . $id;
                 $is_add_new = true;
             } else {
                 // default is return to edit screen
-                $url = $this->base_url . '/' . $id . '/edit';
+                $url = $this->base_url . '/' . $id . '/' . FW::ACTION_MORE_EDIT;
             }
         } else {
             $url = $this->base_url;
@@ -761,7 +762,7 @@ abstract class FwController {
      * @param array|null $more_json added to json response
      * @return array|null ps array of json response or null (will be redirected to new location or ShowForm)
      */
-    public function afterSave(bool $success, string $id = '', bool $is_new = false, string $action = 'ShowForm', string $location = '', array $more_json = null): ?array {
+    public function afterSave(bool $success, string $id = '', bool $is_new = false, string $action = FW::ACTION_SHOW_FORM, string $location = '', array $more_json = null): ?array {
         if (!$location) {
             $location = $this->afterSaveLocation($id);
         }
@@ -769,15 +770,21 @@ abstract class FwController {
         if ($this->fw->isJsonExpected()) {
             $ps   = array();
             $json = array(
-                'success'  => $success,
                 'id'       => $id,
                 'is_new'   => $is_new,
                 'location' => $location,
-                'err_msg'  => $this->fw->GLOBAL['err_msg'] ?? '',
             );
-            // add ERR field errors to response if any
+            if (!$success) {
+                $json['error'] = [
+                    'message' => $this->fw->GLOBAL['err_msg'] ?? ''
+                ];
+            }
+            // add FormErrors field errors to response if any
             if (!empty($this->fw->FormErrors)) {
-                $json['ERR'] = $this->fw->FormErrors;
+                if (!isset($json['error'])) {
+                    $json['error'] = [];
+                }
+                $json['error']['details'] = $this->fw->FormErrors;
             }
 
             if ($more_json) {
@@ -879,11 +886,11 @@ abstract class FwController {
     }
 
     public function setAddUpdUser(array &$ps, array $item): void {
-        if ($this->model0->field_add_users_id > '') {
-            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model0->field_add_users_id] ?? 0);
+        if ($this->model->field_add_users_id > '') {
+            $ps["add_users_id_name"] = Users::i()->iname($item[$this->model->field_add_users_id] ?? 0);
         }
-        if ($this->model0->field_upd_users_id > '') {
-            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model0->field_upd_users_id] ?? 0);
+        if ($this->model->field_upd_users_id > '') {
+            $ps["upd_users_id_name"] = Users::i()->iname($item[$this->model->field_upd_users_id] ?? 0);
         }
     }
 
@@ -959,7 +966,7 @@ abstract class FwController {
     public function getViewListConversions(array $afields): array {
         $result = array();
         //use table_name or list_view if it's not subquery
-        $list_view_name = $this->model0->table_name;
+        $list_view_name = $this->model->table_name;
         if ($this->list_view > '' && $this->list_view[0] != "(") {
             $list_view_name = $this->list_view;
         }

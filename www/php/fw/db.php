@@ -368,6 +368,62 @@ class DBException extends Exception {
 } #exception to be raised by our code
 
 /**
+ * DB functions enum
+ */
+enum DBFuncs {
+    case NOW;
+    case UNHEX;
+    case HEX;
+    case SHA1;
+    case MD5;
+}
+
+/**
+ * helper class - describes DB function
+ */
+class DBFunction {
+    public DBFuncs $func;
+    public string $funcstr; // string name for func
+    public mixed $value; // can be array for specific functions
+    public bool $is_value = true; // if false - function is unary (no value)
+
+    public function __construct(DBFuncs $func, mixed $value = null) {
+        $this->func = $func;
+        $this->setFuncStr();
+        $this->value = $value;
+    }
+
+    public function __toString() {
+        return $this->funcstr . ($this->is_value ? "(" . $this->value . ")" : "()");
+    }
+
+    public function setFuncStr(): void {
+        switch ($this->func) {
+            case DBFuncs::NOW:
+                $this->funcstr  = "NOW";
+                $this->is_value = false;
+                break;
+            case DBFuncs::UNHEX:
+                $this->funcstr = "UNHEX";
+                break;
+            case DBFuncs::HEX:
+                $this->funcstr = "HEX";
+                break;
+            case DBFuncs::SHA1:
+                $this->funcstr = "SHA1";
+                break;
+            case DBFuncs::MD5:
+                $this->funcstr = "MD5";
+                break;
+        }
+    }
+
+    public function getSQL(string $param_name): string {
+        return $this->funcstr . ($this->is_value ? "(" . $param_name . ")" : "()");
+    }
+}
+
+/**
  * DB operations enum
  */
 enum DBOps {
@@ -393,7 +449,7 @@ class DBOperation {
     public DBOps $op;
     public string $opstr; // string value for op
     public bool $is_value = true; // if false - operation is unary (no value)
-    public mixed $value; // can be array for IN, NOT IN, OR
+    public mixed $value; // can be array for IN, NOT IN, BETWEEN, OR or DBFunction
     public string $sql = ""; // raw value to be used in sql query string if !is_value
 
     public function __construct(DBOps $op, mixed $value = null) {
@@ -795,7 +851,8 @@ class DB {
                     }
                     $arrstr[] = "@" . $pnew;
                 }
-                $sql = str_replace("@" . $p, implode('', $arrstr), $sql);
+                # now we need to replace in $sql string with ":$p" or "@$p" or "$p"(if $p already have prefix ":" or "@")
+                $sql = preg_replace('/[@:]' . $p . '\b/', implode('', $arrstr), $sql);
                 unset($params[$p]);
             }
         }
@@ -1015,7 +1072,7 @@ class DB {
     public function value(string $table, array $where, string $field_name = null, string $order_by = null): string|null {
         if (is_null($field_name)) {
             $field_name = '*';
-        } elseif (str_starts_with($field_name, 'count(')) {
+        } elseif (str_starts_with(strtolower($field_name), 'count(')) {
             //$field_name = $field_name; // for count - do not quote (there could be different variants like count(*), count(field), count(1))
         } elseif (preg_match('/^(\w+)\((\w+)\)$/', $field_name, $m)) {
             $field_name = $m[1] . '(' . $this->qid($m[2]) . ')'; // sum, avg, max, min
@@ -1142,9 +1199,9 @@ class DB {
 
         if (isset($fields[0]) && is_array($fields[0])) {
             // multi row mode
-
-            foreach ($fields as $row) {
-                $insert_params = $this->prepareParams($table, $row, 'insert');
+            for ($i = 0; $i < count($fields); $i++) {
+                $row           = $fields[$i];
+                $insert_params = $this->prepareParams($table, $row, 'insert', '_' . $i);
                 if (empty($result->fields)) {
                     $result->fields = $insert_params->fields;
                     $sql_fields     = implode(', ', array_map(fn($v) => $this->qid($v), $insert_params->fields));
@@ -1153,7 +1210,7 @@ class DB {
                 $result->sql    .= '(' . $insert_params->sql . '), ';
                 $result->params = array_merge($result->params, $insert_params->params);
             }
-
+            $result->sql = rtrim($result->sql, ', ');
         } else {
             // single row mode
             $insert_params = $this->prepareParams($table, $fields, 'insert');
@@ -1184,7 +1241,7 @@ class DB {
         if (isset($fields[0]) && is_array($fields[0])) {
             // multi row mode
             $MAX_BIND_PARAMS = 2000; #let's set some limit
-            $rows_per_exec   = floor($MAX_BIND_PARAMS / count($fields[0])); # group insert by this number of rows
+            $rows_per_exec   = $MAX_BIND_PARAMS / count($fields[0]); #how many rows to insert per exec
 
             $rows = [];
             foreach ($fields as $row) {
@@ -1326,33 +1383,33 @@ class DB {
             if ($dbop->is_value) {
                 // if we have value - add it to params
                 if ($dbop->op == DBOps::BETWEEN) {
-                    // special case for between
-                    $params[$param_name . '_1'] = $value[0];
-                    $params[$param_name . '_2'] = $value[1];
+                    // special case for BETWEEN
+                    [$param_value1, $param_sql1] = $this->prepareSingleParam($param_name . '_1', $value[0]);
+                    [$param_value2, $param_sql2] = $this->prepareSingleParam($param_name . '_2', $value[1]);
+                    $params[$param_name . '_1'] = $param_value1;
+                    $params[$param_name . '_2'] = $param_value2;
                     // BETWEEN @p1 AND @p2
-                    $sql .= '@' . $param_name . '_1 AND @' . $param_name . '_2';
+                    $sql .= $param_sql1 . ' AND ' . $param_sql2;
+
                 } elseif ($dbop->op == DBOps::IN || $dbop->op == DBOps::NOTIN) {
+                    // special case for IN
                     $sql_params = array();
                     $i          = 1;
                     foreach ($dbop->value as $pvalue) {
-                        $params[$param_name . '_' . $i] = $pvalue;
-                        $sql_params[]                   = '@' . $param_name . '_' . $i;
-                        $i                              += 1;
+                        $param_name_i = $param_name . '_' . $i;
+                        [$param_value, $param_sql] = $this->prepareSingleParam($param_name_i, $pvalue);
+                        $params[$param_name_i] = $param_value;
+                        $sql_params[]          = $param_sql;
+                        $i                     += 1;
                     }
                     // [NOT] IN (@p1,@p2,@p3...)
                     $sql .= '(' . (count($sql_params) > 0 ? implode(',', $sql_params) : 'NULL') . ')';
                 } else {
-                    if ($dbop->value instanceof DBSpecialValue) {
-                        // if value is NOW object - don't add it to params, just use NOW()/GETDATE() in sql
-                        $sql .= $dbop->value;
-                    } elseif ($dbop->value instanceof DateTime) {
-                        $params[$param_name] = $dbop->value->format('Y-m-d H:i:s');
-                        $sql                 .= '@' . $param_name;
-                    } else {
-                        $params[$param_name] = $dbop->value;
-                        $sql                 .= '@' . $param_name;
-                    }
+                    [$param_value, $param_sql] = $this->prepareSingleParam($param_name, $dbop->value);
+                    $params[$param_name] = $param_value;
+                    $sql                 .= $param_sql;
                 }
+
                 $fields_list[] = $fname; // only if field has a parameter - include in the list
             } else {
                 $sql .= $dbop->sql; //if no value - add operation's raw sql if any
@@ -1367,72 +1424,25 @@ class DB {
         return $result;
     }
 
-    /*
-     *     public DBOperation field2Op(string table, string field_name, object field_value_or_op, bool is_for_where = false)
-    {
-        DBOperation dbop;
-        if (field_value_or_op is DBOperation dbop1)
-            dbop = dbop1;
-        else
-        {
-            // if it's equal - convert to EQ db operation
-            if (is_for_where)
-                // for WHERE xxx=NULL should be xxx IS NULL
-                dbop = opEQ(field_value_or_op);
-            else
-                // for update SET xxx=NULL should be as is
-                dbop = new DBOperation(DBOps.EQ, field_value_or_op);
-        }
-
-        return field2Op(table, field_name, dbop, is_for_where);
-    }
-
-    // return DBOperation class with value converted to type appropriate for the db field
-    public DBOperation field2Op(string table, string field_name, DBOperation dbop, bool is_for_where = false)
-    {
-        connect();
-        loadTableSchema(table);
-        field_name = field_name.ToLower();
-        Hashtable schema_table = (Hashtable)schema[table];
-        if (!schema_table.ContainsKey(field_name))
-        {
-            throw new ApplicationException("field " + table + "." + field_name + " does not defined in FW.config(\"schema\") ");
-        }
-
-        string field_type = (string)schema_table[field_name];
-        //logger(LogLevel.DEBUG, "field2Op IN: ", table, ".", field_name, " ", field_type, " ", dbop.op, " ", dbop.value);
-
-        // db operation
-        if (dbop.op == DBOps.IN || dbop.op == DBOps.NOTIN)
-        {
-            ArrayList result = new(((IList)dbop.value).Count);
-            foreach (var pvalue in (IList)dbop.value)
-                result.Add(field2typed(field_type, pvalue));
-            dbop.value = result;
-        }
-        else if (dbop.op == DBOps.BETWEEN)
-        {
-            ((IList)dbop.value)[0] = field2typed(field_type, ((IList)dbop.value)[0]);
-            ((IList)dbop.value)[1] = field2typed(field_type, ((IList)dbop.value)[1]);
-        }
-        else
-        {
-            // convert to field's type
-            dbop.value = field2typed(field_type, dbop.value);
-            if (is_for_where && dbop.value == DBNull.Value)
-            {
-                // for where if we got null value here for EQ/NOT operation - make it ISNULL/ISNOT NULL
-                // (this could happen when comparing int field to empty string)
-                if (dbop.op == DBOps.EQ)
-                    dbop = opISNULL();
-                else if (dbop.op == DBOps.NOT)
-                    dbop = opISNOTNULL();
-            }
-        }
-
-        return dbop;
-    }
+    /**
+     * prepare single parameter for query
+     * @param string $param_name
+     * @param mixed $pvalue can be DBSpecialValue, DateTime, DBFunction or any other value
+     * @return array [value, sql]
      */
+    public function prepareSingleParam(string $param_name, mixed $pvalue): array {
+        if ($pvalue instanceof DBSpecialValue) {
+            // if value is NOW object - don't add it to params, just use NOW()/GETDATE() in sql
+            return [null, $pvalue];
+        } elseif ($pvalue instanceof DateTime) {
+            return [$pvalue->format('Y-m-d H:i:s'), '@' . $param_name];
+        } elseif ($pvalue instanceof DBFunction) {
+            return [$pvalue->value, $pvalue->getSQL('@' . $param_name)];
+        } else {
+            return [$pvalue, '@' . $param_name];
+        }
+    }
+
     public function field2Op(string $table, string $field_name, mixed $field_value_or_op, bool $is_for_where = false): DBOperation {
         $dbop = $field_value_or_op instanceof DBOperation ? $field_value_or_op : new DBOperation(DBOps::EQ, $field_value_or_op);
 
@@ -1594,7 +1604,7 @@ class DB {
      * @param mixed $value
      * @return DBOperation
      */
-    public function opIN(mixed $value): DBOperation {
+    public function opIN(array $value): DBOperation {
         return new DBOperation(DBOps::IN, $value);
     }
 
@@ -1605,7 +1615,7 @@ class DB {
      * @param mixed $value
      * @return DBOperation
      */
-    public function opNOTIN(mixed $value): DBOperation {
+    public function opNOTIN(array $value): DBOperation {
         return new DBOperation(DBOps::NOTIN, $value);
     }
 
@@ -1616,8 +1626,37 @@ class DB {
      * @param mixed $value
      * @return DBOperation
      */
-    public function opBETWEEN(mixed $value): DBOperation {
+    public function opBETWEEN(array $value): DBOperation {
         return new DBOperation(DBOps::BETWEEN, $value);
+    }
+
+    //</editor-fold>
+
+    //<editor-fold desc="DBFunctions support">
+    /**
+     * create DBFunction object for given function name and value
+     * @param string $function_name
+     * @param mixed $value
+     * @return DBFunction
+     * @throws Exception
+     */
+    public function func(string $function_name, mixed $value): DBFunction {
+        //convert function name to DBFuncs enum
+        $function_name = strtoupper($function_name);
+        $const_name    = 'DBFuncs::' . $function_name;
+        if (!defined($const_name)) {
+            throw new Exception("Unknown DB function name: $function_name");
+        }
+        return new DBFunction(constant($const_name), $value);
+    }
+
+    /**
+     * UNHEX function
+     * @param mixed $value
+     * @return DBFunction
+     */
+    public function fUNHEX(mixed $value): DBFunction {
+        return new DBFunction(DBFuncs::UNHEX, $value);
     }
     //</editor-fold>
 
@@ -1752,6 +1791,33 @@ class DB {
      */
     public function get_identity(): int {
         return $this->dbh->insert_id;
+    }
+
+    /**
+     * start transaction
+     * @return void
+     * @throws DBException
+     */
+    public function transaction(): void {
+        $this->exec("START TRANSACTION");
+    }
+
+    /**
+     * commit transaction
+     * @return void
+     * @throws DBException
+     */
+    public function commit(): void {
+        $this->exec("COMMIT");
+    }
+
+    /**
+     * rollback transaction
+     * @return void
+     * @throws DBException
+     */
+    public function rollback(): void {
+        $this->exec("ROLLBACK");
     }
 
     /**

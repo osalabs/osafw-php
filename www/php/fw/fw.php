@@ -4,7 +4,7 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 (c) 2009-2024 Oleg Savchuk www.osalabs.com
  */
 
-require_once dirname(__FILE__) . "/../config.php";
+require_once dirname(__FILE__) . "/../configs/config.php";
 require_once dirname(__FILE__) . "/FwExceptions.php";
 require_once dirname(__FILE__) . "/../FwHooks.php";
 require_once dirname(__FILE__) . "/dispatcher.php";
@@ -30,6 +30,7 @@ class fw {
     public const string ACTION_SAVE_MULTI    = "SaveMulti";
     public const string ACTION_SHOW_DELETE   = "ShowDelete";
     public const string ACTION_DELETE        = "Delete";
+    public const string ACTION_OPTIONS       = "Options";
     //additional actions used across controllers
     public const string ACTION_DELETE_RESTORE  = "RestoreDeleted";
     public const string ACTION_NEXT            = "Next"; // prev/next on view/edit forms
@@ -49,12 +50,14 @@ class fw {
 
     public Dispatcher $dispatcher;
     public DB $db;
+    public FwCache $cache;
 
     public string $request_url; #current request url (relative to application url)
     public stdClass $route; #current request route data, stdClass
 
     public array $GLOBAL = []; #"global" vars, initialized with $CONFIG - used in template engine, also stores "_flash"
-    public array $FormErrors = []; # for storing form id's with error messages, put to ps("ERR") for parser
+
+    public array $FormErrors = []; # for storing form id's with error messages, put to ps['error']['details'] for parser
     public object $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
     public array $models_cache = []; #cached model instances
 
@@ -86,28 +89,34 @@ class fw {
         self::$start_time = microtime(true);
         $fw               = fw::i();
 
-        session_start(); #start session on each request
+        #session_start(); #start session on each request - moved to FwHooks::initRequest as it's not always needed
 
-        #setup user's language to use by template engine
-        if (isset($_SESSION['lang'])) {
-            $fw->config->LANG = $_SESSION['lang'];
+        if ($fw->is_session) {
+            #setup user's language to use by template engine
+            if (isset($_SESSION['lang'])) {
+                $fw->config->LANG = $_SESSION['lang'];
+            }
+            // override default ui_theme/ui_mode with user's settings
+            if (!empty($_SESSION["ui_theme"])) {
+                $fw->GLOBAL["ui_theme"] = $_SESSION["ui_theme"];
+            }
+            if (!empty($_SESSION["ui_mode"])) {
+                $fw->GLOBAL["ui_mode"] = $_SESSION["ui_mode"];
+            }
         }
-        // override default ui_theme/ui_mode with user's settings
-        if (!empty($_SESSION["ui_theme"])) {
-            $fw->GLOBAL["ui_theme"] = $_SESSION["ui_theme"];
-        }
-        if (!empty($_SESSION["ui_mode"])) {
-            $fw->GLOBAL["ui_mode"] = $_SESSION["ui_mode"];
-        }
+
+        $fw->cache = new FwCache($fw);
 
         # and now run dispatcher
         FwHooks::initRequest($fw, $uri);
 
-        #save flash to current var and update session
-        if (isset($_SESSION['_flash'])) {
-            $fw->GLOBAL['_flash'] = $_SESSION['_flash'];
+        if ($fw->is_session) {
+            #save flash to current var and update session
+            if (isset($_SESSION['_flash'])) {
+                $fw->GLOBAL['_flash'] = $_SESSION['_flash'];
+            }
+            $_SESSION['_flash'] = array();
         }
-        $_SESSION['_flash'] = array();
 
         $fw->dispatcher  = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES);
         $fw->route       = $fw->dispatcher->getRoute();
@@ -137,6 +146,8 @@ class fw {
         set_time_limit(0);
         ignore_user_abort(true);
 
+        $fw->cache = new FwCache($fw);
+
         FwHooks::initRequest($fw, $caller); #additional initializations
     }
 
@@ -155,7 +166,7 @@ class fw {
 
         $total_time  = microtime(true) - self::$start_time;
         $memory_used = memory_get_peak_usage(true);
-        logger("DEBUG", $msg . number_format($total_time, 4) . 's, ' . number_format(1 / $total_time, 3) . '/s, SQL:' . DB::$SQL_QUERY_CTR . ', MEM:' . Utils::bytes2str($memory_used));
+        logger("NOTICE", $msg . number_format($total_time, 4) . 's, ' . number_format(1 / $total_time, 3) . '/s, SQL:' . DB::$SQL_QUERY_CTR . ', MEM:' . Utils::bytes2str($memory_used));
         if ($fw->isOffline()) {
             # cmd script
             if ($memory_used > 80 * 1000 * 1000) {
@@ -221,7 +232,7 @@ class fw {
         $this->GLOBAL                 = $CONFIG;
         $this->FormErrors             = []; #store form errors
         $this->GLOBAL['current_time'] = time(); #current time for the request
-        $this->GLOBAL['request_url']  = $_SERVER['REQUEST_URI'];
+        $this->GLOBAL['request_url']  = $_SERVER['REQUEST_URI'] ?? '';
         $CONFIG['LANG']               = $CONFIG['LANG_DEF']; #use default language
 
         # fw vairables
@@ -240,6 +251,11 @@ class fw {
         if (str_ends_with($class_name, 'Controller')) {
             $is_controller = true;
             $dirs[]        = $bdir . '../controllers/';
+            #add prefixes from config, so controller classes can be in a prefix subfolders
+            foreach ($this->config->ROUTE_PREFIXES as $prefix) {
+                $dirs[] = $bdir . '../controllers' . $prefix . '/';
+            }
+
             if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController' && $class_name !== 'FwApiController') {
                 $class_name = preg_replace("/Controller$/", "", $class_name);
             }
@@ -252,22 +268,37 @@ class fw {
         $dirs[] = $bdir; #also look at /www/php/fw
         $dirs[] = $bdir . '../'; #also look at /www/php
 
+        #if under linux (not Win or Mac) - need to do a case-insensitive search in each dir
+        $is_linux = !preg_match('/win/i', PHP_OS); #WIN - windows, Darwin - mac
+        if ($is_linux) {
+            $qclass_name = preg_quote($class_name, '/');
+        }
+
         $file_found = '';
         #logger($class_name, $dirs);
         foreach ($dirs as $dir) {
-            #try class name directly
+            #first, try class name directly (under win/mac it will find right away as filesystem is case-insensitive)
             $file = $dir . $class_name . '.php';
             if (file_exists($file)) {
                 $file_found = $file;
                 break;
             }
 
-            #if not exists - try normalized
-            $file = $dir . ucfirst(strtolower($class_name)) . '.php'; #normalize name, i.e. users => Users
-            if (file_exists($file)) {
-                $file_found = $file;
-                break;
+            #if not found - for linux - do a case-insensitive search and return first found
+            if ($is_linux) {
+                $files      = glob($dir . '*.php', GLOB_NOSORT);
+                $file_found = current(preg_grep("/$qclass_name\.php$/i", $files));
+                if ($file_found) {
+                    break;
+                }
             }
+
+            #if not exists - try normalized
+            #$file = $dir . ucfirst(strtolower($class_name)) . '.php'; #normalize name, i.e. users => Users
+            #if (file_exists($file)) {
+            #    $file_found = $file;
+            #    break;
+            #}
         }
 
         if ($file_found) {
@@ -309,17 +340,20 @@ class fw {
             return;
         } catch (NoClassMethodException) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
-            logger('DEBUG', "No method found for route, checking route_default_action");
-            logger('DEBUG', "Route: ", $this->route);
+            logger('NOTICE', "No method found for route, checking route_default_action");
+            logger('NOTICE', "Route: ", $this->route);
 
             $default_action = $this->dispatcher->getRouteDefaultAction($this->route->controller);
-            if ($default_action == 'index') {
-                $this->route->action = 'Index';
-            } elseif ($default_action == 'show') {
+            if ($default_action == self::ACTION_INDEX) {
+                $this->route->action = self::ACTION_INDEX;
+            } elseif ($default_action == self::ACTION_SHOW) {
                 #assume action is id and use ShowAction
                 $this->route->id        = $this->route->action;
                 $this->route->params[0] = $this->route->id;
-                $this->route->action    = 'Show';
+                $this->route->action    = self::ACTION_SHOW;
+            } elseif ($default_action == 'error') {
+                $this->handlePageError(404, 'Not found');
+                return;
             } else {
                 #if no default action set - this is special case action - this mean action should be got form REST's 'id'
                 if ($this->route->id > '') {
@@ -379,7 +413,7 @@ class fw {
             $route = $this->route;
         }
 
-        if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) {
+        if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
             return 1;
         } else {
             return 0;
@@ -391,7 +425,7 @@ class fw {
             $route = $this->route;
         }
 
-        if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) {
+        if ($route->format == 'json' || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json')) {
             $result = 'json';
         } elseif ($route->format == 'pjax' || isset($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             $result = 'pjax';
@@ -432,23 +466,29 @@ class fw {
     # also check for XSS in $_SESSION
     # IN: route hash
     # OUT: return TRUE throw AuthException if not authorized to view the page
+    /**
+     * @throws AuthException
+     * @throws NoControllerException
+     */
     private function auth(stdClass $route): void {
-        $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS);
-        #XSS check for all requests that modify data
-        $request_xss = reqs("XSS");
-        $session_xss = $_SESSION["XSS"] ?? '';
-        if (($request_xss
-                || $route->method == "POST"
-                || $route->method == "PUT"
-                || $route->method == "DELETE"
-                || $route->action == self::ACTION_SAVE
-                || $route->action == self::ACTION_DELETE
-                || $route->action == self::ACTION_SAVE_MULTI
-            )
-            && $session_xss > "" && $session_xss != $request_xss
-            && !in_array($route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
+        if (!array_key_exists($route->prefix, $this->config->NO_XSS_PREFIXES) //no XSS check for selected prefixes
+            && !array_key_exists($route->controller, $this->config->NO_XSS) //no XSS check for selected controllers
         ) {
-            throw new AuthException("XSS Error");
+            #XSS check for all requests that modify data
+            $request_xss = reqs("XSS");
+            $session_xss = $_SESSION["XSS"] ?? '';
+            if (($request_xss
+                    || $route->method == "POST"
+                    || $route->method == "PUT"
+                    || $route->method == "DELETE"
+                    || $route->action == self::ACTION_SAVE
+                    || $route->action == self::ACTION_DELETE
+                    || $route->action == self::ACTION_SAVE_MULTI
+                )
+                && $session_xss > "" && $session_xss != $request_xss
+            ) {
+                throw new AuthException("XSS Error");
+            }
         }
 
         #access level check
@@ -457,7 +497,8 @@ class fw {
 
         $current_level = self::userAccessLevel();
 
-        $rule_level = null;
+        $rule_level    = null;
+        $ACCESS_LEVELS = array_change_key_case($this->config->ACCESS_LEVELS);
         if (array_key_exists($path, $ACCESS_LEVELS)) {
             $rule_level = $ACCESS_LEVELS[$path];
         } elseif (array_key_exists($path2, $ACCESS_LEVELS)) {
@@ -470,7 +511,7 @@ class fw {
         }
 
         if (is_null($rule_level)) {
-            #if no access level set in config and in controller - no restictions
+            #if no access level set in config and in controller - no restrictions
             $rule_level = Users::ACL_VISITOR;
         }
 
@@ -494,10 +535,12 @@ class fw {
             $ps = FwHooks::handleException($ex);
             if ($ps) {
                 // only process exceptions there and only return here if we actually returned something
-                if (!$ps["success"]) {
-                    if ($ps["err_code"] >= 100 && $ps["err_code"] <= 599) {
+                $error = $ps["error"] ?? false;
+                if ($error) {
+                    $err_code = intval($error["code"] ?? 0);
+                    if ($err_code >= 100 && $err_code <= 599) {
                         #if error http code exists
-                        header("HTTP/1.0 " . $ps["err_code"] . " " . $ps["err_msg"], true, $ps["err_code"]);
+                        header("HTTP/1.0 " . $err_code . " " . $error["message"], true, $err_code);
                     }
                     $this->parser('/error', $ps);
                 }
@@ -529,24 +572,25 @@ class fw {
                 $is_error_processed = true;
             } catch (NoClassException $ex) {
                 //still error not processed
-                logger('ERROR', 'Additional error occured during processing custom error handler: ' . $ex->getMessage());
+                logger('ERROR', 'Additional error occurred during processing custom error handler: ' . $ex->getMessage());
             }
         }
 
         if (!$is_error_processed) {
             $uri           = $_SERVER['REQUEST_URI'];
-            $err_code_desc = Dispatcher::$HTTP_CODE[$error_code] ?? 'Server error';
+            $err_code_desc = Dispatcher::HTTP_CODE[$error_code] ?? 'Server error';
 
             header("HTTP/1.0 $error_code $err_code_desc", true, $error_code);
 
             $err_msg = $error_message ?: ($err_code_desc ?: "PAGE NOT YET IMPLEMENTED [$uri]");
 
             $ps = array(
-                '_json'    => true, #also allow return urls by json
-                'success'  => false,
-                'err_code' => $error_code,
-                'err_msg'  => $err_msg,
-                'err_time' => time(),
+                '_json' => true, #also allow return urls by json
+                'error' => [
+                    'code'    => $error_code,
+                    'message' => $err_msg,
+                    'time'    => time(),
+                ],
             );
 
             //if it was Auth error - add current XSS to response, so client can try to re-send request
@@ -617,9 +661,12 @@ class fw {
             throw new Exception("parser - wrong call");
         }
 
-        if ($this->FormErrors && !isset($ps['ERR'])) {
-            $ps['ERR'] = $this->FormErrors; // add form errors if any
-            logger("DEBUG", "Form errors:", $ps["ERR"]);
+        if ($this->FormErrors && !isset($ps['error']['details'])) {
+            if (!isset($ps['error'])) {
+                $ps['error'] = [];
+            }
+            $ps['error']['details'] = $this->FormErrors; // add form errors if any
+            logger("DEBUG", "Form errors:", $this->FormErrors);
         }
 
         $out_format = $this->getResponseExpectedFormat();
@@ -663,6 +710,8 @@ class fw {
             $layout = $ps['_layout'];
         }
 
+        $ps['current_time'] = time();
+
         logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
         parse_page($basedir, $layout, $ps, $out_filename);
     }
@@ -678,11 +727,11 @@ class fw {
             #read mode
             return $this->GLOBAL['_flash'][$name];
         } else {
-            if (!$this->isJsonExpected()) {
+            if (!$this->isJsonExpected() && $this->is_session) {
                 #write for the next request
-                #@session_start();
+                @session_start();
                 $_SESSION['_flash'][$name] = $value;
-                #@session_write_close();
+                @session_write_close();
             }
             return $this; //for chaining
         }
@@ -737,8 +786,8 @@ class fw {
             $files = array();
         }
 
-        logger('INFO', "Sending email. From=[$from], To=[" . implode(",", $ToEmail) . "], Subj=[$Subj]");
-        logger('DEBUG', $Message);
+        logger('NOTICE', "Sending email. From=[$from], To=[" . implode(",", $ToEmail) . "], Subj=[$Subj]");
+        logger('TRACE', $Message);
 
         #detect if message is in html format - it should start with <!DOCTYPE or <html tag
         $is_html = false;
@@ -933,36 +982,59 @@ class fw {
 
 //Helper/debug functions - TODO move to fw or Utils class?
 
-//get some value from $_REQUEST
-//TODO? make support of infinite []
-function _req(string $name) {
+/**
+ * get some value from $_REQUEST
+ * if name contains [key][key2] - return value from $_REQUEST[name][key][key2]
+ * if request doesn't contain such key - return default value
+ * TODO? make support of infinite []
+ * @param string $name
+ * @param mixed $default
+ * @return mixed|string
+ */
+function _req(string $name, mixed $default = ''): mixed {
     if (preg_match('/^(.+?)\[(.+?)]/', $name, $m)) {
-        return $_REQUEST[$m[1]][$m[2]] ?? '';
+        return $_REQUEST[$m[1]][$m[2]] ?? $default;
     } else {
-        return $_REQUEST[$name] ?? '';
+        return $_REQUEST[$name] ?? $default;
     }
 }
 
-//get integer value from $_REQUEST
-//return 0
-function reqi(string $name): int {
-    return intval(_req($name));
+/**
+ * get integer value from $_REQUEST
+ * @param string $name
+ * @param int $default
+ * @return int value from request or default
+ */
+function reqi(string $name, int $default = 0): int {
+    return intval(_req($name, $default));
 }
 
-//get string value from $_REQUEST
-//return 0
-function reqs(string $name): string {
-    return _req($name) . '';
+/**
+ * get string value from $_REQUEST
+ * @param string $name
+ * @param string $default
+ * @return string
+ */
+function reqs(string $name, string $default = ''): string {
+    return _req($name, $default) . '';
 }
 
-//shortcut to $_REQUEST[$name]
-//return value from request
-function req(string $name) {
-    return @$_REQUEST[$name];
+/**
+ * get value from $_REQUEST
+ * @param string $name
+ * @param mixed $default
+ * @return mixed
+ */
+function req(string $name, mixed $default = ''): mixed {
+    return @$_REQUEST[$name] ?? $default;
 }
 
-//return hash/array from request (if no such param or not array - returns empty array)
-function reqh(string $name) {
+/**
+ * get array value from $_REQUEST
+ * @param string $name
+ * @return array value from request or empty array
+ */
+function reqh(string $name): array {
     $h = $_REQUEST[$name] ?? [];
     if (!is_array($h)) {
         $h = array();
@@ -971,9 +1043,14 @@ function reqh(string $name) {
     return $h;
 }
 
-// return date (timestamp seconds) from request
-function reqd(string $name): int {
-    $date = reqs($name);
+/**
+ * get date value (timestamp seconds) from $_REQUEST
+ * @param string $name
+ * @param string $default
+ * @return int
+ */
+function reqd(string $name, string $default = ''): int {
+    $date = reqs($name, $default);
     if ($date) {
         $date = strtotime($date);
     }
@@ -981,22 +1058,28 @@ function reqd(string $name): int {
     return intval($date);
 }
 
-//get bool value from $_REQUEST
-// true only if "true" or 1 passed
-//return bool
-function reqb($name): bool {
-    $value = reqs($name);
-    if ($value == "true" || $value == 1) {
+/**
+ * get bool value from $_REQUEST
+ * @param string $name
+ * @param bool $default
+ * @return bool true only if "true" or 1 passed
+ */
+function reqb(string $name, bool $default = false): bool {
+    $value = _req($name, $default);
+    if ($value === true || $value == "true" || $value == 1) {
         return true;
     } else {
         return false;
     }
 }
 
-//get decoded json array from $_REQUEST
-//return array
-function reqjson($name) {
-    $result = json_decode(reqs($name), true) ?? [];
+function reqjson(string $name): array {
+    $value = _req($name, []);
+    if (is_array($value)) {
+        return $value; #if already array - return as is (possible with posted json)
+    }
+
+    $result = json_decode($value, true) ?? [];
     if (!is_array($result)) {
         $result = [];
     }
@@ -1036,13 +1119,14 @@ function logger(): void {
     $arr      = debug_backtrace(); #0-logger(),1-func called logger,...
     $func     = ($arr[1] ?? '');
     $function = $func['function'] ?? '';
-    $line     = $arr[1]['line'];
+    $line     = $arr[1]['line'] ?? '';
+    $file     = $func['file'] ?? '';
 
     //remove unnecessary site_root_offline path
-    $func['file'] = str_replace(strtolower($CONFIG['SITE_ROOT']), "", strtolower($func['file']));
+    $file = str_replace(strtolower($CONFIG['SITE_ROOT']), "", strtolower($file));
 
     $date   = new DateTime();
-    $strlog = $date->format("Y-m-d H:i:s.v") . ' ' . getmypid() . ' ' . $logtype . ' ' . $func['file'] . '::' . $function . '(' . $line . ') ';
+    $strlog = $date->format("Y-m-d H:i:s.v") . ' ' . getmypid() . ' ' . $logtype . ' ' . $file . '::' . $function . '(' . $line . ') ';
     foreach ($args as $str) {
         if (is_scalar($str)) {
             $strlog .= $str;

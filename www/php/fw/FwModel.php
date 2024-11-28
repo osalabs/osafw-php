@@ -32,6 +32,9 @@ abstract class FwModel {
     public string $field_prio = '';
     public bool $is_normalize_names = false; // if true - Utils.name2fw() will be called for all fetched rows to normalize names (no spaces or special chars)
 
+    // default list of sensitive fields to filter out from json output
+    public string $json_fields_exclude = "pwd password pwd_reset mfa_secret mfa_recovery";
+
     public bool $is_log_changes = true; // if true - event_log record added on add/update/delete
     public bool $is_log_fields_changed = true; // if true - event_log.fields filled with changes
     public bool $is_under_bulk_update = false; // true when perform bulk updates like modelAddOrUpdateSubtableDynamic (disables log changes for status)
@@ -130,7 +133,7 @@ abstract class FwModel {
         }
 
         $cache_key = $this->cache_prefix . $id;
-        $row       = FwCache::getValue($cache_key);
+        $row       = $this->fw->cache->getRequestValue($cache_key);
         if (is_null($row)) {
             $row = $this->db->row($this->getTable(), [$this->field_id => $id]);
             $this->normalizeNames($row);
@@ -159,11 +162,11 @@ abstract class FwModel {
 
     public function oneByIcode(string $icode): array {
         $cache_key = $this->cache_prefix_bycode . $icode;
-        $row       = FwCache::getValue($cache_key);
+        $row       = $this->fw->cache->getRequestValue($cache_key);
         if (is_null($row)) {
             $row = $this->db->row($this->getTable(), [$this->field_icode => $icode]);
             $this->normalizeNames($row);
-            FwCache::setValue($cache_key, $row);
+            $this->fw->cache->setRequestValue($cache_key, $row);
 
             #also save to cache by id
             if ($row) {
@@ -187,6 +190,20 @@ abstract class FwModel {
     # list multiple records by multiple ids
     public function listMulti(array $ids): array {
         return $this->db->arrp("SELECT * from {$this->qTable()} where " . $this->db->qid($this->field_id) . $this->db->insql($ids));
+    }
+
+    /**
+     * list records by where condition optionally limited and ordered
+     * @param array $where
+     * @param int $limit
+     * @param int $offset
+     * @param string $orderby
+     * @return array
+     * @throws DBException
+     */
+    public function listByWhere(array $where = [], int $limit = 0, int $offset = 0, string $orderby = ''): array {
+        $limit_str = $limit ? "$limit OFFSET $offset" : '';
+        return $this->db->arr($this->table_name, $where, $orderby ?: $this->getOrderBy(), $limit_str);
     }
 
     // add renamed fields For template engine - spaces and special chars replaced With "_" and other normalizations
@@ -376,6 +393,10 @@ abstract class FwModel {
      * @throws DBException
      */
     public function update(int $id, array $item): bool {
+        if (!$item) {
+            return false; #nothing to update
+        }
+
         $item_changes = [];
         if ($this->is_log_changes) {
             $item_old     = $this->one($id);
@@ -469,26 +490,26 @@ abstract class FwModel {
     //<editor-fold desc="cache">
     public function saveCache($id, $row): void {
         $cache_key = $this->cache_prefix . $id;
-        FwCache::setValue($cache_key, $row);
+        $this->fw->cache->setRequestValue($cache_key, $row);
     }
 
     //remove from cache - can be called from outside model if model table updated
     public function removeCache($id): void {
         $cache_key = $this->cache_prefix . $id;
-        FwCache::remove($cache_key);
+        $this->fw->cache->removeRequest($cache_key);
 
         if ($this->field_icode > '') {
             #we need to cleanup all cache keys which might be related, so cleanup all cached icodes
-            FwCache::removeWithPrefix($this->cache_prefix_bycode);
+            $this->fw->cache->removeRequestWithPrefix($this->cache_prefix_bycode);
         }
     }
 
     //remove all cached rows for the table
     public function removeCacheAll(): void {
-        FwCache::removeWithPrefix($this->cache_prefix);
+        $this->fw->cache->removeRequestWithPrefix($this->cache_prefix);
 
         if ($this->field_icode > '') {
-            FwCache::removeWithPrefix($this->cache_prefix_bycode);
+            $this->fw->cache->removeRequestWithPrefix($this->cache_prefix_bycode);
         }
     }
 
@@ -1233,6 +1254,102 @@ abstract class FwModel {
 
     //</editor-fold>
 
+    //<editor-fold desc="frontend(json) output support and export">
+
+    /**
+     * fetch one record and prepare for json output
+     * @param int $accounts_id
+     * @param array $options
+     * @return array
+     */
+    public function oneForJson(int $accounts_id, array $options = []): array {
+        $item = $this->one($accounts_id);
+        return $this->filterForJson($item);
+    }
+
+    /**
+     * to filter item for json output - remove sensitive fields, add calculated fields, etc
+     * @param array $item
+     * @return array
+     */
+    public function filterForJson(array $item): array {
+        $result = [];
+
+        //first, remove sensitive fields
+        $hfields_exclude = Utils::qh($this->json_fields_exclude);
+        foreach ($item as $key => $value) {
+            if (!array_key_exists($key, $hfields_exclude)) {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
+        //TODO then perform necessary transformations
+        //        $table_schema = $this->getTableSchema();
+        //        //iterate over item.Keys, but make it static array to avoid "collection was modified" error
+        //        $keys = array_keys($item);
+        //        foreach ($keys as $fieldname) {
+        //            $fieldname_lc = strtolower($fieldname);
+        //            if (!array_key_exists($fieldname_lc, $table_schema)) {
+        //                continue;
+        //            }
+        //
+        //            $field_schema = $table_schema[$fieldname_lc];
+        //
+        //            $fw_type    = $field_schema["fw_type"];
+        //            $fw_subtype = $field_schema["fw_subtype"];
+        //            if ($fw_subtype == "date") {
+        //                //if field is exactly DATE - show only date part without time - in YYYY-MM-DD format
+        //                $item[$fieldname] = DateUtils::str2SQL($item[$fieldname]);
+        //            } elseif ($fw_type == "datetime") {
+        //                //if field is exactly DATETIME - show in YYYY-MM-DD HH:MM:SS format
+        //                $item[$fieldname] = DateUtils::str2SQL($item[$fieldname], true);
+        //            } elseif ($fw_subtype == "bit") {
+        //                //if field is exactly BIT - convert from True/False to 1/0
+        //                $item[$fieldname] = Utils::f2bool($item[$fieldname]) ? 1 : 0;
+        //            }
+        //            // ADD OTHER CONVERSIONS HERE if necessary
+        //        }
+
+    }
+
+    /**
+     * filter list of items for json output
+     * @param array $rows
+     * @return array
+     */
+    public function filterListForJson(array $rows): array {
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = $this->filterForJson($row);
+        }
+        return $result;
+    }
+
+    /**
+     * filter list of items for json output for list options, leave only keys:
+     *  id, iname, is_checked (if exists), prio (if exists)
+     * @param array $rows list of arrays
+     * @return array
+     */
+    public function filterListOptionsForJson(array $rows): array {
+        $result = [];
+        foreach ($rows as $row) {
+            $item = [
+                $this->field_id    => $row[$this->field_id],
+                $this->field_iname => $row[$this->field_iname],
+            ];
+            if (array_key_exists("is_checked", $row)) {
+                $item["is_checked"] = $row["is_checked"];
+            }
+            if (array_key_exists($this->field_prio, $row)) {
+                $item[$this->field_prio] = $row[$this->field_prio];
+            }
+            $result[] = $item;
+        }
+        return $result;
+    }
+
     /**
      * fetch all active records and export to CSV with csv_export_fields and Utils::exportCSV
      * @return void
@@ -1247,5 +1364,7 @@ abstract class FwModel {
         $rows = $this->db->arr($this->table_name, $where);
         Utils::exportCSV($rows, $this->csv_export_fields);
     }
+
+    //</editor-fold>
 
 } //end of class

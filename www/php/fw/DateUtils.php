@@ -139,8 +139,22 @@ class DateUtils {
         return $dt->format(self::$DATE_FORMAT_STR);
     }
 
+    /**
+     * return datetime in ISO 8601 format YYYY-MM-DDTHH:MM:SSZ (UTC timezone) from any format
+     * example: 2024-09-26T15:32:58Z
+     * @param mixed $date DateTime OR string in SQL format OR unix timestamp
+     * @return string|null return null if date is not valid
+     */
+    public static function date2iso(mixed $date): ?string {
+        $dt = self::f2date($date);
+        return $dt?->format('c');
+    }
+
     // from date string to YYYY-MM-DD
-    public static function Str2SQL($s): string {
+    public static function Str2SQL($s): ?string {
+        if (is_null($s)) {
+            return null; #keep passed null as is, so it will go to db as NULL
+        }
         if (!strlen($s)) {
             return '';
         }
@@ -155,6 +169,11 @@ class DateUtils {
         }
 
         return "$year-$month-$day";
+    }
+
+    public static function Str2Unix($str): int {
+        $dt = new \DateTime(strval($str));
+        return $dt->getTimestamp();
     }
 
     /**
@@ -252,11 +271,11 @@ class DateUtils {
 
     /**
      * return true if datetime(in sql format) earlier than now-$seconds
-     * @param string $sql_datetime YYYY-MM-DD HH:MM:SS
+     * @param string|null $sql_datetime YYYY-MM-DD HH:MM:SS
      * @param int $seconds
      * @return boolean
      */
-    public static function isSQLExpired(string $sql_datetime, int $seconds): bool {
+    public static function isSQLExpired(?string $sql_datetime, int $seconds): bool {
         return self::isExpired(self::SQL2Unix($sql_datetime), $seconds);
     }
 

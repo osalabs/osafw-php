@@ -19,6 +19,8 @@ class FwHooks {
 
         if (!$fw->isOffline()) {
 
+            session_start(); #session starts only here
+
             #permanent login support
             if (!$fw->userId()) {
                 Users::i()->checkPermanentLogin();

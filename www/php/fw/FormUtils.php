@@ -94,6 +94,26 @@ class FormUtils {
         }
     }
 
+    /**
+     * remap key names in $fields according to mappings
+     * @param array $fields [oldname => value]
+     * @param array $mappings [oldname => newname, oldname => true(if no name change)]
+     * @return array [newname => value]
+     */
+    public static function fieldsReMap(array $fields, array $mappings): array {
+        $result = [];
+        foreach ($fields as $name => $value) {
+            $name_replace = $mappings[$name];
+            if (is_string($name_replace)) {
+                $result[$name_replace] = $value;
+            } else {
+                $result[$name] = $value;
+            }
+        }
+        return $result;
+    }
+
+
     #RETURN: array of pages for pagination
     public static function getPager($count, $pagenum, $pagesize = NULL) {
         if (is_null($pagesize)) {
@@ -191,9 +211,6 @@ class FormUtils {
      */
     public static function selectTplName(string $tpl_path, string $sel_id): string {
         $result = "";
-        if (!$sel_id) {
-            $sel_id = '';
-        }
 
         $lines = file(fw::i()->config->SITE_TEMPLATES . $tpl_path);
         foreach ($lines as $line) {
@@ -213,7 +230,6 @@ class FormUtils {
 
         return $result;
     }
-
 
     public static function selectTplOptions($tpl_path): array {
         $result = array();

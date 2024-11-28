@@ -17,7 +17,7 @@
        $_REQUEST['q']=b64e('SHOW TABLE STATUS');
     }
  }else{
-    #$ACCESS_PWD=''; #set Access password here to enable access to database as non-logged admin
+    $ACCESS_PWD='321'; #set Access password here to enable access to database as non-logged admin
     if (!$ACCESS_PWD){
         rw("Set \$ACCESS_PWD or login to site as an Administrator");
         exit;

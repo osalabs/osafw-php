@@ -21,7 +21,7 @@ class FwEntities extends FwModel {
     //find record by icode, if not exists - add, return id (existing or newly added)
     public function idByIcodeOrAdd(string $icode): int {
         $row = $this->oneByIcode($icode);
-        $id  = intval($row[$this->field_id]);
+        $id  = intval($row[$this->field_id] ?? 0);
         if (!$id) {
             $id = $this->add([
                 'icode' => $icode,

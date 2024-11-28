@@ -103,10 +103,15 @@ class Utils {
     /**
      * leave just allowed chars in string - for routers: controller, action
      * @param string $str raw name of the controller or action
+     * @param bool $is_strict if true only A-Za-z0-9_ chars allowed, if false - also allows "-"
      * @return string normalized name with only allowed chars
      */
-    public static function routeFixChars(string $str): string {
-        return preg_replace("/[^A-Za-z0-9_-]+/", "", $str);
+    public static function routeFixChars(string $str, $is_strict = false): string {
+        if ($is_strict) {
+            return preg_replace("/[^A-Za-z0-9_]+/", "", $str);
+        } else {
+            return preg_replace("/[^A-Za-z0-9_-]+/", "", $str);
+        }
     }
 
     /**
@@ -270,7 +275,7 @@ class Utils {
         $result = '';
 
         foreach ($fields as $fld) {
-            $str = $row[$fld];
+            $str = strval($row[$fld]);
             if (preg_match('/[^\x20-\x7f]/', $str)) {
                 //non-ascii data - convert to hex
                 $str = bin2hex($str);
@@ -912,11 +917,28 @@ class Utils {
 
     /**
      * return parsed json from the POST request
-     * @return array json or FALSE
+     * @return array json or empty array
      */
     public static function getPostedJson(): array {
-        $raw = file_get_contents("php://input");
-        return json_decode($raw, true);
+        $raw    = file_get_contents("php://input");
+        $result = json_decode($raw, true);
+        if (!is_array($result)) {
+            $result = [];
+        }
+        return $result;
+    }
+
+    /**
+     * read posted json and add keys to $_REQUEST
+     * @return array json or empty array
+     */
+    public static function parsePostedJson(): array {
+        $json = self::getPostedJson();
+        foreach ($json as $key => $value) {
+            $_REQUEST[$key] = $value;
+        }
+        logger("TRACE", "REQUEST with Posted Json:", $_REQUEST);
+        return $json;
     }
 
     /**

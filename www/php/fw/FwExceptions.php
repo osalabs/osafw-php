@@ -10,12 +10,18 @@ class UserException extends ApplicationException {
 
 #Validation is even more specific User exception, used for form input validations
 class ValidationException extends UserException {
+    public function __construct($msg = '', $code = 400) {
+        parent::__construct($msg, $code);
+    }
 }
 
 class ExitException extends Exception {
 }
 
 class AuthException extends Exception {
+    public function __construct($msg = 'Authentication failure', $code = 401) {
+        parent::__construct($msg, $code);
+    }
 }
 
 class NoClassException extends Exception {

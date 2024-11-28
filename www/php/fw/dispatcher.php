@@ -26,7 +26,6 @@ $ROUTES = array(
 Dispatcher::go($ROUTES);
 
 
-
 RESTful interface:
 GET   /controller                 Index
 POST  /controller                 Save     (save new record - Create)
@@ -36,14 +35,17 @@ GET   /controller/{id}[.format]   Show     (show in format - not for editing)
 GET   /controller/{id}/edit       ShowForm (show edit form - ShowEdit)
 GET   /controller/{id}/delete     ShowDelete
 POST/PUT  /controller/{id}        Save     (save changes to exisitng record - Update    Note:$_POST should contain data
-POST/DELETE  /controller/{id}     Delete    Note:$_POST should NOT contain any data
+DELETE  /controller/{id}          Delete   (alternative: POST with _method=DELETE)
 
 /controller/(Action)              Action    call for arbitrary action from the controller
+/controller/Action                Action    call for arbitrary action from the controller, action name should be less than 32 chars
+
+id - record id (numeric or UUID - at least 32 chars no dashes)
 
  */
 
 class Dispatcher {
-    public static array $METHOD_ALLOWED = array(
+    public const array METHOD_ALLOWED = array(
         'GET'    => true,
         'POST'   => true,
         'PUT'    => true,
@@ -51,20 +53,20 @@ class Dispatcher {
     );
 
     # public static $table_name = '';
-    public static array $REST2METHOD_MAP = array(
-        'view'        => 'Show',
-        'create'      => 'Save',
-        'update'      => 'Save',
-        'updatemulti' => 'SaveMulti',
-        'delete'      => 'Delete',
-        'showdelete'  => 'ShowDelete',
-        'list'        => 'Index',
-        'new'         => 'ShowForm',
-        'edit'        => 'ShowForm',
-        'options'     => 'Options',
+    public const array REST2METHOD_MAP = array(
+        'view'        => FW::ACTION_SHOW,
+        'create'      => FW::ACTION_SAVE,
+        'update'      => FW::ACTION_SAVE,
+        'updatemulti' => FW::ACTION_SAVE_MULTI,
+        'delete'      => FW::ACTION_DELETE,
+        'showdelete'  => FW::ACTION_SHOW_DELETE,
+        'list'        => FW::ACTION_INDEX,
+        'new'         => FW::ACTION_SHOW_FORM,
+        'edit'        => FW::ACTION_SHOW_FORM,
+        'options'     => FW::ACTION_OPTIONS,
     );
 
-    public static array $HTTP_CODE = array(
+    public const array HTTP_CODE = array(
         401 => 'Unauthorized',
         403 => 'Forbidden',
         404 => 'Not Found',
@@ -171,7 +173,7 @@ class Dispatcher {
         if (!$controller) {
             #TODO - global
         } elseif (!$action) {
-            $action = "Index";
+            $action = FW::ACTION_INDEX;
         }
 
         return array($controller, $action);
@@ -215,11 +217,7 @@ class Dispatcher {
             }
         } elseif ($method == 'POST') {
             if ($id > '') {
-                if (count($_POST) > 0) {
-                    $result = 'update';
-                } else {
-                    $result = 'delete';
-                }
+                $result = 'update';
             } else {
                 $result = 'create';
             }
@@ -264,8 +262,6 @@ class Dispatcher {
     public function uriToRoute(string $method, string $uri, array $ROUTES): stdClass {
         $root_url = $this->ROOT_URL;
 
-        $result = array();
-
         if ($root_url) {
             $uri = preg_replace("/^" . preg_quote($root_url, '/') . "/", '', $uri); #remove root_url if any
         }
@@ -275,9 +271,9 @@ class Dispatcher {
         $uri               = str_replace(["%28", "%29"], ["(", ")"], $uri); # mobile chrome posts urls like /xxx/(Save) to /xxx/%28Save%29 for some reason, need to un-escape
         $this->request_url = $uri;
 
-        #check if method override exits
+        #check if method override exists
         $tmp_method_check = $_POST['_method'] ?? '';
-        if ($tmp_method_check > '' && array_key_exists($tmp_method_check, $this::$METHOD_ALLOWED)) {
+        if ($tmp_method_check > '' && array_key_exists($tmp_method_check, self::METHOD_ALLOWED)) {
             $method = $tmp_method_check;
         }
 
@@ -286,14 +282,14 @@ class Dispatcher {
         foreach ($this->ROUTE_PREFIXES as $prefix) {
             $qprefix = preg_quote($prefix, '/');
             if (preg_match('/^' . $qprefix . '/i', $uri)) {
-                $controller_prefix = Utils::routeFixChars($prefix);
-                $uri               = preg_replace('/^' . $qprefix . '/', '', $uri);
+                $controller_prefix = Utils::routeFixChars($prefix, true);
+                $uri               = preg_replace('/^' . $qprefix . '/i', '', $uri);
                 break;
             }
         }
 
         $cur_controller  = 'Home';
-        $cur_action      = 'Index';
+        $cur_action      = FW::ACTION_INDEX;
         $cur_id          = '';
         $cur_action_more = '';
         $cur_format      = 'html';
@@ -326,17 +322,16 @@ class Dispatcher {
         if (!$is_route_found) {
             #if no special ROUTES found - try to detect default RESTful URLs
             $RX_CONTROLLER = '[^/]+';
-            $RX_ACTION     = '[\d\w_-]+';
+            $RX_ID         = '\d+|[\w_]{32,}'; // Match numeric IDs or UUID-like IDs (at least 32 chars, no dashes). I.e. custom action names should be less than 32 chars
 
             #get RESTful URI
-            $is_match = preg_match("!^/($RX_CONTROLLER)(?:/(new|\.\w+)|/($RX_ACTION)(?:\.(\w+))?(?:/(edit|delete))?)?/?$!i", $uri, $m); #one controller only, id is "Alphanum_-"
+            $is_match = preg_match("!^/($RX_CONTROLLER)(?:/(new|\.\w+)|/($RX_ID)(?:\.(\w+))?(?:/(edit|delete))?)?/?$!i", $uri, $m);
 
             #logger('TRACE', "$method $uri => REST is_match=$is_match");
             #logger($m);
 
             if ($is_match) {
-                #foreach ($m[0] as $vv) { #go thru resourses
-                $cur_controller = Utils::routeFixChars($m[1]);
+                $cur_controller = Utils::routeFixChars($m[1], true);
                 if (!strlen($cur_controller)) {
                     throw new Exception("Wrong request", 1);
                 }
@@ -349,15 +344,15 @@ class Dispatcher {
 
                 $tmp_check_suffix = $m[2] ?? ''; #could contain "new" or ".format"
                 if ($tmp_check_suffix > '') {
-                    if ($tmp_check_suffix == 'new') {
-                        $cur_action_more = 'new';
+                    if ($tmp_check_suffix == FW::ACTION_MORE_NEW) {
+                        $cur_action_more = FW::ACTION_MORE_NEW;
                     } else {
                         $cur_format = substr($tmp_check_suffix, 1);
                     }
                 }
 
                 $rest_oper  = $this->detectOperation($method, $cur_id, $cur_action_more);
-                $cur_action = self::$REST2METHOD_MAP[$rest_oper];
+                $cur_action = self::REST2METHOD_MAP[$rest_oper];
 
                 #check if there is mapping module => class present and replace dest class
                 if (array_key_exists($cur_controller, $ROUTES)) {
@@ -372,7 +367,12 @@ class Dispatcher {
                     $cur_action      = $arr[2] ?? '';
                     $cur_id          = $arr[3] ?? '';
                     $cur_action_more = $arr[4] ?? '';
-                    $cur_controller  = Utils::routeFixChars($cur_controller);
+                    $cur_controller  = Utils::routeFixChars($cur_controller, true);
+
+                    #special case for OPTIONS request -> always call Options method
+                    if ($method == 'OPTIONS') {
+                        $cur_action = FW::ACTION_OPTIONS;
+                    }
                 }
 
                 #call default method $ROUTES['']
@@ -382,9 +382,9 @@ class Dispatcher {
         }
 
         $cur_controller = $controller_prefix . $cur_controller;
-        $cur_action     = Utils::routeFixChars($cur_action);
+        $cur_action     = Utils::routeFixChars($cur_action, true);
         if (!strlen($cur_action)) {
-            $cur_action = 'Index';
+            $cur_action = FW::ACTION_INDEX;
         }
 
         array_unshift($cur_aparams, $cur_id); #first param always is id
@@ -402,4 +402,5 @@ class Dispatcher {
         logger('TRACE', 'ROUTER RESULT=', $result);
         return $result;
     }
+
 }

@@ -15,24 +15,29 @@ class FwApiController extends FwController {
     protected string $http_origin = '';
     protected ?object $jwt_payload = null; #decoded JWT payload
 
-    public function __construct() {
+    protected array $posted_json = []; #original JSON from POST request body
+
+    public function __construct($is_auth = true) {
+        $this->posted_json = Utils::parsePostedJson(); #API always parse posted JSON (if any) and it add to $_REQUEST
+
         parent::__construct();
 
-        #$this->http_origin = $_SERVER['HTTP_ORIGIN']; #use this if API consumed by external sites
-        $this->http_origin = $this->fw->config->ROOT_DOMAIN; #use this if API consumed by the same site only
-
-        if ($this->fw->route->method != 'OPTIONS') {
-            $this->prepare(true); #auth+set headers
-        }
-
+        $this->prepare($is_auth);
     }
 
     /**
-     * Prepare API call - set headers and auth
+     * Prepare API call - set http_origin, headers and auth (except OPTIONS request)
      * @param bool $is_auth - if true - also check auth
      * @throws AuthException
      */
     protected function prepare(bool $is_auth = true): void {
+        #$this->http_origin = $_SERVER['HTTP_ORIGIN'] ?? '*'; #use this if API consumed by external sites
+        $this->http_origin = $this->fw->config->ROOT_DOMAIN; #use this if API consumed by the same site only
+
+        if ($this->fw->route->method == 'OPTIONS') {
+            return;
+        }
+
         $this->setHeaders();
 
         if ($is_auth) {
@@ -55,8 +60,8 @@ class FwApiController extends FwController {
      */
     protected function setHeadersOptions(): void {
         header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-        header("Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization");
-        #header("Access-Control-Allow-Headers: Access-Control-Allow-Headers, Origin,Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
+        #header("Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization");
+        header("Access-Control-Allow-Headers: Access-Control-Allow-Headers, Origin, Authorization, Accept, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers");
         #header("Access-Control-Max-Age: 86400");
     }
 
@@ -214,15 +219,12 @@ class FwApiController extends FwController {
     //sample API method /Api/SomeController/(Test)/$form_id
     // public function TestAction($form_id = '') {
     //     $id = intval($form_id);
-    //     $ps = array(
-    //         'success' => true,
-    //     );
+    //     $ps = [];
 
     //     try {
     //         //do something
     //     } catch (Exception $ex) {
-    //         $ps['success'] = false;
-    //         $ps['err_msg'] = $ex->getMessage();
+    //         $ps['error'] = [ 'message' => $ex->getMessage() ];
     //     }
 
     //     return ['_json' => $ps];

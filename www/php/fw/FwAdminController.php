@@ -32,7 +32,7 @@ class FwAdminController extends FwController {
         parent::__construct();
 
         //optionally init controller
-        $this->list_view = $this->model0->table_name ?? '';
+        $this->list_view = $this->model->table_name ?? '';
     }
 
     public function IndexAction(): ?array {
@@ -62,7 +62,7 @@ class FwAdminController extends FwController {
 
     public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
-        $item = $this->model0->one($id);
+        $item = $this->model->one($id);
         if (!$item) {
             throw new ApplicationException("Not Found", 404);
         }
@@ -93,13 +93,13 @@ class FwAdminController extends FwController {
 
         if ($this->isGet()) {
             if ($id > 0) {
-                $item = $this->model0->one($id);
+                $item = $this->model->one($id);
             } else {
                 # override any defaults here
                 $item = array_merge($item, $this->form_new_defaults);
             }
         } else {
-            $itemdb = $this->model0->one($id);
+            $itemdb = $this->model->one($id);
             $item   = array_merge($itemdb, $item);
         }
 
@@ -161,7 +161,7 @@ class FwAdminController extends FwController {
 
         $id = intval($form_id);
         $ps = array(
-            'i'          => $this->model0->one($id),
+            'i'          => $this->model->one($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
             'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates
@@ -174,7 +174,7 @@ class FwAdminController extends FwController {
 
     public function DeleteAction($form_id): ?array {
         $id = intval($form_id);
-        $this->model0->deleteWithPermanentCheck($id);
+        $this->model->deleteWithPermanentCheck($id);
 
         $this->fw->flash("onedelete", 1);
         return $this->afterSave(true);
@@ -201,7 +201,7 @@ class FwAdminController extends FwController {
         $ctr = 0;
         foreach ($acb as $id => $value) {
             if ($is_delete) {
-                $this->model0->deleteWithPermanentCheck($id);
+                $this->model->deleteWithPermanentCheck($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
                 UserLists::i()->addItemList($user_lists_id, $id);
