@@ -7,13 +7,24 @@
 
 */
 
+#for command line scripts - override host (must contain "verified.email") from arg OR use path for staging/develop
+$_dirname = dirname(__FILE__);
+if (PHP_SAPI === 'cli') {
+    if (isset($argv[1]) && filter_var($argv[1], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+        $_SERVER['HTTP_HOST'] = $argv[1];
+    } elseif (str_contains($_dirname, "staging")) {
+        $_SERVER['HTTP_HOST'] = "staging.example.com"; #TODO set your staging domain here, so cli scripts run withing directory will use this domain
+    } elseif (str_contains($_dirname, "develop")) {
+        $_SERVER['HTTP_HOST'] = "develop.example.com"; #TODO set your develop domain here, so cli scripts run withing directory will use this domain
+    }
+}
 ######### set all variables to defaults with detection of base dirs
-$site_root         = preg_replace("![\\\/]\w+$!i", "", dirname(__FILE__));
-$site_root_offline = preg_replace("![\\\/]\w+$!i", "", $site_root);
+$site_root         = dirname(dirname(dirname(__FILE__)));# level up as we are under /configs dir
+$site_root_offline = dirname($site_root);
 
 #!note, these will be empty if script run from command line
 # X-forwarded are for the load balancer setup.
-if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') == "https")) {
+if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? 0) == 443 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') == "https")) {
     $proto = 'https';
 } else {
     $proto = 'http';
@@ -88,10 +99,15 @@ $FW_CONFIG = array(
         '/Admin',
         '/My',
         '/Dev',
+        '/v1', #API version 1
+    ),
+    #prefixes without XSS check (without slash)
+    'NO_XSS_PREFIXES'       => array(
+        'v1' => true, # no need to check for API
     ),
     #Controllers without need for XSS check
     'NO_XSS'                => array(
-        'Login',
+        'Login' => true,
     ),
     #Allowed Access levels for Controllers
     #if set here - overrides Controller::access_level
@@ -115,19 +131,34 @@ $FW_CONFIG = array(
     'PDF_CONVERTER' => '"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"', #(optional) path to html to pdf converter for reports, if empty - try to use Dompdf
 
     ########### place site specific configuration variables here:
-    'SITE_VERSION'  => '0.23.1107', #also used to re-load css/js to avoid browser caching
+    'SITE_VERSION'  => '0.24.1121', #also used to re-load css/js to avoid browser caching
     'SITE_NAME'     => 'Site Name',
     'SITE_VAR'      => false,
 );
 
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_secure', 1);
+
 #load $SITE_CONFIG config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
-$conf_server_name = str_replace(':', '_', strtolower($_SERVER['HTTP_HOST']));
-if (!include_once('config.' . $conf_server_name . '.php')) {
-    #if no config exists for the domain - use site config
-    $conf_server_name = 'site';
-    include_once('config.' . $conf_server_name . '.php');
+$conf_server_name = str_replace(':', '_', strtolower($root_domain0));
+if (include_once('config.' . $conf_server_name . '.php')) {
+    #set loaded config name
+    $overrides['loaded_config'] = $conf_server_name;
 }
-$CONFIG = array_merge($FW_CONFIG, $SITE_CONFIG);
+$CONFIG = array_replace_recursive($FW_CONFIG, $SITE_CONFIG);
+
+if (!empty($CONFIG['site_error_log'])) {
+    ini_set("log_errors", 1);
+    ini_set("error_log", $CONFIG['site_error_log']);
+} else {
+    if (!empty($CONFIG['php_error_log'])) {
+        ini_set("log_errors", 1);
+        ini_set("error_log", $CONFIG['php_error_log']);
+        ini_set("log_errors_max_len", 0);
+    } else {
+        ini_set("log_errors", 0);
+    }
+}
 
 /*
 echo "conf_server_name=$conf_server_name<br>";
