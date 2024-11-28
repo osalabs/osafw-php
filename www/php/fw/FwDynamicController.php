@@ -141,7 +141,7 @@ class FwDynamicController extends FwController {
 
     public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
-        $item = $this->model0->one($id);
+        $item = $this->model->one($id);
         if (!$item) {
             throw new ApplicationException("Not Found", 404);
         }
@@ -173,8 +173,8 @@ class FwDynamicController extends FwController {
 
             $this->list_filter["tab_activity"] = reqs("tab_activity") ?? FwActivityLogs::TAB_COMMENTS;
             $ps["list_filter"]                 = $this->list_filter;
-            $ps["activity_entity"]             = $this->model0->table_name;
-            $ps["activity_rows"]               = FwActivityLogs::i()->listByEntityForUI($this->model0->table_name, $id, $this->list_filter["tab_activity"]);
+            $ps["activity_entity"]             = $this->model->table_name;
+            $ps["activity_rows"]               = FwActivityLogs::i()->listByEntityForUI($this->model->table_name, $id, $this->list_filter["tab_activity"]);
         }
 
         return $ps;
@@ -186,13 +186,13 @@ class FwDynamicController extends FwController {
 
         if ($this->isGet()) {
             if ($id > 0) {
-                $item = $this->model0->one($id);
+                $item = $this->model->one($id);
             } else {
                 #defaults
                 $item = array_merge($item, $this->form_new_defaults);
             }
         } else {
-            $itemdb = $id ? $this->model0->one($id) : array();
+            $itemdb = $id ? $this->model->one($id) : array();
             $item   = array_merge($itemdb, $item);
         }
 
@@ -283,7 +283,7 @@ class FwDynamicController extends FwController {
             $fields = $this->config["showform_fields"];
             $req    = array();
             foreach ($fields as $def) {
-                if ($def['required']) {
+                if ($def['required'] ?? false) {
                     $req[] = $def['field'];
                 }
             }
@@ -314,7 +314,7 @@ class FwDynamicController extends FwController {
             if ($type == "subtable_edit") {
                 //validate subtable rows
                 $model_name = $def['model'];
-                $sub_model  = fw::model($model_name);
+                $sub_model  = $this->getModelWithRelated($model_name);
 
                 $save_fields            = $def['required_fields'] ?? '';
                 $save_fields_checkboxes = $def['save_fields_checkboxes'];
@@ -358,11 +358,11 @@ class FwDynamicController extends FwController {
                 }
             } else {
                 // other types - use "validate" field
-                $val = Utils::qh($def["validate"]);
+                $val = Utils::qh($def["validate"] ?? '');
                 if (count($val) > 0) {
                     $field_value = $item[$field] ?? '';
 
-                    if (array_key_exists('exists', $val) && $this->model0->isExists($field_value, $id)) {
+                    if (array_key_exists('exists', $val) && $this->model->isExists($field_value, $id)) {
                         $this->setError($field, 'EXISTS');
                         $result = false;
                     }
@@ -427,7 +427,7 @@ class FwDynamicController extends FwController {
 
         $id = intval($form_id);
         $ps = array(
-            'i'          => $this->model0->one($id),
+            'i'          => $this->model->one($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
             'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates
@@ -444,7 +444,7 @@ class FwDynamicController extends FwController {
         $id = intval($form_id);
 
         try {
-            $this->model0->deleteWithPermanentCheck($id);
+            $this->model->deleteWithPermanentCheck($id);
             $this->fw->flash("onedelete", 1);
         } catch (Exception $ex) {
             $msg = $ex->getMessage();
@@ -457,7 +457,7 @@ class FwDynamicController extends FwController {
             return fw::redirect("{$this->base_url}/{$id}/delete");
         }
 
-        $this->model0->delete($id);
+        $this->model->delete($id);
 
         $this->fw->flash("onedelete", 1);
         return $this->afterSave(true);
@@ -467,7 +467,7 @@ class FwDynamicController extends FwController {
         Users::i()->checkReadOnly();
 
         $id = intval($form_id);
-        $this->model0->update($id, [$this->model0->field_status => FwModel::STATUS_ACTIVE]);
+        $this->model->update($id, [$this->model->field_status => FwModel::STATUS_ACTIVE]);
 
         $this->fw->flash("record_updated", 1);
         return $this->afterSave(true, $id);
@@ -495,7 +495,7 @@ class FwDynamicController extends FwController {
         foreach ($acb as $id => $value) {
             $id = intval($id);
             if ($is_delete) {
-                $this->model0->deleteWithPermanentCheck($id);
+                $this->model->deleteWithPermanentCheck($id);
                 $ctr += 1;
             } elseif ($user_lists_id) {
                 UserLists::i()->addItemList($user_lists_id, $id);
@@ -628,7 +628,7 @@ class FwDynamicController extends FwController {
             UserViews::i()->updateByIcodeFields($this->base_url, $fields);
         }
 
-        return $this->afterSave(true, null, false, "no_action", $this->return_url);
+        return $this->afterSave(true, '', false, "no_action", $this->return_url);
     }
 
 
@@ -643,13 +643,22 @@ class FwDynamicController extends FwController {
         $under_id = reqi("under");
         $above_id = reqi("above");
 
-        $success = $this->model0->reorderPrio($sortdir, $id, $under_id, $above_id);
+        $success = $this->model->reorderPrio($sortdir, $id, $under_id, $above_id);
 
         return ['_json' => ['success' => $success]];
     }
 
 
     ###################### HELPERS for dynamic fields
+
+    protected function getModelWithRelated(string $model_name): FwModel {
+        $model = fw::model($model_name);
+        #if $model has setAccount - set it with $this->related_id
+        if (method_exists($model, 'setAccount')) {
+            $model->setAccount($this->related_id);
+        }
+        return $model;
+    }
 
     /**
      * prepare data for fields repeat in ShowAction based on config.json show_fields parameter
@@ -687,31 +696,31 @@ class FwDynamicController extends FwController {
             } elseif ($dtype == "multi") {
                 #complex field
                 if (array_key_exists('lookup_model', $def)) {
-                    $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($field_value, $def);
+                    $def["multi_datarow"] = $this->getModelWithRelated($def["lookup_model"])->listWithChecked($field_value, $def);
                 } else {
                     if ($def["is_by_linked"] ?? false) {
                         #list main items by linked id from junction model (i.e. list of Users(with checked) for Company from UsersCompanies model)
-                        $def["multi_datarow"] = fw::model($def["model"])->listMainByLinkedId($id, $def); #junction model
+                        $def["multi_datarow"] = $this->getModelWithRelated($def["model"])->listMainByLinkedId($id, $def); #junction model
                     } else {
                         #list linked items by main id from junction model (i.e. list of Companies(with checked) for User from UsersCompanies model)
-                        $def["multi_datarow"] = fw::model($def["model"])->listLinkedByMainId($id, $def); #junction model
+                        $def["multi_datarow"] = $this->getModelWithRelated($def["model"])->listLinkedByMainId($id, $def); #junction model
                     }
                 }
 
             } elseif ($dtype == "multi_prio") {
                 #complex field with prio
-                $def["multi_datarow"] = fw::model($def["model"])->listLinkedByMainId($id, $def); #junction model
+                $def["multi_datarow"] = $this->getModelWithRelated($def["model"])->listLinkedByMainId($id, $def); #junction model
 
             } elseif ($dtype == "att") {
                 $def["att"] = Att::i()->one(intval($field_value));
 
             } elseif ($dtype == "att_links") {
-                $def["att_links"] = Att::i()->listLinked($this->model0->table_name, $id);
+                $def["att_links"] = Att::i()->listLinked($this->model->table_name, $id);
 
             } elseif ($dtype == "subtable") {
                 #subtable functionality
                 $model_name = $def["model"];
-                $sub_model  = fw::model($model_name);
+                $sub_model  = $this->getModelWithRelated($model_name);
                 $list_rows  = $sub_model->listByMainId($id, $def); #list related rows from db
                 $sub_model->prepareSubtable($list_rows, $id, $def);
 
@@ -728,7 +737,7 @@ class FwDynamicController extends FwController {
                     $def["value"]      = $def["lookup_row"][$lookup_field] ?? '';
 
                 } elseif (array_key_exists('lookup_model', $def)) {
-                    $lookup_model      = fw::model($def["lookup_model"]);
+                    $lookup_model      = $this->getModelWithRelated($def["lookup_model"]);
                     $def["lookup_id"]  = intval($field_value);
                     $def["lookup_row"] = $lookup_model->one($def["lookup_id"]);
 
@@ -789,14 +798,14 @@ class FwDynamicController extends FwController {
 
             } elseif ($dtype == "multicb") {
                 if (array_key_exists('lookup_model', $def)) {
-                    $def["multi_datarow"] = fw::model($def["lookup_model"])->listWithChecked($field_value, $def);
+                    $def["multi_datarow"] = $this->getModelWithRelated($def["lookup_model"])->listWithChecked($field_value, $def);
                 } else {
                     if ($def["is_by_linked"] ?? false) {
                         // list main items by linked id from junction model (i.e. list of Users(with checked) for Company from UsersCompanies model)
-                        $def["multi_datarow"] = fw::model($def["model"])->listMainByLinkedId($id, $def); //junction model
+                        $def["multi_datarow"] = $this->getModelWithRelated($def["model"])->listMainByLinkedId($id, $def); //junction model
                     } else {
                         // list linked items by main id from junction model (i.e. list of Companies(with checked) for User from UsersCompanies model)
-                        $def["multi_datarow"] = fw::model($def["model"])->listLinkedByMainId($id, $def); //junction model
+                        $def["multi_datarow"] = $this->getModelWithRelated($def["model"])->listLinkedByMainId($id, $def); //junction model
                     }
                 }
 
@@ -806,7 +815,7 @@ class FwDynamicController extends FwController {
                 unset($row);
 
             } elseif ($dtype == "multicb_prio") {
-                $def["multi_datarow"] = fw::model($def["model"])->listLinkedByMainId($id, $def); // junction model
+                $def["multi_datarow"] = $this->getModelWithRelated($def["model"])->listLinkedByMainId($id, $def); // junction model
 
                 foreach ($def["multi_datarow"] as &$row) {
                     $row["field"] = $def["field"];
@@ -818,12 +827,12 @@ class FwDynamicController extends FwController {
                 $def["value"] = $field_value;
 
             } elseif ($dtype == "att_links_edit") {
-                $def["att_links"] = Att::i()->listLinked($this->model0->table_name, $id);
+                $def["att_links"] = Att::i()->listLinked($this->model->table_name, $id);
 
             } elseif ($dtype == "subtable_edit") {
                 // subtable functionality
                 $model_name = $def["model"];
-                $sub_model  = fw::model($model_name);
+                $sub_model  = $this->getModelWithRelated($model_name);
                 $list_rows  = array();
 
                 if ($this->isGet()) {
@@ -901,11 +910,11 @@ class FwDynamicController extends FwController {
                 } elseif (array_key_exists('lookup_model', $def)) {
                     if ($dtype == "select" || $dtype == "radio") {
                         // lookup select
-                        $def["select_options"] = fw::model($def["lookup_model"])->listSelectOptions($def);
+                        $def["select_options"] = $this->getModelWithRelated($def["lookup_model"])->listSelectOptions($def);
                         $def["value"]          = $field_value;
                     } else {
                         // single value from lookup
-                        $lookup_model      = fw::model($def["lookup_model"]);
+                        $lookup_model      = $this->getModelWithRelated($def["lookup_model"]);
                         $def["lookup_id"]  = intval($field_value);
                         $lookup_row        = $lookup_model->one($def["lookup_id"]);
                         $def["lookup_row"] = $lookup_row;
@@ -955,7 +964,7 @@ class FwDynamicController extends FwController {
                 $def  = $showform_fields[$field];
                 $type = $def["type"];
                 if ($type == "autocomplete") {
-                    $fields[$field] = fw::model($def["lookup_model"])->findOrAddByIname($value, $out);
+                    $fields[$field] = $this->getModelWithRelated($def["lookup_model"])->findOrAddByIname($value, $out);
                 } elseif ($type == "date_combo") {
                     $fields[$field] = FormUtils::dateForCombo($item, $field);
                 } elseif ($def['type'] == 'date_popup') {
@@ -993,25 +1002,25 @@ class FwDynamicController extends FwController {
         foreach ($showform_fields as $def) {
             $type = $def["type"];
             if ($type == "att_links_edit") {
-                AttLinks::i()->updateJunctionByKeys($this->model0->table_name, $id, reqh("att")); // TODO make att configurable
+                AttLinks::i()->updateJunctionByKeys($this->model->table_name, $id, reqh("att")); // TODO make att configurable
             } elseif ($type == "multicb") {
                 if (empty($def["model"])) {
                     $fields_update[$def["field"]] = FormUtils::multi2ids(reqh($def["field"] . "_multi")); // multiple checkboxes -> single comma-delimited field
                 } else {
                     if ($def["is_by_linked"]) {
                         //by linked id
-                        fw::model($def["model"])->updateJunctionByLinkedId($id, reqh($def["field"] . "_multi")); // junction model
+                        $this->getModelWithRelated($def["model"])->updateJunctionByLinkedId($id, reqh($def["field"] . "_multi")); // junction model
                     } else {
                         //by main id
-                        fw::model($def["model"])->updateJunctionByMainId($id, reqh($def["field"] . "_multi")); // junction model
+                        $this->getModelWithRelated($def["model"])->updateJunctionByMainId($id, reqh($def["field"] . "_multi")); // junction model
                     }
                 }
             } elseif ($type == "multicb_prio") {
-                fw::model($def["model"])->updateJunctionByMainId($id, reqh($def["field"] . "_multi")); // junction model
+                $this->getModelWithRelated($def["model"])->updateJunctionByMainId($id, reqh($def["field"] . "_multi")); // junction model
             } elseif ($type == "subtable_edit") {
                 //save subtable
                 $model_name = $def["model"];
-                $sub_model  = fw::model($model_name);
+                $sub_model  = $this->getModelWithRelated($model_name);
 
                 $save_fields            = $def["save_fields"];
                 $save_fields_checkboxes = $def["save_fields_checkboxes"];
@@ -1063,7 +1072,7 @@ class FwDynamicController extends FwController {
         }
 
         if (count($fields_update) > 0) {
-            $this->model0->update($id, $fields_update);
+            $this->model->update($id, $fields_update);
         }
     }
 
@@ -1081,7 +1090,7 @@ class FwDynamicController extends FwController {
     public function modelAddOrUpdateSubtableDynamic(int $main_id, string $row_id, array $fields, array $def, ?FwModel $sub_model = null): int {
         if ($sub_model === null) {
             $model_name = $def["model"];
-            $sub_model  = fw::model($model_name);
+            $sub_model  = $this->getModelWithRelated($model_name);
         }
 
         if (str_starts_with($row_id, "new-")) {
