@@ -9,7 +9,7 @@
 class AdminDemosDynamicController extends FwDynamicController {
     const int access_level = Users::ACL_MANAGER;
 
-    public Demos $model;
+    public FwModel|Demos $model;
     public string $model_name = 'Demos';
 
     public string $base_url = '/Admin/DemosDynamic';

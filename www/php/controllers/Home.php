@@ -1,7 +1,7 @@
 <?php
 
 class HomeController extends FwController {
-    const string route_default_action = 'show';
+    const string route_default_action = FW::ACTION_SHOW;
 
     public function __construct() {
         parent::__construct();
@@ -15,7 +15,7 @@ class HomeController extends FwController {
         #fw::redirect('/Login'); #uncomment to always show login instead of Home
 
         /*cached version
-        $ps = FwCache::getValue('home_page');
+        $ps = $this->fw->cache->get('home_page');
 
         if (is_null($ps)){
             #cache miss
@@ -23,7 +23,7 @@ class HomeController extends FwController {
             #create home page with heavy queries, for example from Spages
             ps['page'] = $this->oneByFullUrl('');
 
-            FwCache::setValue('home_page', $ps);
+            $this->fw->cache->set('home_page', $ps);
         }
         */
 

@@ -7,7 +7,7 @@
 */
 
 class AdminSettingsController extends FwAdminController {
-    public Settings $model;
+    public FwModel|Settings $model;
     public string $model_name = 'Settings';
 
     public string $base_url = '/Admin/Settings';
@@ -25,7 +25,6 @@ class AdminSettingsController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
-        $this->model = $this->model0;
     }
 
     public function IndexAction(): ?array {
@@ -74,7 +73,7 @@ class AdminSettingsController extends FwAdminController {
             $id = $this->model->update($id, $itemdb);
 
             #TODO cleanup any caches that depends on settings
-            #FwCache::remove("XXX");
+            #$this->fw->cache->remove("XXX");
 
             fw::redirect($this->base_url . '/' . $id . '/edit');
 

@@ -8,7 +8,7 @@
 
 class AdminReportsController extends FwAdminController {
     const int access_level = Users::ACL_MANAGER;
-    public Reports $model;
+    public FwModel|Reports $model;
     public string $model_name = 'Reports';
 
     public string $base_url = '/Admin/Reports';
@@ -16,8 +16,6 @@ class AdminReportsController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
-
-        $this->model = $this->model0;
 
         //optionally init controller
         $this->is_admin = Users::i()->isAccessLevel(Users::ACL_MANAGER);

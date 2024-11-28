@@ -7,18 +7,13 @@
 */
 
 class AttController extends FwController {
-    const string route_default_action = 'show';
+    const string route_default_action = FW::ACTION_SHOW;
 
-    public Att $model;
+    public FwModel|Att $model;
     public string $model_name = 'Att';
 
-    public function __construct() {
-        parent::__construct();
-        $this->model = $this->model0; // use then $this->model in code for proper type hinting
-    }
-
     public function IndexAction(): ?array {
-        return $this->redirect($this->fw->config->ASSETS_URL . Att::IMGURL_0);
+        return $this->fw->redirect($this->fw->config->ASSETS_URL . Att::IMGURL_0);
     }
 
     public function DownloadAction($form_id): void {

@@ -12,7 +12,7 @@
 
 class DevConfigureController extends FwController {
     const int    access_level         = Users::ACL_VISITOR; #unlogged
-    const string route_default_action = 'index';
+    const string route_default_action = FW::ACTION_INDEX;
 
     public function IndexAction(): ?array {
         global $conf_server_name;
@@ -20,8 +20,8 @@ class DevConfigureController extends FwController {
             'hide_sidebar' => true,
         );
 
-        $config_file            = "/php/config.$conf_server_name.php";
-        $ps['config_file_name'] = $config_file;
+        $config_file            = "/php/configs/$conf_server_name.php";
+        $ps['config_file_name'] = $conf_server_name;
 
         $ps['is_config_env'] = file_exists(dirname(__FILE__) . '/../..' . $config_file);
 

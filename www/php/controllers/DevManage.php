@@ -109,6 +109,7 @@ class DevManageController extends FwController {
         $replacements = array(
             "AdminDemosDynamic"   => $controller_name,
             "/Admin/DemosDynamic" => $controller_url,
+            "Demo Dynamic"        => $controller_title,
             "DemoDicts"           => $model_name,
             "Demos"               => $model_name,
         );
@@ -125,7 +126,7 @@ class DevManageController extends FwController {
         #replace in url.html /Admin/DemosDynamic to $controller_url
         $replacements = array(
             "/Admin/DemosDynamic" => $controller_url,
-            "DemoDynamic"         => $controller_title,
+            "Demo Dynamic"        => $controller_title,
         );
         $this->_replaceInFiles($tpl_to, $replacements);
 
@@ -153,24 +154,27 @@ class DevManageController extends FwController {
         $hfields    = array();
         $sys_fields = Utils::qh("add_time add_users_id upd_time upd_users_id");
 
-        $saveFields     = array();
-        $hFieldsMap     = array();
-        $showFields     = array();
-        $showFormFields = array();
+        $saveFields         = array();
+        $saveFieldsNullable = array(); #TODO
+        $hFieldsMap         = array();
+        $showFields         = array();
+        $showFormFields     = array();
         foreach ($fields as &$fld) {
             #logger("check field=", $fld["name"]);
+            $human_name = Utils::name2human($fld["name"]);
+
             $hfields[$fld["name"]]    = $fld;
-            $hFieldsMap[$fld["name"]] = $fld["name"];
+            $hFieldsMap[$fld["name"]] = $human_name;
 
             $sf          = array();
             $sff         = array();
             $is_skip     = false;
             $sf["field"] = $fld["name"];
-            $sf["label"] = $fld["name"];
+            $sf["label"] = $human_name;
             $sf["type"]  = "plaintext";
 
             $sff["field"] = $fld["name"];
-            $sff["label"] = $fld["name"];
+            $sff["label"] = $human_name;
 
             if ($fld["is_nullable"] = "0" && !$fld["default"]) {
                 $sff["required"] = true;

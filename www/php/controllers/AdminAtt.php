@@ -10,7 +10,7 @@ class AdminAttController extends FwAdminController {
     const int    access_level         = Users::ACL_MANAGER;
     const string route_default_action = '';
 
-    public Att $model;
+    public FwModel|Att $model;
     public string $model_name = 'Att';
 
     public string $base_url = '/Admin/Att';
@@ -28,12 +28,6 @@ class AdminAttController extends FwAdminController {
                                         'ext'      => 'ext',
                                         'category' => 'att_categories_id',
     );
-
-    public function __construct() {
-        parent::__construct();
-
-        $this->model = $this->model0;
-    }
 
     public function setListSearch(): void {
         $this->list_where = " fwentities_id IS NULL "; //only show uploads directly from user (not linked to specific entity)

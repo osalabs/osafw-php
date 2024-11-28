@@ -4,14 +4,13 @@ class MySettingsController extends FwController {
     const int    access_level         = 0; #logged only
     const string route_default_action = '';
 
-    public Users $model;
+    public FwModel|Users $model;
     public string $model_name = 'Users';
 
     public string $base_url = '/My/Settings';
 
     public function __construct() {
         parent::__construct();
-        $this->model = $this->model0; // use then $this->model in code for proper type hinting
     }
 
     public function IndexAction(): ?array {

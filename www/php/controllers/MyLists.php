@@ -4,7 +4,7 @@ class MyListsController extends FwAdminController {
     const int    access_level         = 0; #logged only
     const string route_default_action = '';
 
-    public UserLists $model;
+    public FwModel|UserLists $model;
     public string $model_name = 'UserLists';
 
     public string $base_url = '/My/Lists';
@@ -23,7 +23,6 @@ class MyListsController extends FwAdminController {
 
     public function __construct() {
         parent::__construct();
-        $this->model = $this->model0; // use then $this->model in code for proper type hinting
 
         //optionally init controller
         $this->form_new_defaults["entity"] = $this->related_id;
@@ -74,8 +73,7 @@ class MyListsController extends FwAdminController {
 
         $item_id = reqi("item_id");
         $ps      = array(
-            "_json"   => true,
-            "success" => true
+            "_json" => true,
         );
 
         try {
@@ -89,8 +87,7 @@ class MyListsController extends FwAdminController {
             $ps["action"] = ($res ? 'added' : 'removed');
 
         } catch (Exception $ex) {
-            $ps["success"] = false;
-            $ps["err_msg"] = $ex->getMessage();
+            $ps['error'] = ['message' => $ex->getMessage()];
         }
 
         return $ps;

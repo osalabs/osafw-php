@@ -9,12 +9,12 @@
 class AdminSpagesController extends FwAdminController {
     const int access_level = Users::ACL_MANAGER;
 
-    public Spages $model;
+    public FwModel|Spages $model;
     public string $model_name = 'Spages';
 
     public string $base_url = '/Admin/Spages';
     public string $required_fields = 'iname';
-    public string $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_css custom_js';
+    public string $save_fields = 'iname idesc idesc_left idesc_right head_att_id template prio meta_keywords meta_description custom_head custom_css custom_js';
     public string $save_fields_checkboxes = '';
 
     /*REMOVE OR OVERRIDE*/
@@ -28,20 +28,13 @@ class AdminSpagesController extends FwAdminController {
                                        'status'   => 'status',
     );
 
-    public function __construct() {
-        parent::__construct();
-        $this->model = $this->model0;
-
-        //optionally init controller
-    }
-
     //override list rows
     public function getListRows(): void {
         if ($this->list_filter['sortby'] == 'iname' && ($this->list_filter['s'] ?? '') == '') {
-            $this->list_count = $this->db->valuep("select count(*) from " . $this->model->table_name . " where " . $this->list_where);
+            $this->list_count = $this->db->valuep("select count(*) from " . $this->model->table_name . " where " . $this->list_where, $this->list_where_params);
             if ($this->list_count > 0) {
                 #build pages tree
-                $pages_tree      = $this->model->tree($this->list_where, "parent_id, prio desc, iname");
+                $pages_tree      = $this->model->tree($this->list_where, $this->list_where_params, "parent_id, prio desc, iname");
                 $this->list_rows = $this->model->getPagesTreeList($pages_tree, 0);
 
                 #apply LIMIT
@@ -85,22 +78,24 @@ class AdminSpagesController extends FwAdminController {
 
         $ps = parent::ShowFormAction($form_id);
 
-        $item                           = $ps["i"];
-        $id                             = $item["id"];
+        $item      = $ps["i"];
+        $id        = $item["id"] ?? 0;
+        $parent_id = $item["parent_id"] ?? 0;
+
         $where                          = " status<>127 ";
-        $pages_tree                     = $this->model->tree($where, "parent_id, prio desc, iname");
-        $ps["select_options_parent_id"] = $this->model->getPagesTreeSelectHtml($item["parent_id"], $pages_tree);
-
-        $ps["parent_url"] = $this->model->getFullUrl($item["parent_id"]);
-        $ps["full_url"]   = $this->model->getFullUrl($item["id"]);
-
-        $ps["parent"] = $this->model->one($item["parent_id"]);
-
-        if ($item["head_att_id"]) {
-            $ps["head_att_id_url_s"] = Att::i()->getUrlDirect($item["head_att_id"], "s");
-        }
+        $pages_tree                     = $this->model->tree($where, [], "parent_id, prio desc, iname");
+        $ps["select_options_parent_id"] = $this->model->getPagesTreeSelectHtml($parent_id, $pages_tree);
 
         if ($id) {
+            $ps["parent_url"] = $this->model->getFullUrl($parent_id);
+            $ps["full_url"]   = $this->model->getFullUrl($item["id"]);
+
+            $ps["parent"] = $this->model->one($parent_id);
+
+            if (!empty($item["head_att_id"])) {
+                $ps["head_att_id_url_s"] = Att::i()->getUrlDirect($item["head_att_id"], "s");
+            }
+
             $ps["subpages"] = $this->model->listChildren($id);
         }
 
@@ -118,8 +113,9 @@ class AdminSpagesController extends FwAdminController {
 
         try {
             $item_old = $this->model->one($id);
+            $is_home  = $item_old["is_home"] ?? 0;
             #for non-home page enable some fields
-            if (!$id || $item_old["is_home"] != 1) {
+            if (!$id || $is_home != 1) {
                 $this->required_fields .= " url";
                 $this->save_fields     .= " parent_id url status pub_time";
             }
@@ -141,8 +137,8 @@ class AdminSpagesController extends FwAdminController {
 
             $id = $this->modelAddOrUpdate($id, $itemdb);
 
-            if ($item_old["is_home"] == 1) {
-                FwCache::remove("home_page");
+            if ($is_home == 1) {
+                $this->fw->cache->remove("home_page");
             } #reset home page cache if Home page changed
 
         } catch (ApplicationException $ex) {

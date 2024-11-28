@@ -9,7 +9,7 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 class AdminDemosController extends FwAdminController {
     const int access_level = Users::ACL_MANAGER;
 
-    public Demos $model;
+    public FwModel|Demos $model;
     public string $model_name = 'Demos';
 
     public string $base_url = '/Admin/Demos';
@@ -41,7 +41,6 @@ class AdminDemosController extends FwAdminController {
         parent::__construct();
 
         $this->model_related = DemoDicts::i();
-        $this->model         = $this->model0;
     }
 
     //override due to custom search filter on status
@@ -85,7 +84,7 @@ class AdminDemosController extends FwAdminController {
         if ($this->is_activity_logs) {
             $this->initFilter();
             $ps["list_filter"]["tab_activity"] = $ps["list_filter"]["tab_activity"] ?? FwActivityLogs::TAB_COMMENTS;
-            $ps["activity_entity"]             = $this->model0->table_name;
+            $ps["activity_entity"]             = $this->model->table_name;
             $ps["activity_rows"]               = FwActivityLogs::i()->listByEntityForUI($this->model->table_name, $id, $ps["list_filter"]["tab_activity"]);
         }
 

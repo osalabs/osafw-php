@@ -9,12 +9,11 @@
 class AdminUsersController extends FwDynamicController {
     const int access_level = Users::ACL_ADMIN;
 
-    public Users $model;
+    public FwModel|Users $model;
     public string $base_url = '/Admin/Users';
 
     public function __construct() {
         parent::__construct();
-        $this->model = $this->model0; // use then $this->model in code for proper type hinting
     }
 
     public function setListSearch(): void {
@@ -72,7 +71,7 @@ class AdminUsersController extends FwDynamicController {
         $this->model->updateLinkedRoles($id, reqh('roles_link'));
 
         if ($id == $this->fw->userId()) {
-            $this->model->reloadSession();
+            $this->model->reloadSession(0, true);
         }
 
         return $this->afterSave($success, $id, $is_new);
@@ -125,10 +124,9 @@ class AdminUsersController extends FwDynamicController {
 
         $success = $this->model->sendPwdReset($id);
         return array(
-            '_json' => array(
-                'success' => $success,
-                'err_msg' => $this->fw->last_error_send_email
-            ),
+            '_json' => array_merge(
+                $success ? [] : ['error' => ['message' => $this->fw->last_error_send_email]]
+            )
         );
     }
 
