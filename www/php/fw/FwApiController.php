@@ -12,6 +12,15 @@ class FwApiController extends FwController {
     #public string $model_name = 'MODELCLASS';
     #public $base_url = '/Api/SomeController';
 
+    const string route_default_action = FW::ACTION_ERROR; #in API - if no route found - return error
+
+    #list of routes that do not require authorization #TODO move to config
+    # format: 'controller.action' in lowercase
+    const array NON_AUTH_ROUTES = [
+        'v1users.login',
+        'v1users.confirm',
+    ];
+
     protected string $http_origin = '';
     protected ?object $jwt_payload = null; #decoded JWT payload
 
@@ -40,6 +49,9 @@ class FwApiController extends FwController {
 
         $this->setHeaders();
 
+        if (in_array(strtolower($this->fw->route->controller . '.' . $this->fw->route->action), self::NON_AUTH_ROUTES)) {
+            $is_auth = false;
+        }
         if ($is_auth) {
             $this->auth();
         }
@@ -88,7 +100,7 @@ class FwApiController extends FwController {
 
         #$result=true; #DEBUG
         if (!$result) {
-            throw new AuthException("API auth error", 401);
+            throw new AuthException("API auth error", FW::HTTP_UNAUTHORIZED);
         }
     }
 
@@ -142,32 +154,32 @@ class FwApiController extends FwController {
                 $payload = \Firebase\JWT\JWT::decode($encoded_token, $this->fw->config->JWT_SECRET, ['HS256']);
                 #validate payload
                 //                if (isset($payload->exp) && DateUtils::isExpired($payload->exp, 0)) {
-                //                    throw new AuthException("JWT token expired", 401); # exp - expiration time
+                //                    throw new AuthException("JWT token expired", FW::HTTP_UNAUTHORIZED); # exp - expiration time
                 //                }
                 //                if (isset($payload->nbf) && !DateUtils::isExpired($payload->nbf, 0)) {
-                //                    throw new AuthException("JWT token not yet valid", 401); # nbf - not before time
+                //                    throw new AuthException("JWT token not yet valid", FW::HTTP_UNAUTHORIZED); # nbf - not before time
                 //                }
 
                 if (isset($payload->iss) && $payload->iss != $this->fw->config->JWT_ISSUER) {
-                    throw new AuthException("JWT token issuer invalid", 401); # iss - issuer
+                    throw new AuthException("JWT token issuer invalid", FW::HTTP_UNAUTHORIZED); # iss - issuer
                 }
                 if (isset($payload->aud) && $payload->aud != $this->fw->config->JWT_AUDIENCE) {
-                    throw new AuthException("JWT token audience invalid", 401); # aud - audience
+                    throw new AuthException("JWT token audience invalid", FW::HTTP_UNAUTHORIZED); # aud - audience
                 }
                 $this->jwt_payload = $payload;
 
                 $result = true;
             } catch (\Firebase\JWT\BeforeValidException $e) {
-                throw new AuthException("JWT token not yet valid", 401);
+                throw new AuthException("JWT token not yet valid", FW::HTTP_UNAUTHORIZED);
             } catch (\Firebase\JWT\ExpiredException $e) {
-                throw new AuthException("JWT token expired", 401);
+                throw new AuthException("JWT token expired", FW::HTTP_UNAUTHORIZED);
             } catch (\Firebase\JWT\SignatureInvalidException $e) {
-                throw new AuthException("JWT signature invalid", 401);
+                throw new AuthException("JWT signature invalid", FW::HTTP_UNAUTHORIZED);
             } catch (\Exception $e) {
                 // InvalidArgumentException
                 // DomainException
                 // UnexpectedValueException
-                throw new AuthException("JWT processing error", 401);
+                throw new AuthException("JWT processing error", FW::HTTP_UNAUTHORIZED);
             }
         }
         return $result;
@@ -214,6 +226,11 @@ class FwApiController extends FwController {
         $this->setHeaders();
         $this->setHeadersOptions();
         echo "";
+    }
+
+    // just to disable default IndexAction in FwController
+    public function IndexAction(): ?array {
+        throw new UserException("Bad request", FW::HTTP_BAD_REQUEST);
     }
 
     //sample API method /Api/SomeController/(Test)/$form_id

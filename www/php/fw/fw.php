@@ -31,6 +31,7 @@ class fw {
     public const string ACTION_SHOW_DELETE   = "ShowDelete";
     public const string ACTION_DELETE        = "Delete";
     public const string ACTION_OPTIONS       = "Options";
+    public const string ACTION_ERROR         = "Error"; // not actual action, just a const for error handling
     //additional actions used across controllers
     public const string ACTION_DELETE_RESTORE  = "RestoreDeleted";
     public const string ACTION_NEXT            = "Next"; // prev/next on view/edit forms
@@ -44,6 +45,18 @@ class fw {
     public const string ACTION_MORE_EDIT   = "edit";
     public const string ACTION_MORE_DELETE = "delete";
 
+    #http status codes
+    const int HTTP_OK                 = 200;
+    const int HTTP_CREATED            = 201;
+    const int HTTP_NO_CONTENT         = 204;
+    const int HTTP_BAD_REQUEST        = 400;
+    const int HTTP_UNAUTHORIZED       = 401;
+    const int HTTP_FORBIDDEN          = 403;
+    const int HTTP_PAYMENT_REQUIRED   = 402;
+    const int HTTP_NOT_FOUND          = 404;
+    const int HTTP_METHOD_NOT_ALLOWED = 405;
+    const int HTTP_TOO_MANY_REQUESTS  = 429;
+    const int HTTP_SERVER_ERROR       = 500;
 
     public static ?self $instance = null;
     public static float $start_time;
@@ -331,12 +344,12 @@ class fw {
                 $this->renderRoute($this->route);
             } catch (NoClassMethodException) {
                 logger('WARN', "No HomeController->NotFoundAction() found");
-                $this->handlePageError(404, $ex->getMessage(), $ex);
+                $this->handlePageError(self::HTTP_NOT_FOUND, $ex->getMessage(), $ex);
                 return;
             }
         } catch (NoClassException $ex) {
             #if can't call class - this is server error
-            $this->handlePageError(500, $ex->getMessage(), $ex);
+            $this->handlePageError(self::HTTP_SERVER_ERROR, $ex->getMessage(), $ex);
             return;
         } catch (NoClassMethodException) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
@@ -351,8 +364,8 @@ class fw {
                 $this->route->id        = $this->route->action;
                 $this->route->params[0] = $this->route->id;
                 $this->route->action    = self::ACTION_SHOW;
-            } elseif ($default_action == 'error') {
-                $this->handlePageError(404, 'Not found');
+            } elseif ($default_action == self::ACTION_ERROR) {
+                $this->handlePageError(self::HTTP_NOT_FOUND);
                 return;
             } else {
                 #if no default action set - this is special case action - this mean action should be got form REST's 'id'
@@ -372,11 +385,11 @@ class fw {
             #not a problem - just graceful exit
             logger('TRACE', "Exit Exception (normal behaviour, usually due to redirect)");
         } catch (UserException $ex) {
-            $this->handlePageError(($ex->getCode() ?: 400), $ex->getMessage(), $ex);
+            $this->handlePageError(($ex->getCode() ?: self::HTTP_BAD_REQUEST), $ex->getMessage(), $ex);
         } catch (ApplicationException $ex) {
-            $this->handlePageError(($ex->getCode() ?: 500), $ex->getMessage(), $ex);
+            $this->handlePageError(($ex->getCode() ?: self::HTTP_SERVER_ERROR), $ex->getMessage(), $ex);
         } catch (Exception $ex) {
-            $this->handlePageError(500, $ex->getMessage(), $ex);
+            $this->handlePageError(self::HTTP_SERVER_ERROR, $ex->getMessage(), $ex);
         }
     }
 
@@ -560,7 +573,7 @@ class fw {
             logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
         }
 
-        if ($error_code >= 500) {
+        if ($error_code >= self::HTTP_SERVER_ERROR) {
             logger($ex->getTraceAsString());
         }
 
