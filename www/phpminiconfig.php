@@ -1,6 +1,6 @@
 <?php
  @session_start();
- require_once "php/config.php" ;
+ require_once "php/configs/config.php" ;
 
  if ($_SESSION['user_id'] && $_SESSION['access_level']==100){
     $DBDEF=array(

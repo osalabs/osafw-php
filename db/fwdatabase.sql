@@ -3,10 +3,12 @@
 
 -- CREATE DATABASE xxx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- USE xxx;
+-- CREATE USER 'uuu'@'localhost' IDENTIFIED BY 'PASSWORD';
+-- GRANT ALL PRIVILEGES ON xxx.* TO 'uuu'@'localhost';
 
 -- core framework tables only, create app-specific tables in database.sql
 
-SET @OLD_SQL_MODE = @@SQL_MODE, SQL_MODE = '';
+-- SET @OLD_SQL_MODE = @@SQL_MODE, SQL_MODE = '';
 
 -- application entities lookup - autofilled on demand
 DROP TABLE IF EXISTS fwentities;
@@ -169,7 +171,7 @@ CREATE TABLE settings
     id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     icat           VARCHAR(64) NOT NULL DEFAULT '', /* settings category: ''-system, 'other' -site specific */
     icode          VARCHAR(64) NOT NULL DEFAULT '', /* settings internal code */
-    ivalue         TEXT        NOT NULL DEFAULT '', /* value */
+    ivalue         TEXT, /* value */
 
     iname          VARCHAR(64) NOT NULL DEFAULT '', /* settings visible name */
     idesc          TEXT, /* settings visible description */
@@ -212,6 +214,7 @@ CREATE TABLE spages
     is_home          INT UNSIGNED          DEFAULT 0, /* 1 is for home page (non-deletable page)*/
     redirect_url     VARCHAR(255) NOT NULL DEFAULT '', /*if set - redirect to this url instead displaying page*/
 
+    custom_head      TEXT, /*custom page content inside head */
     custom_css       TEXT, /*custom page css*/
     custom_js        TEXT, /*custom page js*/
 

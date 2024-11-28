@@ -19,7 +19,7 @@ class UserFilters extends FwModel {
         return $this->db->arrp("select id, iname from " . $this->db->qid($this->table_name) .
             " where status=0 and icode=@icode
                      and (is_system=1 OR add_users_id=@users_id)
-                   order by is_system desc, iname", ['@icode' => $icode, '@users_id' => $this->fw->userId]);
+                   order by is_system desc, iname", ['@icode' => $icode, '@users_id' => $this->fw->userId()]);
     }
 
 }

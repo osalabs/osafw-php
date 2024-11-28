@@ -44,9 +44,10 @@ class Spages extends FwModel {
     /**
      * return one latest record by full_url (i.e. relative url from root, without domain)
      * @param string $full_url full url (without domain)
-     * @return db array
+     * @return array
+     * @throws NoModelException
      */
-    public function oneByFullUrl($full_url) {
+    public function oneByFullUrl(string $full_url): array {
         $url_parts = explode('/', $full_url);
         $parent_id = 0;
         $item      = array();
@@ -62,11 +63,13 @@ class Spages extends FwModel {
             $parent_id = $item['id'];
         }
 
+        if (!$item) {
+            return [];
+        }
+
         #item now contains page data for the url
-        if ($item) {
-            if ($item["head_att_id"] > '') {
-                $item["head_att_id_url"] = Att::i()->getUrlDirect($item["head_att_id"]);
-            }
+        if (!empty($item["head_att_id"])) {
+            $item["head_att_id_url"] = Att::i()->getUrlDirect($item["head_att_id"]);
         }
 
         #page[top_url] used in templates navigation
@@ -105,12 +108,13 @@ class Spages extends FwModel {
     /**
      * Read ALL rows from db according to where, then apply getPagesTree to return tree structure
      * @param string $where where to apply in sql
+     * @param array $params params to apply in sql
      * @param string $orderby order by fields to apply in sql
      * @return array            parsepage array with hierarcy (via "children" key)
      * @throws DBException
      */
-    public function tree($where, $orderby) {
-        $rows       = $this->db->arrp("SELECT * FROM $this->table_name WHERE $where ORDER BY $orderby");
+    public function tree(string $where, array $params, string $orderby): array {
+        $rows       = $this->db->arrp("SELECT * FROM $this->table_name WHERE $where ORDER BY $orderby", $params);
         $pages_tree = $this->getPagesTree($rows, 0);
         return $pages_tree;
     }
@@ -233,13 +237,13 @@ class Spages extends FwModel {
     /**
      * render page by full url
      * @param string $full_url full page url (without domain)
-     * @return none, parser called with output to browser
+     * @return void, parser called with output to browser
      */
-    public function showPageByFullUrl($full_url) {
+    public function showPageByFullUrl(string $full_url): void {
         $ps = array();
 
         #for navigation
-        $pages_tree  = $this->tree('status=0', "parent_id, prio desc, iname"); #published only
+        $pages_tree  = $this->tree('status=0', [], "parent_id, prio desc, iname"); #published only
         $ps['pages'] = $this->getPagesTreeList($pages_tree, 0);
 
         $item = $this->oneByFullUrl($full_url);

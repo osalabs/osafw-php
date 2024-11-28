@@ -38,11 +38,11 @@ class Settings extends FwModel {
     public function oneByIcode($icode, $is_force = false): array {
         $cache_key = $this->cache_prefix . $icode;
         if (!$is_force) {
-            $row = FwCache::getValue($cache_key);
+            $row = $this->fw->cache->getRequestValue($cache_key);
         }
         if ($is_force || is_null($row)) {
             $row = $this->db->row($this->table_name, array('icode' => $icode));
-            FwCache::setValue($cache_key, $row);
+            $this->fw->cache->setRequestValue($cache_key, $row);
         }
         return $row;
     }

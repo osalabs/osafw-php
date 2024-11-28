@@ -14,12 +14,12 @@
 #require_once dirname(__FILE__) . "/Roles/UsersRoles.php";
 
 class Users extends FwModel {
-    public const ACL_SITE_ADMIN = 100;
-    public const ACL_ADMIN      = 90;
-    public const ACL_MANAGER    = 80;
-    public const ACL_EMPLOYEE   = 50;
-    public const ACL_USER       = 1; //min access level for users
-    public const ACL_VISITOR    = 0; //non-logged visitor
+    public const int ACL_SITE_ADMIN = 100;
+    public const int ACL_ADMIN      = 90;
+    public const int ACL_MANAGER    = 80;
+    public const int ACL_EMPLOYEE   = 50;
+    public const int ACL_USER          = 1; //min access level for users
+    public const int ACL_VISITOR       = 0; //non-logged visitor
 
     public static $PERM_COOKIE_NAME = 'perm';
     public static $PERM_COOKIE_DAYS = 356;
@@ -108,13 +108,18 @@ class Users extends FwModel {
 
         }
 
-        $sql = "SELECT *, (fname+' '+lname) as iname FROM {$this->qTable()} WHERE status=@status $where ORDER BY " . $this->getOrderBy();
+        $sql = "SELECT *, CONCAT(fname,' ',lname) as iname FROM {$this->qTable()} WHERE status=@status $where ORDER BY " . $this->getOrderBy();
         return $this->db->arrp($sql, ['status' => FwModel::STATUS_ACTIVE]);
     }
 
     public function listSelectOptions(array $def = null): array {
-        $sql = "SELECT id, (fname+' '+lname) as iname FROM {$this->qTable()} WHERE status=@status ORDER BY " . $this->getOrderBy();
-        return $this->db->col($sql, ['status' => FwModel::STATUS_ACTIVE]);
+        $where = '';
+        if (($def['lookup_params'] ?? '') == 'account') {
+            $where .= " AND accounts_id=" . intval($def['i']['id'] ?? 0);
+        }
+
+        $sql = "SELECT id, CONCAT(fname,' ',lname) as iname FROM {$this->qTable()} WHERE status=@status $where ORDER BY " . $this->getOrderBy();
+        return $this->db->arrp($sql, ['status' => FwModel::STATUS_ACTIVE]);
     }
     //</editor-fold>
 
@@ -155,14 +160,14 @@ class Users extends FwModel {
         ];
         $this->update($id, $item);
 
-        $user                    = $this->one($id);
+        $user            = $this->one($id);
         $user['pwd_reset_token'] = $pwd_reset_token;
 
         return $this->fw->sendEmailTpl($user['email'], "email_pwd.txt", $user);
     }
 
     /**
-     * evaluate password's stength and return a score (>60 good, >80 strong)
+     * evaluate password's strength and return a score (>60 good, >80 strong)
      * @param string $pwd
      * @return float
      */
@@ -303,12 +308,16 @@ class Users extends FwModel {
         $this->updateAfterLogin($id);
     }
 
-    public function reloadSession(int $id = 0): void {
+    public function reloadSession(int $id = 0, bool $is_sesson_write = false): void {
         if (!$id) {
             $id = $this->fw->userId();
         }
 
         $user = $this->one($id);
+
+        if ($is_sesson_write) {
+            @session_start();
+        }
 
         $_SESSION['user_id']      = $id;
         $_SESSION['login']        = $user['email'];
@@ -333,6 +342,10 @@ class Users extends FwModel {
             $avatar_link = Att::i()->getUrl($user["att_id"], "s");
         }
         $_SESSION['user_avatar_link'] = $avatar_link;
+
+        if ($is_sesson_write) {
+            session_write_close();
+        }
     }
 
     private function updateAfterLogin(int $id): void {
@@ -402,7 +415,7 @@ class Users extends FwModel {
     }
 
     public function removePermCookie() {
-        $cookie_id = $_COOKIE[self::$PERM_COOKIE_NAME];
+        $cookie_id = $_COOKIE[self::$PERM_COOKIE_NAME] ?? '';
 
         setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
 
