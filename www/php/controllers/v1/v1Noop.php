@@ -8,7 +8,7 @@
 class v1NoopController extends FwApiController {
     public FwModel $model;
     //    public string $model_name = 'FwModel';
-    public string $base_url = '/v1/boop';
+    public string $base_url = '/v1/noop';
 
     public function __construct() {
         parent::__construct(); #pass false if no auth required
@@ -26,7 +26,7 @@ class v1NoopController extends FwApiController {
     //        description: 'Noop response',
     //        content: new OA\JsonContent(
     //            properties: [
-    //                new OA\Property(property: 'boop', type: 'boolean', example: true),
+    //                new OA\Property(property: 'noop', type: 'boolean', example: true),
     //            ],
     //            type: 'object'
     //        )
