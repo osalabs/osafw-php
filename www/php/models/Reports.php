@@ -111,8 +111,7 @@ class Reports extends FwModel {
                 $ps['IS_PRINT_MODE'] = true;
                 $ps['IS_EXPORT_PDF'] = true;
 
-                $html = parse_page($base_dir, $this->fw->config->PAGE_LAYOUT_PRINT, $ps, 'v');
-                #$html = parse_page($base_dir, $common_dir.'/docx.html', $ps, 'v');
+                $html = $this->fw->parsePage($base_dir, $this->fw->config->PAGE_LAYOUT_PRINT, $ps);
 
                 if ($this->fw->config->PDF_CONVERTER) {
                     ### if wkhtmltopdf
@@ -160,7 +159,7 @@ class Reports extends FwModel {
                 require_once $this->fw->config->SITE_ROOT . '/php/vsword/VsWord.php';
                 VsWord::autoLoad();
 
-                $html = parse_page($base_dir, $common_dir . '/docx.html', $ps, 'v');
+                $html = $this->fw->parsePage($base_dir, $common_dir . '/docx.html', $ps);
 
                 $doc    = new VsWord();
                 $parser = new HtmlParser($doc);
@@ -184,9 +183,9 @@ class Reports extends FwModel {
                 $ps['IS_PRINT_MODE'] = true;
                 $ps['IS_EXPORT_XLS'] = true;
 
-                $html = parse_page($base_dir, $common_dir . '/xls.html', $ps, 'v');
+                $html = $this->fw->parsePage($base_dir, $common_dir . '/xls.html', $ps);
 
-                $filename    = $this->report_code . '-' . date('Ymd', time()) . '.xlsx'; #Ymd-His
+                $filename    = $this->report_code . '-' . date('Ymd', time()) . '.xls'; #Ymd-His
                 $disposition = 'attachment';
                 //output to browser
                 header('Content-type: application/vnd.ms-excel');

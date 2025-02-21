@@ -8,6 +8,10 @@
 
 class UserViews extends FwModel {
 
+    public static function icodeByUrl(string $url, bool $is_list_edit = false): string {
+        return $url . ($is_list_edit ? "/edit" : "");
+    }
+
     public function __construct() {
         parent::__construct();
 

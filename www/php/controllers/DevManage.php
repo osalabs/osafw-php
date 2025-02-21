@@ -2,7 +2,7 @@
 /*Manage controller for Developers
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2019 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
  */
 
 class DevManageController extends FwController {
@@ -90,10 +90,11 @@ class DevManageController extends FwController {
 
     public function CreateControllerAction() {
         $item             = reqh("item");
-        $model_name       = Trim($item["model_name"]);
-        $controller_url   = Trim($item["controller_url"]);
+        $model_name       = trim($item["model_name"]);
+        $controller_url   = trim($item["controller_url"]);
         $controller_name  = str_replace("/", "", $controller_url);
-        $controller_title = Trim($item["controller_title"]);
+        $controller_title = trim($item["controller_title"]);
+        $controller_type  = trim($item["controller_type"]);
 
         if (!$model_name || !$controller_url || !$controller_title) {
             throw new ApplicationException("No model or no controller name or no title");
@@ -103,240 +104,111 @@ class DevManageController extends FwController {
         }
 
         #copy DemoDicts.php to $model_name.php
-        $path = $this->fw->config->SITE_ROOT . "/php/controllers";
+        $path    = $this->fw->config->SITE_ROOT . "/php/controllers";
+        $path_to = $path;
+
+        if ($controller_type == "vue") {
+            $demos_controller = "/AdminDemosVue.php";
+            #copy templates from
+            $tpl_from = $this->fw->config->SITE_TEMPLATES . "/admin/demosvue";
+
+            $replacements_controller = array(
+                "AdminDemosVue"   => $controller_name,
+                "/Admin/DemosVue" => $controller_url,
+                "Demo Vue"        => $controller_title,
+                "DemoDicts"       => $model_name,
+                "Demos"           => $model_name,
+            );
+
+            #replace in templates: DemoVue to Title
+            #replace in url.html /Admin/DemosVue to $controller_url
+            $replacements_templates = array(
+                "/Admin/DemosVue" => $controller_url,
+                "Demo Vue"        => $controller_title,
+            );
+
+        } elseif ($controller_type == "api") {
+            $demos_controller = "/v1/v1DemosApi.php";
+
+            $tpl_from = ""; // no templates for API
+
+            $replacements_controller = array(
+                "v1DemosApi"   => $controller_name,
+                "/v1/demosapi" => $controller_url,
+                "Demo Api"     => $controller_title,
+                "DemoDicts"    => $model_name,
+                "Demos"        => $model_name,
+            );
+            $replacements_templates  = [];
+
+            $path_to = $path . "/v1";
+
+        } else {
+            $demos_controller = "/AdminDemosDynamic.php";
+            #copy templates from
+            $tpl_from = $this->fw->config->SITE_TEMPLATES . "/admin/demosdynamic";
+
+            $replacements_controller = array(
+                "AdminDemosDynamic"   => $controller_name,
+                "/Admin/DemosDynamic" => $controller_url,
+                "Demo Dynamic"        => $controller_title,
+                "DemoDicts"           => $model_name,
+                "Demos"               => $model_name,
+            );
+
+            #replace in templates: DemoDynamic to Title
+            #replace in url.html /Admin/DemosDynamic to $controller_url
+            $replacements_templates = array(
+                "/Admin/DemosDynamic" => $controller_url,
+                "Demo Dynamic"        => $controller_title,
+            );
+        }
 
         #replace: DemoDicts => ModelName, demo_dicts => table_name
-        $replacements = array(
-            "AdminDemosDynamic"   => $controller_name,
-            "/Admin/DemosDynamic" => $controller_url,
-            "Demo Dynamic"        => $controller_title,
-            "DemoDicts"           => $model_name,
-            "Demos"               => $model_name,
-        );
-        if (!$this->_replaceInFile($path . "/AdminDemosDynamic.php", $replacements, $path . "/" . $controller_name . ".php")) {
-            throw new ApplicationException("Can't open AdminDemosDynamic.php");
+        if (!$this->_replaceInFile($path . $demos_controller, $replacements_controller, $path_to . "/" . $controller_name . ".php")) {
+            throw new ApplicationException("Can't open $demos_controller");
         }
 
-        #copy templates from /admin/demosdynamic to /controller/url
-        $tpl_from = $this->fw->config->SITE_TEMPLATES . "/admin/demosdynamic";
-        $tpl_to   = $this->fw->config->SITE_TEMPLATES . strtolower($controller_url);
-        $this->_copyDirectory($tpl_from, $tpl_to);
+        #copy templates from demos folder to /controller/url
+        if ($tpl_from) {
+            $tpl_to = $this->fw->config->SITE_TEMPLATES . strtolower($controller_url);
+            $this->_copyDirectory($tpl_from, $tpl_to);
+            $this->_replaceInFiles($tpl_to, $replacements_templates);
 
-        #replace in templates: DemoDynamic to Title
-        #replace in url.html /Admin/DemosDynamic to $controller_url
-        $replacements = array(
-            "/Admin/DemosDynamic" => $controller_url,
-            "Demo Dynamic"        => $controller_title,
-        );
-        $this->_replaceInFiles($tpl_to, $replacements);
+            #update config.json:
+            # save_fields - all fields from model table (except id and sytem add_time/user fields)
+            # save_fields_checkboxes - empty (TODO based on bit field?)
+            # list_view - $model->table_name
+            # view_list_defaults - iname add_time status
+            # view_list_map
+            # view_list_custom - just status
+            # show_fields - all
+            # show_form_fields - all, analyse if:
+            #   field NOT NULL and no default - required
+            #   field has foreign key - add that table as dropdown
+            $config_file = $tpl_to . "/config.json";
+            $config      = Utils::jsonDecode(file_get_contents($config_file));
+            if (!$config) {
+                $config = array();
+            }
+            logger("LOADED:", $config);
 
-        #update config.json:
-        # save_fields - all fields from model table (except id and sytem add_time/user fields)
-        # save_fields_checkboxes - empty (TODO based on bit field?)
-        # list_view - $model->table_name
-        # view_list_defaults - iname add_time status
-        # view_list_map
-        # view_list_custom - just status
-        # show_fields - all
-        # show_form_fields - all, analyse if:
-        #   field NOT NULL and no default - required
-        #   field has foreign key - add that table as dropdown
-        $config_file = $tpl_to . "/config.json";
-        $config      = Utils::jsonDecode(file_get_contents($config_file));
-        if (!$config) {
-            $config = array();
+            $entity = [
+                'model_name' => $model_name,
+                'controller' => [
+                    'url'   => $controller_url,
+                    'title' => $controller_title,
+                    'type'  => $controller_type
+                ],
+                #'table' => fw::model($model_name)->table_name,
+            ];
+            $config = FwDev::init($this->fw, $this->db)->updateControllerConfig($entity, $config);
+
+            #Utils.jsonEncode(config) - can't use as it produces unformatted json string
+            $config_str = json_encode($config, JSON_PRETTY_PRINT);
+            file_put_contents($config_file, $config_str);
+
         }
-        logger("LOADED:", $config);
-
-        $model  = fw::model($model_name);
-        $fields = $this->db->tableSchema($model->table_name);
-        logger("DB $fields", $fields);
-        $hfields    = array();
-        $sys_fields = Utils::qh("add_time add_users_id upd_time upd_users_id");
-
-        $saveFields         = array();
-        $saveFieldsNullable = array(); #TODO
-        $hFieldsMap         = array();
-        $showFields         = array();
-        $showFormFields     = array();
-        foreach ($fields as &$fld) {
-            #logger("check field=", $fld["name"]);
-            $human_name = Utils::name2human($fld["name"]);
-
-            $hfields[$fld["name"]]    = $fld;
-            $hFieldsMap[$fld["name"]] = $human_name;
-
-            $sf          = array();
-            $sff         = array();
-            $is_skip     = false;
-            $sf["field"] = $fld["name"];
-            $sf["label"] = $human_name;
-            $sf["type"]  = "plaintext";
-
-            $sff["field"] = $fld["name"];
-            $sff["label"] = $human_name;
-
-            if ($fld["is_nullable"] = "0" && !$fld["default"]) {
-                $sff["required"] = true;
-            } #if not nullable and no default - required
-
-            if ($fld["maxlen"] > 0) {
-                $sff["maxlength"] = intval($fld["maxlen"]);
-            }
-            if ($fld["fw_type"] == "varchar") {
-                if ($fld["maxlen"] == -1 || $fld["type"] == 'text') { #large text
-                    $sf["type"]           = "markdown";
-                    $sff["type"]          = "textarea";
-                    $sff["rows"]          = 5;
-                    $sff["class_control"] = "markdown autoresize"; #or fw-html-editor or fw-html-editor-short
-                } else {
-                    $sff["type"] = "input";
-                }
-
-            } elseif ($fld["fw_type"] == "int") {
-                if (str_ends_with($fld["name"], "_id") && $fld["name"] != "dict_link_auto_id") { #TODO remove dict_link_auto_id
-                    #TODO better detect if field has foreign key
-                    #if link to other table - make type=select
-                    $mname = $this->_tablename2model(substr($fld["name"], 0, strlen($fld["name"]) - 3));
-                    if ($mname == "Parent") {
-                        $mname = $model_name;
-                    }
-
-                    $sf["lookup_model"] = $mname;
-                    #$sf["lookup_field"] = "iname"
-
-                    $sff["type"]           = "select";
-                    $sff["lookup_model"]   = $mname;
-                    $sff["is_option0"]     = true;
-                    $sff["class_contents"] = "col-md-3";
-
-                } elseif ($fld["type"] == "tinyint") {
-                    #make it as yes/no radio
-                    $sff["type"]      = "yesno";
-                    $sff["is_inline"] = true;
-                } else {
-                    $sff["type"]           = "number";
-                    $sff["min"]            = 0;
-                    $sff["max"]            = 999999;
-                    $sff["class_contents"] = "col-md-3";
-                }
-            } elseif ($fld["fw_type"] == "float") {
-                $sff["type"]           = "number";
-                $sff["step"]           = 0.1;
-                $sff["class_contents"] = "col-md-3";
-
-            } elseif ($fld["fw_type"] == "datetime") {
-                $sf["type"]            = "date";
-                $sff["type"]           = "date_popup";
-                $sff["class_contents"] = "col-md-3";
-                #TODO distinguish between date and date with time
-            } else {
-                #everything else - just input
-                $sff["type"] = "input";
-            }
-
-            if ($fld["is_identity"] == "1") {
-                $sff["type"] = "group_id";
-                unset($sff["required"]);
-            }
-
-            #special fields
-            switch ($fld["name"]) {
-                case "iname":
-                    $sff["validate"] = "exists"; #unique field
-                    break;
-
-                case "att_id": #Single attachment field - TODO better detect on foreign key to "att" table
-                    $sf["type"]           = "att";
-                    $sf["label"]          = "Attachment";
-                    $sf["class_contents"] = "col-md-2";
-                    unset($sff["lookup_model"]);
-
-                    $sff["type"]           = "att_edit";
-                    $sff["label"]          = "Attachment";
-                    $sff["class_contents"] = "col-md-3";
-                    $sff["att_category"]   = "general";
-                    unset($sff["class_contents"]);
-                    unset($sff["lookup_model"]);
-                    unset($sff["is_option0"]);
-                    break;
-
-                case "status":
-                    $sf["label"]      = "Status";
-                    $sf["lookup_tpl"] = "/common/sel/status.sel";
-
-                    $sff["label"]          = "Status";
-                    $sff["type"]           = "select";
-                    $sff["lookup_tpl"]     = "/common/sel/status.sel";
-                    $sff["class_contents"] = "col-md-3";
-                    break;
-
-                case "add_time":
-                    $sf["label"] = "Added on";
-                    $sf["type"]  = "added";
-
-                    $sff["label"] = "Added on";
-                    $sff["type"]  = "added";
-                    break;
-
-                case "upd_time":
-                    $sf["label"] = "Updated on";
-                    $sf["type"]  = "updated";
-
-                    $sff["label"] = "Updated on";
-                    $sff["type"]  = "updated";
-                    break;
-
-                case "add_users_id":
-                case "upd_users_id":
-                    $is_skip = true;
-                    break;
-
-                default:
-                    #nothing else
-                    break;
-            }
-
-            if (!$is_skip) {
-                $showFields[]     = $sf;
-                $showFormFields[] = $sff;
-            }
-
-            if ($fld["is_identity"] == "1" || in_array($fld["name"], $sys_fields)) {
-                continue;
-            }
-            $saveFields[] = $fld["name"];
-        }
-        unset($fld);
-        logger('$hfields:', $hfields);
-
-        $config["model"]                  = $model_name;
-        $config["save_fields"]            = $saveFields; #save all non-system
-        $config["save_fields_checkboxes"] = "";
-        $config["save_fields_nullable"]   = $saveFieldsNullable;
-        $config["search_fields"]          = "id" . (array_key_exists('iname', $hfields) ? ' iname' : ''); #id iname
-        $config["list_sortdef"]           = (array_key_exists('iname', $hfields) ? 'iname asc' : 'id desc'); #either sort by iname or id
-        unset($config["list_sortmap"]); #N/A in dynamic controller
-        unset($config["required_fields"]); #not necessary in dynamic controller as controlled by showform_fields required attribute
-        $config["related_field_name"] = ""; #TODO?
-        $config["list_view"]          = $model->table_name;
-        $config["view_list_defaults"] = "id" . (array_key_exists('iname', $hfields) ? ' iname' : '') . (array_key_exists('add_time', $hfields) ? ' add_time' : '') . (array_key_exists('status', $hfields) ? ' status' : '');
-        $config["view_list_map"]      = $hFieldsMap; #fields to names
-        $config["view_list_custom"]   = "status";
-        $config["show_fields"]        = $showFields;
-        $config["showform_fields"]    = $showFormFields;
-
-        #remove all commented items - name start with "#"
-        foreach (array_keys($config) as $key) {
-            if (substr($key, 0, 1) == '#') {
-                unset($config[$key]);
-            }
-        }
-        logger("BEFORE SAVE:", $config);
-
-        #Utils.jsonEncode(config) - can't use as it produces unformatted json string
-        $config_str = json_encode($config, JSON_PRETTY_PRINT);
-        file_put_contents($config_file, $config_str);
 
         $this->fw->flash("controller_created", $controller_name);
         $this->fw->flash("controller_url", $controller_url);
@@ -347,6 +219,19 @@ class DevManageController extends FwController {
         fw::redirect($this->base_url);
     }
 
+    public function LibManAction() {
+        $jsonPath = $this->fw->config->SITE_ROOT . '/php/libman.json';
+        $rootPath = $this->fw->config->SITE_ROOT;
+
+        rw("started libman install");
+        rw("jsonPath: $jsonPath");
+        rw("rootPath: $rootPath");
+
+        $libman = new PhpLibMan($jsonPath, $rootPath);
+        $libman->install();
+
+        rw("done");
+    }
 
     private function _models() {
         $result = array();
@@ -448,5 +333,3 @@ class DevManageController extends FwController {
     }
 
 }
-
-?>

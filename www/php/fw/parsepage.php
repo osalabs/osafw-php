@@ -1,10 +1,13 @@
 <?php
+
+/**
+ * ParsePage - Template Parser
+ *
+ * Part of PHP osa framework  www.osalabs.com/osafw/php
+ * (c) 2009-2025 Oleg Savchuk www.osalabs.com
+ */
+
 /*
-ParsePage - Site Template Parser
-
-Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
-
 2006-07-15 Oleg Savchuk - fixed inline tags parsing
 2006-12-30 - fixed parse_page_sort_tags (added \b)
 2009-03-28 - added multi-language support
@@ -33,7 +36,7 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 2012-11-29 - if/unless fixes
 2012-12-01 - added get_selvalue fuction
 2012-12-04 - added support of SESSION/GLOBAL to repeat
-2013-02-23 - vvalue="abc" - actual value got via hfvalue('abc', $hf);
+2013-02-23 - vvalue="abc" - actual value got via getVariableValue('abc', $data);
 2013-04-04 - removed evaled parse_page_if
 2013-04-04 - changed ifXX to perl-notation, ex: neq => eq see below (!!!)
 2013-04-04 - removed cols support from repeat
@@ -53,104 +56,98 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 2018-07-29 - added more secure headers
 2019-01-31 - added json, PARSEPAGE.TOP, PARSEPAGE.PARENT
 2019-02-01 - added sub="var" support
- */
-require_once dirname(__FILE__) . "/lock.php";
+2025-01-11 - converted to ParsePage class and PHP 8.3+
+2025-01-16 - comments support <~#tag>
+2025-01-17 - added support for attributes: currency, url, noparse
 
-/*
 ##########################################################
-Universal Page parser
-ATTENTION! this version of parse_page assumes all templates under $CONFIG['SITE_TEMPLATES'] dir, so root path is $CONFIG['SITE_TEMPLATES']
-mode autodetect $out_filename='' or 's' - variable/screen, >'' - to file $out_filename
 tags in templates should be in <~name [attributes]> format
 <~var[aaa][0][bbb]>  - also supported
 
-# DEPRECATED:
-# if="php expression" - tag/template will be parsed only if expression is true, notes:
-#    vars from $hf can be used as $var_name
-#    > comparison sign MUST be written as &gt; (for faster tag parsing)
-#    example: <~aaa if="$bbb < 100"> <~ccc if="$bbb &gt; 100"> <~xxx if="$yyy eq $zzz">
-
 # Supported attributes:
 
-var - tag is variable, no fileseek necessary
-ifXX - if confitions
-ifeq="var" value="XXX" - tag/template will be parsed only if var=XXX
-ifne="var" value="XXX" - tag/template will be parsed only if var!=XXX
-ifgt="var" value="XXX" - tag/template will be parsed only if var>XXX
-ifge="var" value="XXX" - tag/template will be parsed only if var>=XXX
-iflt="var" value="XXX" - tag/template will be parsed only if var<XXX
-ifle="var" value="XXX" - tag/template will be parsed only if var<=XXX
-
-## old mapping
-neq => ne
-ge => gt
-le => lt
-gee => ge
-lee => le
+var - tag is variable, no fileseek necessary if var is not present in $data
+ifXX - if conditions
+    ifeq="var" value="XXX" - tag/template will be parsed only if var=XXX
+    ifne="var" value="XXX" - tag/template will be parsed only if var!=XXX
+    ifgt="var" value="XXX" - tag/template will be parsed only if var>XXX
+    ifge="var" value="XXX" - tag/template will be parsed only if var>=XXX
+    iflt="var" value="XXX" - tag/template will be parsed only if var<XXX
+    ifle="var" value="XXX" - tag/template will be parsed only if var<=XXX
 
 vvalue - value as hf variable:
-<~tag ifeq="var" vvalue="YYY"> - actual value got via hfvalue('YYY', $hf);
+    <~tag ifeq="var" vvalue="YYY"> - actual value got via getVariableValue('YYY', $data);
 
-#shortcuts
-<~tag if="var"> - tag will be shown if var is evaluated as TRUE, not using eval(), equivalent to "if ($var)"
-<~tag unless="var"> - tag will be shown if var is evaluated as TRUE, not using eval(), equivalent to "if (!$var)"
+if/unless shortcuts:
+    <~tag if="var"> - tag will be shown if var is evaluated as TRUE, not using eval(), equivalent to "if ($var)"
+    <~tag unless="var"> - tag will be shown if var is evaluated as TRUE, not using eval(), equivalent to "if (!$var)"
 -------------------------
-TRUE values:
-non-empty string, but not equal to '0'!
-1 or other non-zero number
-true (boolean)
+True/False determined according boolval():
+    TRUE values:
+      non-empty string, but not equal to '0'!
+      1 or other non-zero number
+      true (boolean)
 
-FALSE values:
-'0'
-0
-false (boolean)
-''
-unset variable
+    FALSE values:
+      '0'
+      0
+      false (boolean)
+      ''
+      unset variable
 -------------------------
 
-repeat - this tag is repeat content ($hf hash should contain reference to array of hashes),
-supported repeat vars:
-repeat.first (0-not first, 1-first)
-repeat.last  (0-not last, 1-last)
-repeat.total (total number of items)
-repeat.index  (0-based)
-repeat.iteration (1-based)
+repeat - use $data[tag] (array of hashes) for repeat content, the following vars can be used in repeat template:
+    repeat.first (0-not first, 1-first)
+    repeat.last  (0-not last, 1-last)
+    repeat.total (total number of items)
+    repeat.index  (0-based)
+    repeat.iteration (1-based)
+    example:  <~/common/comma unless="repeat.last"> - will add comma template for all but last item
 
-sub - this tag tell parser to use subhash for parse subtemplate ($hf hash should contain reference to hash), examples:
-<~tag sub inline>...</~tag>- use $hf[tag] as hashtable for inline template
-<~tag sub="var"> - use $hf[var] as hashtable for template in "tag.html"
-inline - this tag tell parser that subtemplate is not in file - it's between <~tag>...</~tag> , useful in combination with 'repeat' and 'if'
-global - this tag is a global var, not in $hf hash
-global[var] - also possible
-session - this tag is a $_SESSION var, not in $hf hash
-session[var] - also possible
-parent - this tag is a $parent_hf var, not in current $hf hash
-select="var" - this tag tell parser to either load file with tag name and use it as value|display for <select> tag
-or if variable with tag name exists - use it as arraylist of hashtables with id/iname keys
-, example:
-<select name="item[fcombo]">
-<option value=""> - select -
-<~./fcombo.sel select="fcombo">  or <~fcombo_options select="fcombo">
-</select>
-radio="var" name="YYY" [delim="CLASSNAM"]- this tag tell parser to load file and use it as value|display for <input type=radio> tags, example:
-<~./fradio.sel radio="fradio" name="item[fradio]" delim="custom-control-inline">
+sub - this attribute tell parser to use sub-hashtable for parse subtemplate ($data hash should contain reference to hash), examples:
+  <~tag sub inline>...</~tag>- use $data[tag] as hashtable for inline template
+  <~tag sub="var"> - use $data[var] as hashtable for template in "tag.html"
+inline - this attribute tell parser that subtemplate is not in file - it's between <~tag>...</~tag> , useful in combination with 'repeat' and 'if'
+global - this attribute is a global var, not in $data hash
+  <~GLOBAL[var]> - also possible
+session - this tag is a $_SESSION var, not in $data hash
+  <~SESSION[var]> - also possible
+parent - this tag is a $parent_hf var, not in current $data hash
+  <~PARSEPAGE.PARENT[var]> - also possible (parent $data)
+  <~PARSEPAGE.TOP[var]> - also possible (topmost $data)
+
+select="var" - this attribute tells parser to either load file with tag name and use it as value|display for <select> tag
+    or if variable with tag name exists - use it as arraylist of hashtables with id/iname keys
+    , example:
+    <select name="item[fcombo]">
+        <option value=""> - select -
+        <~./fcombo.sel select="fcombo">  or <~fcombo_options select="fcombo">
+    </select>
+
+radio="var" name="YYY" [delim="CLASSNAME"]- this attribute tell parser to load file and use it as value|display for <input type=radio> tags, example:
+    <~./fradio.sel radio="fradio" name="item[fradio]" delim="custom-control-inline">
+
 selvalue="var" - display value (fetched from the .sel file) for the var (example: to display 'select' and 'radio' values in List view)
-ex: <~../fcombo.sel selvalue="fcombo">  or <~fcombo_options selvalue="fcombo">
-nolang - for subtemplates - use default language instead of current (usually english)
-htmlescape - replace special symbols by their html equivalents (such as <>,",')
+    ex: <~../fcombo.sel selvalue="fcombo">  or <~fcombo_options selvalue="fcombo">
+
+nolang - do not parse lang strings in backticks `Hello`, files only, not "inline" templates (this automatically applied for .js files)
+noescape - do not escape variable
+htmlescape - (by default) replace special symbols by their html equivalents (such as <>,",')
 
 support `text` => replaced by multilang from $CONFIG['SITE_TEMPLATES']/lang/$lang.txt according to $GLOBAL['lang'] (if !='' - english by default)
-example: <b>`Hello`</b>
-lang.txt line format:
-english string === lang string
+    example: <b>`Hello`</b>
+    lang.txt line format:
+    english string === lang string
 
 support modifiers:
-htmlescape
 date          - format as datetime, sample "d M Y H:i", see http://php.net/manual/en/function.date.php
-<~var date>         output "m/d/Y" - date only (TODO - should be formatted per user settings actually)
-<~var date="short"> output "m/d/Y H:i" - date and time short (to mins)
-<~var date="long">  output "m/d/Y H:i:s" - date and time long
-<~var date="sql">   output "Y-m-d H:i:s" - sql date and time
+    <~var date>         output "m/d/Y" - date only (TODO - should be formatted per user settings actually)
+    <~var date="short"> output "m/d/Y H:i" - date and time short (to mins)
+    <~var date="long">  output "m/d/Y H:i:s" - date and time long
+    <~var date="sql">   output "Y-m-d H:i:s" - sql date and time
+currency[="USD"]      - NumberFormatter::formatCurrency(value, "3 letter ISO 4217 currency code") => $12,345.12
+string_format
+sprintf
 truncate
 strip_tags
 trim
@@ -160,1084 +157,1243 @@ lower
 upper
 default
 urlencode
-json (was var2js) - produces json-compatible string, example: {success:true, msg:""}
+url             - add https:// to begin of string if absent
+json[="pretty"] - produces json-compatible string, example: {success:true, msg:""}
+noparse       - doesn't parse file and just include file by tag path as is, ignores all other attrs except if
  */
 
-// !!!RECURSIVE
-// $page - if set - contains page contents (no need to read file!), $tpl_name in this case is just for helping determine relative dirs
-$PARSE_PAGE_OPS = array('if', 'unless', 'ifeq', 'ifne', 'ifgt', 'iflt', 'ifge', 'ifle');
+class ParsePage {
+    private static array $langCacheGlobal = []; //Cache for loaded language files - shared across all ParsePage instances
 
-#open/close tags, must be regexp compatible!
-$PARSE_PAGE_OPEN_TAG    = '<~';
-$PARSE_PAGE_CLOSE_TAG   = '>';
-$PARSE_PAGE_OPENEND_TAG = '</~'; #open for end inline tag
+    /**************************************************************************
+     * Configuration & Internal Properties
+     **************************************************************************/
+    private array $parsePageOps = ['if', 'unless', 'ifeq', 'ifne', 'ifgt', 'iflt', 'ifge', 'ifle']; //Supported conditions for if/unless attributes
+    private string $openTag = '<~'; //Opening tag for parse patterns
+    private string $closeTag = '>'; //Closing tag for parse patterns
+    private string $openEndTag = '</~'; //Closing tag for inline subtemplates
 
-$PARSE_PAGE_LANG_PARSE = 1; #parse lang strings in `` or not - 1 - parse(default), 0 - no
+    // runtime configuration
+    private string $templatesRoot; //templates root path
+    private string $rootUrl = ''; //Root URL for the site
+    /* @var array|callable */
+    private $globals = []; //Global variables
+    private string $language = 'en'; //Current language
+    private string $languageDir = '/lang'; //Directory for language files, relative to templates root
+    private bool $isLanguageUpdate = false; //true if auto-add missing language strings to lang file
 
-$PARSE_PAGE_DATA_TOP = array(); #used fro PARSEPAGE.TOP
+    // working variables
+    private array $dataTop = []; //Data top-level reference (similar to PARSE_PAGE_DATA_TOP in original)
+    private bool $langParse = true; //Whether to parse language strings enclosed in backticks
+    private array $fileCache = []; //File cache for loaded template files to prevent re-loading from disk
+    private string $baseDir = ''; //base directory for current Page
 
-function parse_page($basedir, $tpl_name, $hf, $out_filename = '') {
-    $GLOBALS['PARSE_PAGE_DATA_TOP'] = &$hf;
+    // preg_quoted versions for performance
+    private string $openTagQuoted;
+    private string $closeTagQuoted;
+    private string $openEndTagQuoted;
 
-    $page = _parse_page($basedir, $tpl_name, $hf);
-
-    if ($out_filename && $out_filename != 'v' && $out_filename != 's') {
-        $outdir = dirname($out_filename); //check dir
-        if (!is_dir($outdir)) {
-            mkdir($outdir, 0777);
+    /**
+     * Constructor
+     *
+     * @param array $options can contain:
+     *   string `templatesRoot` - Root path for templates - REQUIRED here or via setTemplatesRoot()
+     *   string `rootUrl` - Root URL for the site
+     *   array|callable `globals` - Global variables
+     *   string `language` - Language code (default: 'en')
+     *   string `languageDir` - Directory for language files, relative to templates root
+     *   bool `isLangUpdate` - Whether to auto-add missing language strings to lang file
+     */
+    public function __construct(array $options = []) {
+        //string $templatesRoot, $rootUrl, array $globals, string $language = null, string $languageDir = null, bool $isLanguateUpdate = false) {
+        // Apply any known options using chainable setters
+        if (isset($options['templatesRoot'])) {
+            $this->setTemplatesRoot($options['templatesRoot']);
+        }
+        if (isset($options['rootUrl'])) {
+            $this->setRootUrl($options['rootUrl']);
+        }
+        if (isset($options['globals'])) {
+            $this->setGlobals($options['globals']);
+        }
+        if (isset($options['language'])) {
+            $this->setLanguage($options['language']);
+        }
+        if (isset($options['languageDir'])) {
+            $this->setLanguageDir($options['languageDir']);
+        }
+        if (isset($options['isLangUpdate'])) {
+            $this->setLangUpdate($options['isLangUpdate']);
         }
 
-        $OUTFILE = fopen($out_filename, "w") or die("Can't open out [$out_filename] file");
-        fputs($OUTFILE, $page);
-        fclose($OUTFILE);
-    } else {
-        if ($out_filename == 'v') { #variable mode
-            return $page;
-        } else { #screen mode
-            print_header();
-            print $page; #no XSS here intended to output html
+        $this->initTagQuotes();
+    }
+
+    private function initTagQuotes(): void {
+        // Pre-compile quoted versions of open/close tags for performance
+        $this->openTagQuoted    = preg_quote($this->openTag, '/');
+        $this->closeTagQuoted   = preg_quote($this->closeTag, '/');
+        $this->openEndTagQuoted = preg_quote($this->openEndTag, '/');
+    }
+
+    /*************************************************************************
+     * Chainable Setters (return $this)
+     *************************************************************************/
+    public function setTemplatesRoot(string $path): self {
+        $this->templatesRoot = rtrim($path, '/');
+        return $this;
+    }
+
+    public function setRootUrl(string $url): self {
+        $this->rootUrl = $url;
+        return $this;
+    }
+
+    /**
+     * Accept either an array or a callable.
+     * If callable, we can later do call_user_func($this->globals).
+     */
+    public function setGlobals(array|callable $globals): self {
+        $this->globals = $globals;
+        return $this;
+    }
+
+    public function setLanguage(string $lang): self {
+        $this->language = $lang;
+        return $this;
+    }
+
+    public function setLanguageDir(string $dir): self {
+        $this->languageDir = $dir;
+        return $this;
+    }
+
+    public function setLangUpdate(bool $flag): self {
+        $this->isLanguageUpdate = $flag;
+        return $this;
+    }
+
+    /**************************************************************************
+     * Public API - parsePage
+     **************************************************************************/
+
+    /**
+     * Main entry point for parsing a template.
+     *
+     * @param string $baseDir Base directory relative to SITE_TEMPLATES
+     * @param string $templateName The template file name or path
+     * @param array $data Hash of data to substitute
+     * @return string         Parsed result (if outputMode='v'), otherwise prints or writes file
+     * @throws Exception
+     */
+    public function parsePage(string $baseDir, string $templateName, array $data): string {
+        $this->logger("NOTICE", "Parsing template [$templateName] with baseDir [$baseDir]");
+        //validate $this->templatesRoot is set
+        if ($this->templatesRoot === '') {
+            throw new Exception('ParsePage - templatesRoot not set');
         }
-    }
-}
 
-function _parse_page($basedir, $tpl_name, $hf, $page = '', $parent_hf = 0) {
-    global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG;
-    global $CONFIG;
+        // Set top-level data reference
+        $this->dataTop = &$data;
+        $this->baseDir = rtrim($baseDir, '/');
 
-    //make path 'absolute'
-    if (!preg_match("/^\//", $tpl_name)) {
-        $tpl_name = "$basedir/$tpl_name";
-    }
-
-    #logger('TRACE', "parsing $tpl_name");
-
-    if (!$page) {
-        //load template
-        $page = precache_file($CONFIG['SITE_TEMPLATES'] . $tpl_name);
+        // Parse the template content
+        $parsedOutput = $this->parseTemplate($templateName, $data);
+        #$this->logger("DEBUG", "Parsed page output: $parsedOutput");
+        return $parsedOutput;
     }
 
-    if ($page) { //if template empty - don't parse it
+    /**
+     * Parse template content from a string.
+     *
+     * @param string $template
+     * @param array $data
+     * @return string
+     * @throws Exception
+     */
+    public function parseString(string $template, array $data): string {
+        // Set top-level data reference
+        $this->dataTop = &$data;
+        $this->baseDir = '/';
 
-        parse_lang($page);
+        // Parse the template content
+        $parsedOutput = $this->parseTemplate('', $data, $template);
+        #$this->logger("DEBUG", "Parsed string output: $parsedOutput");
+        return $parsedOutput;
+    }
 
-        //get all tags with attributes needed to be filled
-        preg_match_all("/$PARSE_PAGE_OPEN_TAG([^$PARSE_PAGE_CLOSE_TAG]+)$PARSE_PAGE_CLOSE_TAG/", $page, $out, PREG_PATTERN_ORDER);
-        $tags_full = $out[1];
-        //rw("$tpl_name: found ".count($tags_full)." tags");
+    /**************************************************************************
+     * Internal Parsing Methods
+     **************************************************************************/
 
-        if (count($tags_full) > 0) { //if there are no tags found - dont' parse it
-            $hf['ROOT_URL'] = $CONFIG['ROOT_URL'];
-            // rw("hf=".count($hf)." ");
+    /**
+     * Load and parse the template by scanning for <~tag [attrs]>, inline subtemplates, etc.
+     *
+     * @param string $templateName Template file path/name (will be appended to $baseDir if not absolute)
+     * @param array $data key/value of data for substitutions
+     * @param string $inlineContent Internal usage only (inline template content if any)
+     * @param array|null $parentData Parent data for 'parent' attributes
+     * @param array|null $parentAttrs Parent attributes
+     * @return string    Parsed template content
+     * @throws Exception
+     */
+    private function parseTemplate(string $templateName, array $data, string $inlineContent = '', array $parentData = null, array $parentAttrs = null): string {
+        #$this->logger("DEBUG", "Parsing template: [$templateName]" . ($inlineContent !== '' ? ' inline' : ''));
+        // Resolve the full template path
+        $templateName = $this->getFullTemplatePath($templateName);
 
-            //re-sort $tags_full, so all 'inline' and 'sub' tags will be parsed first
-            $tags_full = parse_page_sort_tags($tags_full);
-            #logger($tags_full);
+        // Load the template file if inline content not provided
+        $content = ($inlineContent !== '' ? $inlineContent : $this->loadTemplate($templateName));
+        if ($content === '') {
+            $this->logger("TRACE", "ParsePage - empty template: [$templateName]");
+            return ''; // empty template - nothing to parse
+        }
 
-            $TAGSEEN = array();
-            for ($i = 0; $i < count($tags_full); $i++) {
-                $tag_full = $tags_full[$i];
-                if (array_key_exists($tag_full, $TAGSEEN)) {
-                    continue;
-                }
+        //parse lang if caller attrs doesn't have "nolang" key and tpl_name is not .js file
+        if (!isset($parentAttrs['nolang']) && !str_ends_with($templateName, '.js')) {
+            $this->parseLanguage($content);
+        }
 
-                $TAGSEEN[$tag_full] = 1;
-                #logger($tag_full);
+        // Grab all <~...> tags from content
+        $pattern = '/' . $this->openTagQuoted . '([^' . $this->closeTagQuoted . ']+)' . $this->closeTagQuoted . '/';
+        if (preg_match_all($pattern, $content, $matches)) {
+            $tags = $matches[1];
 
-                $tag   = '';
-                $attrs = array();
-                if (!preg_match("/\s/", $tag_full)) { //if tag doesn't have attrs - don't parse attrs
-                    $tag = $tag_full;
-                } else { //now cut attrs  <abcd attr1="aa a" attr2='b bb' attr3=ccc attr4> => abcd, attr1="aa a", attr2='b bb', attr3=ccc, attr4
-                    preg_match_all("/((?:\S+\=\".*?\")|(?:\S+\='.*?')|(?:[^'\"\s]+)|(?:\S+\=\S*))/", $tag_full, $out, PREG_PATTERN_ORDER);
-                    $attrs_raw = $out[1];
-                    //dumparr($attrs_raw);
-                    //rw($tag." => ".$attrs_raw);
-                    //echo Dumper(@attrs);
-
-                    $tag = $attrs_raw[0];
-                    for ($j = 0; $j < count($attrs_raw); $j++) {
-                        $attr = $attrs_raw[$j];
-                        //rw("search attr [$attr]");
-                        if (preg_match("/(?:(\S+)\=\"([^\"]*)\")|(?:(\S+)\=(\S*))|(?:(\S+)\='([^']*)')/", $attr, $match)) { //split attr and it's value
-                            $name  = $match[1];
-                            $value = $match[2];
-                            //rw("attr [$attr] $name => $value");
-                            $attrs[$name] = $value;
-                        } else {
-                            $attrs[$attr] = "";
-                        }
-                    }
-                }
-                #echo "tag=$tag_full<br>\n";
-
-                if (tag_if($attrs, $hf)) {
-                    //check for inline template and prepare it
-                    $inline_tpl    = '';
-                    $is_inline_tpl = false;
-
-                    if (count($attrs) > 0) {
-                        //check only if there are some attrs
-                        if (array_key_exists('inline', $attrs)) {
-                            $is_inline_tpl = true;
-                            $inline_tpl    = get_inline_tpl($page, $tag, $tag_full);
-                            #rw("inline = $inline_tpl");
-                        }
-
-                        if (array_key_exists('global', $attrs)) {
-                            //get var from GLOBALS, not from $hf
-                            $tagvalue = hfvalue($tag, fw::i()->GLOBAL); #was: $GLOBALS
-                        } elseif (array_key_exists('session', $attrs)) {
-                            //get var from SESSION, not from $hf
-                            $tagvalue = hfvalue($tag, $_SESSION);
-                        } elseif (array_key_exists('parent', $attrs) && is_array($parent_hf)) {
-                            //get var from parent $hf, not from current $hf (for use original $hf in sub and repeat's)
-                            $tagvalue = hfvalue($tag, $parent_hf);
-                        } else {
-                            //get usual var
-                            $tagvalue = hfvalue($tag, $hf, $parent_hf);
-                        }
-                    } else {
-                        $tagvalue = hfvalue($tag, $hf, $parent_hf);
-                    }
-
-                    #            $attr_lang='';
-                    #            if ( array_key_exists('lang', $attrs) ) $attr_lang=$attrs['lang'];
-
-                    //start working with tag value
-                    if (!is_null($tagvalue)) {
-                        //rw("$tag EXISTS");
-
-                        if (array_key_exists('repeat', $attrs)) { //if this is 'repeat' tag parse as datarow
-                            if (is_array($tagvalue)) {
-                                $repeat_array = $tagvalue;
-                                $tagvalue     = '';
-                                $hfcount      = count($repeat_array);
-                                $k1           = 0;
-                                foreach ($repeat_array as $k => $v) {
-                                    $hfrow                     = $v;
-                                    $hfrow['repeat.last']      = ($k1 == $hfcount - 1) ? 1 : 0;
-                                    $hfrow['repeat.first']     = ($k1 == 0) ? 1 : 0;
-                                    $hfrow['repeat.even']      = ($k1 % 2) ? 1 : 0;
-                                    $hfrow['repeat.odd']       = ($k1 % 2) ? 0 : 1;
-                                    $hfrow['repeat.index']     = $k1;
-                                    $hfrow['repeat.iteration'] = $k1 + 1;
-                                    $hfrow['repeat.total']     = $hfcount;
-                                    $tagvalue                  .= _parse_page($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $hfrow, $inline_tpl, $hf);
-                                    $k1++;
-                                }
-                            } else {
-                                logger('DEBUG', 'ParsePage warning - not an array passed to repeat tag = ' . $tag); #DEBUG cause this dev error happens frequently
-                                $tagvalue = '';
-                            }
-                        } elseif (array_key_exists('select', $attrs)) {
-                            #this is special case for '<select>' HTML tag when options passed as array
-                            $tagvalue = parse_select_tag($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $tag, $hf, $attrs);
-                        } elseif (array_key_exists('selvalue', $attrs)) {
-                            $tagvalue = parse_selvalue_tag($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $tag, $hf, $attrs);
-                            if (!array_key_exists('noescape', $attrs)) {
-                                $tagvalue = htmlescape($tagvalue);
-                            }
-                        } elseif (array_key_exists('sub', $attrs)) { //if this is 'sub' tag - parse it as independent subtemplate
-                            $tagvalue = _tag_sub($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $tag, $hf, $attrs, $inline_tpl, $parent_hf, $tagvalue);
-                        } else { //if usual tag - replace it with tagvalue got above
-                            #CSRF shield +1
-                            if ($tagvalue > "" && !array_key_exists('noescape', $attrs)) {
-                                $tagvalue = htmlescape($tagvalue);
-                            }
-                        }
-                        $page = tag_replace($page, $tag_full, $tagvalue, $attrs);
-                    } elseif (array_key_exists('repeat', $attrs)) {
-                        //if it's repeat tag, but tag value empty - just replace with empty string
-                        $page = tag_replace($page, $tag_full, '', $attrs);
-                    } elseif (array_key_exists('var', $attrs)) {
-                        //if tag doesn't exists in $hf and it's marked as variable (var)
-                        //then don't make subparse and just replace to empty string for more performance
-                        $page = tag_replace($page, $tag_full, "", $attrs);
-                    } elseif (array_key_exists('select', $attrs)) {
-                        //this is special case for '<select>' HTML tag
-                        $v    = parse_select_tag($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $tag, $hf, $attrs);
-                        $page = tag_replace($page, $tag_full, $v, $attrs);
-                    } elseif (array_key_exists('radio', $attrs)) {
-                        //this is special case for '<index type=radio>' HTML tag
-                        $v    = parse_radio_tag($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $hf, $attrs);
-                        $page = tag_replace($page, $tag_full, $v, $attrs);
-                    } elseif (array_key_exists('selvalue', $attrs)) {
-                        //this is special case for displaying just one selected value (for '<select>' or '<index type=radio>' HTML tags
-                        $v = parse_selvalue_tag($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $tag, $hf, $attrs);
-                        if (!array_key_exists('noescape', $attrs)) {
-                            $v = htmlescape($v);
-                        }
-
-                        $page = tag_replace($page, $tag_full, $v, $attrs);
-                    } else {
-                        #also checking for sub
-                        if (array_key_exists('sub', $attrs)) {
-                            $v = _tag_sub($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $tag, $hf, $attrs, $inline_tpl, $parent_hf, $tagvalue);
-                        } else {
-                            //if tag is not set and not a var - then it's subtemplate in a file - parse it
-                            //echo "$tag SUBPARSE<br>\n";
-                            $v = _parse_page($basedir, tag_tplpath($tag, $tpl_name, $is_inline_tpl), $hf, $inline_tpl, $hf);
-                        }
-                        $page = tag_replace($page, $tag_full, $v, $attrs);
-                    }
-                } else {
-                    $page = tag_replace_raw($page, $tag_full, '', array_key_exists('inline', $attrs));
-                    // print "$tag not shown\n";
+            // Sort tags so 'inline' / 'sub' are processed first
+            $isSort = false;
+            foreach ($tags as $t) {
+                if (preg_match('/\b(inline|sub)\b/', $t)) {
+                    $isSort = true;
+                    break;
                 }
             }
-        } //if tags empty
-    } else { //if  tpl empty
-        logger('TRACE', "ParsePage notice - empty template [$tpl_name]");
+            if ($isSort) {
+                $tags = $this->sortTags($tags);
+            }
+
+            // Insert config-based special variables if needed (ROOT_URL, etc.)
+            $data['ROOT_URL'] = $this->rootUrl ?? '';
+
+            // Process each tag
+            $seenTags = []; #tag => true
+            foreach ($tags as $tagFull) {
+                if (isset($seenTags[$tagFull])) {
+                    continue;
+                }
+                $seenTags[$tagFull] = true;
+
+                $content = $this->processTag($content, $tagFull, $data, $templateName, $parentData);
+            }
+        } // else no tags found - nothing to parse
+
+        return $content;
     }
 
-    #logger('TRACE', "End of $tpl_name");
-    return $page;
-}
-
-function print_header() {
-    print header("Content-Type: text/html; charset=utf-8");
-    #security headers - https://infosec.mozilla.org/guidelines/web_security
-    print header("X-Content-Type-Options: nosniff");
-    print header("Content-Security-Policy: frame-ancestors 'self'");
-    print header("X-Frame-Options: DENY");
-    #print header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
-    print header("X-XSS-Protection: 1; mode=block");
-    print header("X-Permitted-Cross-Domain-Policies: master-only");
-}
-
-############## return value from hf , support arrays/hashes
-function hfvalue($tag, &$hf, &$parent_hf = null) {
-    global $PARSE_PAGE_DATA_TOP;
-
-    $value = null;
-    if (!isset($tag)) {
-        return $value;
+    /**
+     * Sort tags so that those containing 'inline' or 'sub' attributes go first.
+     * This ensures inline and sub-templates get parsed at the correct time.
+     */
+    private function sortTags(array $tags): array {
+        $inlineSubTags = [];
+        $otherTags     = [];
+        foreach ($tags as $tag) {
+            if (preg_match('/\b(inline|sub)\b/', $tag)) {
+                $inlineSubTags[] = $tag;
+            } else {
+                $otherTags[] = $tag;
+            }
+        }
+        // Merge inline/sub tags first, then the rest
+        return array_merge($inlineSubTags, $otherTags);
     }
 
-    $empty_val = null;
-    if (preg_match("/\[/", $tag)) {
-        $arr    = explode('[', $tag);
-        $parts0 = strtoupper($arr[0]);
+    private function getGlobals(): array {
+        if (is_array($this->globals)) {
+            return $this->globals;
+        } elseif (is_callable($this->globals)) {
+            return call_user_func($this->globals);
+        }
+        return [];
+    }
 
-        if ($parts0 == 'GLOBAL') {
-            #was $ptr=&$GLOBALS;
-            $ptr = fw::i()->GLOBAL;
-            array_shift($arr);
-        } elseif ($parts0 == 'SESSION') {
-            $ptr = &$_SESSION;
-            array_shift($arr);
-        } elseif ($parts0 == 'PARSEPAGE.TOP') {
-            $ptr = &$PARSE_PAGE_DATA_TOP;
-            array_shift($arr);
-        } elseif ($parts0 == 'PARSEPAGE.PARENT' && $parent_hf) {
-            $ptr = &$parent_hf;
-            array_shift($arr);
-        } else {
-            $ptr = &$hf;
+    /**
+     * Process a single tag (e.g. <~tagName attr1="..." attr2="...">)
+     *
+     * @param string $content Template content
+     * @param string $tagFull Full text between <~ and >
+     * @param array $data key/value of data for substitutions
+     * @param string $templateName Current template name
+     * @param array|null $parentData Parent data (for 'parent' references)
+     * @return string                    Updated template content with tag replaced
+     */
+    private function processTag(string $content, string $tagFull, array $data, string $templateName, ?array $parentData): string {
+        #$this->logger("DEBUG", "Processing tag: $tagFull");
+        [$tagName, $attributes] = $this->parseTagAttributes($tagFull);
+
+        // If conditions not met (if/unless/ifeq/ifne/etc), remove entire tag content
+        if (!$this->ifProcessTag($attributes, $data)) {
+            #$this->logger("DEBUG", "Skipping tag [$tagName] due to if/unless condition");
+            return $this->replaceTagRaw($content, $tagFull, $tagName, '', isset($attributes['inline']));
         }
 
-        for ($i = 0; $i < count($arr); $i++) {
-            $k = preg_replace("/\].*?/", '', $arr[$i]); #remove last ]
-            if (is_array($ptr) && array_key_exists($k, $ptr)) {
-                $ptr = &$ptr[$k];
-            } elseif (is_object($ptr) && property_exists($ptr, $k)) {
-                $ptr = $ptr->$k;
+        // Retrieve the variable value for this tag (unless specialized logic below)
+        if ($attributes) {
+            if (isset($attributes['global'])) {
+                // If it's a global var
+                $tagValue = $this->getVariableValue($tagName, $this->getGlobals());
+            } elseif (isset($attributes['session'])) {
+                // If it's a session var
+                $tagValue = $this->getVariableValue($tagName, $_SESSION);
+            } elseif (isset($attributes['parent']) && is_array($parentData)) {
+                // Use parent data
+                $tagValue = $this->getVariableValue($tagName, $parentData);
             } else {
-                $ptr = &$empty_val; #looks like there are just no such key in array OR $ptr is not an array at all - so return empty value
+                // Default: get from local data
+                $tagValue = $this->getVariableValue($tagName, $data, $parentData);
+            }
+        } else {
+            $tagValue = $this->getVariableValue($tagName, $data, $parentData); #no attributes - try to get value from data by tagName
+        }
+
+        // start working with tag value
+        // Now handle specialized attributes: repeat, sub, select, radio, selvalue, inline or just variable
+        if (isset($attributes['repeat'])) {
+            // repeat array
+            return $this->processRepeatTag($content, $tagFull, $tagName, $attributes, $tagValue, $data, $templateName);
+        } elseif (isset($attributes['select'])) {
+            // <select> options
+            return $this->processSelectTag($content, $tagFull, $tagName, $attributes, $data);
+        } elseif (isset($attributes['radio'])) {
+            // <radio> set
+            return $this->processRadioTag($content, $tagFull, $tagName, $attributes, $data);
+        } elseif (isset($attributes['selvalue'])) {
+            // show selected label
+            return $this->processSelvalueTag($content, $tagFull, $tagName, $attributes, $data);
+        } elseif (isset($attributes['noparse'])) {
+            // just include file as is
+            return $this->processNoParseTag($content, $tagFull, $tagName, $attributes, $data, $templateName);
+        } elseif (isset($attributes['sub'])) {
+            // sub-template
+            return $this->processSubTemplate($content, $tagFull, $tagName, $attributes, $tagValue, $data, $parentData, $templateName);
+        } else {
+            // normal variable with possible inline subtemplate
+            return $this->processVariableTag($content, $tagFull, $tagName, $attributes, $tagValue, $data, $parentData, $templateName);
+        }
+    }
+
+    /**
+     * Extract the tag name and its attributes from a "tagFull" string (e.g. `tagName attr1="..." attr2="..."`)
+     *
+     * @param string $tagFull
+     * @return array [tagName, attributes[]]  attributes is an associative array of key/value pairs
+     */
+    private function parseTagAttributes(string $tagFull): array {
+        // Split into tokens by whitespace, first token is tag name
+        if (!preg_match("/\s/", $tagFull)) {
+            // No attributes
+            return [$tagFull, []];
+        }
+
+        // Detailed attribute extraction
+        // <abcd attr1="aa a" attr2='b bb' attr3=ccc attr4> => abcd, attr1="aa a", attr2='b bb', attr3=ccc, attr4
+        preg_match_all("/(\S+=\".*?\"|\S+='.*?'|[^'\"\s]+|\S+=\S*)/", $tagFull, $matches, PREG_PATTERN_ORDER);
+
+        $tokens     = $matches[1];
+        $tagName    = array_shift($tokens);
+        $attributes = [];
+
+        foreach ($tokens as $token) {
+            if (preg_match("/(\S+)=\"([^\"]*)\"|(\S+)=(\S*)|(\S+)='([^']*)'/", $token, $m)) {
+                // attribute="value" or attribute='value' or attribute=value
+                // we combine captures so that name is in $m[1 or 3 or 5], value in $m[2 or 4 or 6]
+                $name              = $m[1] ?: ($m[3] ?? $m[5] ?? '');
+                $value             = $m[2] ?: ($m[4] ?? $m[6] ?? '');
+                $attributes[$name] = $value;
+            } else {
+                // attribute with no value
+                $attributes[$token] = "";
+            }
+        }
+
+        #$this->logger("DEBUG", "Parsed tag [$tagName] attributes: ", $attributes);
+        return [$tagName, $attributes];
+    }
+
+    /**
+     * Determine if a tag should be processed or skipped based on if/unless/ifeq/etc.
+     *
+     * @param array $attributes Tag attributes
+     * @param array $data Data array
+     * @return bool  True if we should process the tag content, false if we skip it
+     */
+    private function ifProcessTag(array $attributes, array $data): bool {
+        // If there is no condition attribute, then show by default
+        if (!$attributes) {
+            return true;
+        }
+
+        $op = '';
+        foreach ($this->parsePageOps as $ppop) {
+            if (isset($attributes[$ppop])) {
+                $op = $ppop;
                 break;
             }
         }
-        $value = $ptr;
-    } else {
-        if (is_array($hf) && array_key_exists($tag, $hf)) {
-            $value = $hf[$tag];
+        if ($op === '') {
+            return true;
         }
-    }
 
-    return $value;
-}
+        // Evaluate condition
+        $varName = $attributes[$op] ?? '';
+        $varVal  = $this->getVariableValue($varName, $data);
 
-##############  extract inline template from page
-function get_inline_tpl(&$page, $tag, $tag_full) {
-    global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG, $PARSE_PAGE_OPENEND_TAG;
-
-    $inline_tpl = '';
-
-    #get inline template first
-    $restr = '/' . preg_quote($PARSE_PAGE_OPEN_TAG . $tag_full . $PARSE_PAGE_CLOSE_TAG, '/') . "(.*?)" . preg_quote($PARSE_PAGE_OPENEND_TAG . $tag . $PARSE_PAGE_CLOSE_TAG, '/') . '/si';
-    if (preg_match($restr, $page, $match)) {
-        $inline_tpl = $match[1];
-    } else {
-        if (preg_match('/' . preg_quote($PARSE_PAGE_OPEN_TAG . $tag_full . $PARSE_PAGE_CLOSE_TAG, '/') . '/', $page)) {
-            logger('DEBUG', "ParsePage error - no closing tag </~$tag> found for inline template <~$tag_full>");
-        } else {
-            //no open tag found - skip
-            //TODO - optimize - when inline template parsed - tags should be marked as seen
+        // If "value"/"vvalue" is present, compare to that
+        $compareVal = null;
+        if (isset($attributes['value'])) {
+            $compareVal = $attributes['value'];
+        } elseif (isset($attributes['vvalue'])) {
+            $compareVal = $this->getVariableValue($attributes['vvalue'], $data);
         }
-    }
-    return $inline_tpl;
-}
 
-//#################################
-// tag to right template path for the parse_page
-// IN: $tag,$tpl_name,$is_nolang
-function tag_tplpath($tag, $tpl_name, $is_inline_tpl = false) {
-    $add_path = '';
-    $result   = $tag;
-
-    #     rw("&nbsp;&nbsp;&nbsp;tag=$tag, tpl_name=$tpl_name [$is_inline_tpl]\n");
-    if (substr($tag, 0, 2) == './' || $is_inline_tpl) { //if tag start from './' then take template from same dir as tpl_name
-        $add_path = $tpl_name;
-        $add_path = preg_replace("/[^\/]+$/", '', $add_path); //delete file name
-        $result   = preg_replace("/^\.\//", '', $result); //delete ./ at the begin
-    }
-
-    // print "add_path=$add_path\n";
-    $result = $add_path . $result;
-
-    if (!preg_match("/\.[^\/]+$/", $tag)) { //set default .html extension (if extension is not set)
-        $result .= ".html";
-    }
-    #     rw("&nbsp;&nbsp;&nbsp;result=$result");
-    return $result;
-}
-
-function _tag_sub($basedir, $tpl_path, $tag, &$hf, &$attrs, &$inline_tpl, &$parent_hf, &$tagvalue) {
-    if ($attrs['sub'] > '') {
-        #if sub attr contains name - use it to get value from hf (instead using tag_value)
-        $tagvalue = hfvalue($attrs['sub'], $hf, $parent_hf);
-    }
-    if (!is_array($tagvalue)) {
-        logger('DEBUG', 'ParsePage warning - not an array passed for a SUB tag = ' . $tag . ', sub = ' . $attrs['sub']);
-        $tagvalue = array();
-    }
-
-    return _parse_page($basedir, $tpl_path, $tagvalue, $inline_tpl, $parent_hf);
-}
-
-//return true when "ifXX/unless" conditions true, otherwise - false
-function tag_if($attrs, $hf) {
-    global $PARSE_PAGE_OPS;
-
-    $result = false;
-
-    //first - check attrs that control show tag or not
-    $oper  = '';
-    $eqvar = null;
-    foreach ($PARSE_PAGE_OPS as $k => $v) {
-        if (array_key_exists($v, $attrs)) {
-            $oper  = $v;
-            $eqvar = $attrs[$v];
-            break;
+        #$this->logger("DEBUG", "Evaluating condition: {$op} {$varName}=[{$varVal}] <=> [{$compareVal}]");
+        switch ($op) {
+            case 'if':
+                // Show if varVal is "truthy": not empty, not '0', not false
+                if (!$this->isTruthy($varVal)) {
+                    return false;
+                }
+                break;
+            case 'unless':
+                // Show if varVal is NOT truthy
+                if ($this->isTruthy($varVal)) {
+                    return false;
+                }
+                break;
+            case 'ifeq':
+                if ((string)$varVal !== (string)$compareVal) {
+                    return false;
+                }
+                break;
+            case 'ifne':
+                if ((string)$varVal === (string)$compareVal) {
+                    return false;
+                }
+                break;
+            case 'ifgt':
+                if ((string)$varVal <= (string)$compareVal) {
+                    return false;
+                }
+                break;
+            case 'iflt':
+                if ((string)$varVal >= (string)$compareVal) {
+                    return false;
+                }
+                break;
+            case 'ifge':
+                if ((string)$varVal < (string)$compareVal) {
+                    return false;
+                }
+                break;
+            case 'ifle':
+                if ((string)$varVal > (string)$compareVal) {
+                    return false;
+                }
+                break;
         }
-    }
-    # if no if operation - return true
-    if (!$oper) {
+
         return true;
     }
 
-    #just for debug upgrade from old templates
-    if (array_key_exists("ifgee", $attrs) || array_key_exists("iflee", $attrs)) {
-        logger('WARN', "ParsePage warning - old-style template used. Upgrade templates!");
-    }
-
-    $avalue = '';
-    $aeqvar = ($eqvar) ? hfvalue($eqvar, $hf) : '';
-    #get the comparison value
-    if (array_key_exists('value', $attrs)) {
-        $avalue = $attrs['value'];
-    } elseif (array_key_exists('vvalue', $attrs)) {
-        $avalue = hfvalue($attrs['vvalue'], $hf);
-    }
-    #rw("[$tag_full] oper=$oper, eqvar=$eqvar, value=$avalue, hfvalue=$aeqvar");
-    #if (!$eqvar or $eqvar && (array_key_exists('if', $attrs) && parse_page_if($attrs{'if'}, $hf)
-    /*
-    if (){
-    $result = true;
-    }
+    /**
+     * Determine if a variable value is "truthy" in the sense used by the parser.
+     *
+     * Truthy: non-empty string not equal to '0', non-zero number, true boolean, etc.
+     * Falsy: '0', 0, false, '', or unset
      */
-
-    if ($oper == 'if' && $aeqvar
-        or $oper == 'unless' && !$aeqvar
-        or $oper == 'ifeq' && ((string)$aeqvar == (string)$avalue)
-        or $oper == 'ifne' && ((string)$aeqvar != (string)$avalue)
-        or $oper == 'ifgt' && ((string)$aeqvar > (string)$avalue)
-        or $oper == 'iflt' && ((string)$aeqvar < (string)$avalue)
-        or $oper == 'ifge' && ((string)$aeqvar >= (string)$avalue)
-        or $oper == 'ifle' && ((string)$aeqvar <= (string)$avalue)
-    ) {
-        $result = true;
-    }
-    #rw("result = $result");
-
-    return $result;
-}
-
-//#################################
-// tag replacer for the parse_page - WITH NECESSARY value VISUAL CHANGES
-// IN: $page, $tag, $value, $attrs  - references
-function tag_replace($page, $tag_full, $value, $attrs) {
-    // echo "tag_replace tag=$tag_full<br>";
-    // echo "tag_replace value=$value<br>";
-    // echo "tag_replace page=".strlen($page)."<br>";
-    if (is_null($value)) {
-        $value = '';
+    private function isTruthy($val): bool {
+        return boolval($val);
+        // explicit version for reference:
+        //        if (is_null($val)) {
+        //            return false;
+        //        } elseif (is_bool($val)) {
+        //            return $val;
+        //        } elseif (is_numeric($val)) {
+        //            // 0 is falsey, anything else is truthy
+        //            return ($val != 0);
+        //        } else {
+        //            // For strings, '' or '0' are falsey
+        //            $valStr = (string)$val;
+        //            if ($valStr === '' || $valStr === '0') {
+        //                return false;
+        //            }
+        //            return true;
+        //        }
     }
 
-    if (!is_scalar($value)) {
-        if (array_key_exists('json', $attrs)) {
-            if ($attrs['json'] == 'pretty') {
-                $value = var2js($value, JSON_NUMERIC_CHECK | JSON_PRETTY_PRINT);
-            } else {
-                $value = var2js($value, JSON_NUMERIC_CHECK);
+    /**
+     * Retrieve a variable value from a data array, possibly nested (e.g., var[a][b]), or from parent data.
+     *
+     * Also handles special references to "PARSEPAGE.TOP", "PARSEPAGE.PARENT", "GLOBAL", "SESSION" if needed.
+     *
+     * @param string $tagName
+     * @param array|null $data
+     * @param array|null $parentData
+     * @return mixed The variable value or null if not found
+     */
+    private function getVariableValue(string $tagName, array $data = null, array $parentData = null): mixed {
+        if ($tagName === '' || is_null($data)) {
+            return null;
+        }
+
+        // Check if the tagName includes array syntax (e.g. "somevar[a][b]")
+        if (str_contains($tagName, '[')) {
+            // e.g. "somevar[a][b]"
+            // Split at '[' but keep keys
+            $segments = explode('[', $tagName);
+            $root     = strtoupper($segments[0]);
+            $ptr      = $data;
+
+            // If root is GLOBAL, SESSION, PARSEPAGE.TOP, PARSEPAGE.PARENT, override pointer
+            if ($root === 'GLOBAL') {
+                $ptr = $this->getGlobals();
+                array_shift($segments);
+            } elseif ($root === 'SESSION') {
+                $ptr = $_SESSION;
+                array_shift($segments);
+            } elseif ($root === 'PARSEPAGE.TOP') {
+                $ptr = $this->dataTop;
+                array_shift($segments);
+            } elseif ($root === 'PARSEPAGE.PARENT' && $parentData) {
+                $ptr = $parentData;
+                array_shift($segments);
             }
-            if (!array_key_exists('noescape', $attrs)) {
-                $value = htmlescape($value);
+
+            foreach ($segments as $s) {
+                $key = rtrim($s, ']'); // remove trailing ]
+                if (is_array($ptr) && array_key_exists($key, $ptr)) {
+                    $ptr = $ptr[$key];
+                } elseif (is_object($ptr) && property_exists($ptr, $key)) {
+                    $ptr = $ptr->$key;
+                } else {
+                    return null; #looks like there are just no such key in array OR $ptr is not an array at all - so return empty value
+                }
+            }
+            return $ptr;
+        } else {
+            // Single-level key
+            return $data[$tagName] ?? null;
+        }
+    }
+
+    /**************************************************************************
+     * Repeat (Loop) Support
+     **************************************************************************/
+
+    /**
+     * Handle a repeat tag that loops over an array and processes subtemplates or inline content.
+     */
+    private function processRepeatTag(string $content, string $tagFull, string $tagName, array $attributes, mixed $tagValue, array $data, string $templateName): string {
+        $isInline = isset($attributes['inline']);
+        if (!is_array($tagValue)) {
+            // Not an array, just remove it
+            return $this->replaceTagRaw($content, $tagFull, $tagName, '', $isInline);
+        }
+
+        // load inline template if 'inline' attribute is present
+        $inlineTemplate = '';
+        if ($isInline) {
+            $inlineTemplate = $this->getInlineTemplate($content, $tagFull, $tagName);
+        }
+
+        $loopedOutput = '';
+        $items        = $tagValue;
+        $total        = count($items);
+        foreach ($items as $index => $item) {
+            // Add repeat.* variables
+            $item['repeat.first']     = ($index === 0) ? 1 : 0;
+            $item['repeat.last']      = ($index === $total - 1) ? 1 : 0;
+            $item['repeat.index']     = $index;
+            $item['repeat.iteration'] = $index + 1;
+            $item['repeat.total']     = $total;
+            $item['repeat.even']      = ($index % 2) ? 1 : 0;
+            $item['repeat.odd']       = ($index % 2) ? 0 : 1;
+
+            // Parse template for one item
+            $tagTplPath   = $this->getTagTemplatePath($tagName, $templateName, $isInline);
+            $loopedOutput .= $this->parseTemplate($tagTplPath, $item, $inlineTemplate, $data, $attributes);
+        }
+
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $loopedOutput, $isInline);
+    }
+
+    /**
+     * Process "noparse" - insert template into content without parsing it
+     * @param string $content
+     * @param string $tagFull
+     * @param string $tagName
+     * @param array $attributes
+     * @param array $data
+     * @param string $templateName
+     * @return string
+     */
+    private function processNoParseTag(string $content, string $tagFull, string $tagName, array $attributes, array $data, string $templateName): string {
+        // load file and use it as is
+        $filePath = $this->getTagTemplatePath($tagName, $templateName);
+
+        $filePath   = $this->getFullTemplatePath($filePath);
+        $tplContent = $this->loadTemplate($filePath);
+
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $tplContent, isset($attributes['inline']));
+    }
+
+    /**************************************************************************
+     * Sub-Templates (sub="...") and Inline Templates
+     **************************************************************************/
+
+    /**
+     * Process a subtemplate tag (<~tagName sub> or <~tagName sub="varName">)
+     */
+    private function processSubTemplate(string $content, string $tagFull, string $tagName, array $attributes, mixed $tagValue, array $data, ?array $parentData, string $templateName = ''): string {
+        // If sub="somekey", use that data instead of tagValue
+        if (!empty($attributes['sub'])) {
+            $subData = $this->getVariableValue($attributes['sub'], $data, $parentData);
+        } else {
+            $subData = $tagValue; // default
+        }
+
+        if (!is_array($subData)) {
+            $subData = [];
+        }
+
+        #$this->logger("DEBUG", "Processing subtemplate: $tagFull", $subData);
+
+        // Potentially load inline template if 'inline' is also present
+        $isInline       = isset($attributes['inline']);
+        $inlineTemplate = '';
+        if ($isInline) {
+            $inlineTemplate = $this->getInlineTemplate($content, $tagFull, $tagName);
+        }
+
+        // Parse the subtemplate or inline
+        $tagTplPath = $this->getTagTemplatePath($tagName, $templateName, $isInline);
+        $subOutput  = $this->parseTemplate($tagTplPath, $subData, $inlineTemplate, $data, $attributes);
+
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $subOutput, $isInline);
+    }
+
+    /**
+     * Extract inline template content from the main page if there is `inline` attribute.
+     *
+     * The inline template is everything between <~tagFull> and </~tagName>.
+     */
+    private function getInlineTemplate(string $content, string $tagFull, string $tagName): string {
+        // Build a regex to capture everything between <~tagFull> and </~tagName>
+        $regex = '/' . $this->openTagQuoted . preg_quote($tagFull, '/') . $this->closeTagQuoted . '(.*?)' . $this->openEndTagQuoted . preg_quote($tagName, '/') . $this->closeTagQuoted . '/si';
+
+        if (preg_match($regex, $content, $m)) {
+            return $m[1];
+        } else {
+            return '';
+        }
+    }
+
+    /**
+     * Resolve the full template path - if template name is not absolute (starting with "/"), prepend baseDir
+     *
+     * @param string $templateName
+     * @return string
+     */
+    private function getFullTemplatePath(string $templateName): string {
+        if ($templateName > '' && !preg_match('/^\//', $templateName)) {
+            $templateName = $this->baseDir . '/' . ltrim($templateName, '/');
+        }
+        return $templateName;
+    }
+
+    /**
+     * Return template path for the tag with respect to the current template path.
+     *
+     * @param string $tagName
+     * @param string $templateName
+     * @param bool $isInline
+     * @return string
+     */
+    private function getTagTemplatePath(string $tagName, string $templateName, bool $isInline = false): string {
+        $addPath = '';
+        $result  = $tagName;
+
+        if (str_starts_with($tagName, './') || $isInline) {
+            $addPath = $templateName;
+            $addPath = preg_replace("/[^\/]+$/", '', $addPath); //delete file name
+            $result  = preg_replace("/^\.\//", '', $result); //delete ./ at the begin
+        }
+
+        $result = $addPath . $result;
+
+        if (!preg_match("/\.[^\/]+$/", $tagName)) {
+            $result .= ".html"; // set default .html extension (if extension is not set)
+        }
+
+        return $result;
+    }
+
+    /**************************************************************************
+     * Specialized Tag Handlers (select, radio, selvalue)
+     **************************************************************************/
+
+    /**
+     * Generate <option> tags for <select> from either an array or a .sel file.
+     */
+    private function processSelectTag(string $content, string $tagFull, string $tagName, array $attributes, array $data): string {
+        $selectedValue = $this->getVariableValue($attributes['select'], $data);
+        $optionsHtml   = $this->buildOptionsHtml($tagName, $data, $selectedValue, !isset($attributes['noescape']));
+
+        // Replace in main content
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $optionsHtml);
+    }
+
+    /**
+     * Generate radio inputs from .sel file or array, similar to select but with radio buttons.
+     */
+    private function processRadioTag(string $content, string $tagFull, string $tagName, array $attributes, array $data): string {
+        $selectedValue = $this->getVariableValue($attributes['radio'], $data);
+        $name          = $attributes['name'] ?? $tagName;
+        $delim         = $attributes['delim'] ?? '';
+        $options       = $this->loadOptions($tagName, $data);
+
+        $html = '';
+        $i    = 0;
+        foreach ($options as $value => $label) {
+            // Possibly escape if noescape not set
+            if (!isset($attributes['noescape'])) {
+                $value = $this->htmlescape($value);
+                $label = $this->htmlescape($label);
+            }
+
+            $checked = ((string)$value === (string)$selectedValue) ? " checked='checked'" : '';
+            // Using Bootstrap4 custom-control style as in original
+            $html .= "<div class='custom-control custom-radio $delim'>"
+                . "<input class='custom-control-input' type='radio' id=\"$name\$$i\" name=\"$name\" value=\"$value\"$checked>"
+                . "<label class='custom-control-label' for=\"$name\$$i\">$label</label>"
+                . "</div>";
+            $i++;
+        }
+
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $html);
+    }
+
+    /**
+     * Show the selected label from .sel file or array (like a read-only version of select/radio).
+     */
+    private function processSelvalueTag(string $content, string $tagFull, string $tagName, array $attributes, array $data): string {
+        $selectedValue = $this->getVariableValue($attributes['selvalue'], $data);
+        $options       = $this->loadOptions($tagName, $data);
+
+        $label = $options[$selectedValue] ?? '';
+        if (!isset($attributes['noescape'])) {
+            $label = $this->htmlescape($label);
+        }
+
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $label);
+    }
+
+    /**
+     * Build <option>... for a select. Shared logic for array-based or .sel-file-based data.
+     */
+    private function buildOptionsHtml(string $tagName, array $data, mixed $selectedValue, bool $escape = true): string {
+        $options = $this->loadOptions($tagName, $data);
+        $html    = '';
+        foreach ($options as $value => $label) {
+            $selectedAttr = ((string)$value === (string)$selectedValue) ? ' selected' : '';
+            if ($escape) {
+                $value = $this->htmlescape($value);
+                $label = $this->htmlescape($label);
+            }
+            $html .= "<option value=\"$value\"$selectedAttr>$label</option>\n";
+        }
+        return $html;
+    }
+
+    /**
+     * Load option data from a .sel file or from $data[$tagName] if it's an array of items with id/iname.
+     */
+    private function loadOptions(string $tagName, array $data): array {
+        // 1) If $data[$tagName] is an array of assoc arrays with 'id'/'iname', use that
+        if (isset($data[$tagName]) && is_array($data[$tagName])) {
+            $options = [];
+            foreach ($data[$tagName] as $item) {
+                $val   = $item['id'] ?? $item['iname'];
+                $label = $item['iname'];
+                // Optionally parse language and do partial parse if needed
+                $this->parseLanguage($val);
+                $this->parseLanguage($label);
+                $options[$val] = $label;
+            }
+            return $options;
+        }
+
+        // 2) Otherwise, look for a .sel file
+        //    e.g. if $tagName = "options.sel" or "options" => final path = "$baseDir/options.sel"
+        //    or "SITE_TEMPLATES/$baseDir/options" if we add .sel ourselves
+        $filePath = $tagName;
+        if (!preg_match('/\.\w+$/', $tagName)) {
+            // If no extension, assume .sel
+            $filePath .= '.sel';
+        }
+        if (!preg_match('/^\//', $filePath)) {
+            $filePath = $this->baseDir . '/' . $filePath;
+        }
+
+        $fileContent = $this->loadTemplate($filePath);
+        if (!$fileContent) {
+            return [];
+        }
+
+        $options = [];
+        $lines   = preg_split("/[\r\n]+/", $fileContent);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $parts = explode('|', $line);
+            if (count($parts) >= 2) {
+                $val   = trim($parts[0]);
+                $label = trim($parts[1]);
+                // Possibly parse language
+                $this->parseLanguage($val);
+                $this->parseLanguage($label);
+                $options[$val] = $label;
+            }
+        }
+        return $options;
+    }
+
+    /**************************************************************************
+     * Variable Tag Handler (including inline template if any)
+     **************************************************************************/
+
+    /**
+     * Process a normal variable tag, applying any modifiers, or using inline template if specified.
+     */
+    private function processVariableTag(string $content, string $tagFull, string $tagName, array $attributes, mixed $tagValue, ?array $data, ?array $parentData, string $templateName = ''): string {
+        #$this->logger("DEBUG", "Processing variable tag: $tagName = ", $tagValue);
+        // If 'var' is explicitly set and there's no value, short-circuit - replace with empty string
+        if (isset($attributes['var']) && is_null($tagValue)) {
+            return $this->replaceTagRaw($content, $tagFull, $tagName, '');
+        }
+
+        if (isset($attributes['inline'])) {
+            // extract and parse inline template
+            $inlineTemplate = $this->getInlineTemplate($content, $tagFull, $tagName);
+
+            $tagTplPath    = $this->getTagTemplatePath($tagName, $templateName, true);
+            $inlineContent = $this->parseTemplate($tagTplPath, $data, $inlineTemplate, $parentData, $attributes);
+            return $this->replaceTagRaw($content, $tagFull, $tagName, $inlineContent, true);
+        }
+
+        // now check if we have a value to replace
+        if (!is_null($tagValue)) {
+            // Apply additional modifiers (date, truncate, default, etc.)
+            $tagValue = $this->applyModifiers($tagValue, $attributes);
+            if (!isset($attributes['noescape'])) {
+                // By default, we escape normal variables if "noescape" is not set
+                $tagValue = $this->htmlescape($tagValue);
             }
         } else {
-            logger('ParsePage warning - not a scalar passed for tag = ' . $tag_full . ' Passed type = ' . gettype($value));
-            $value = '';
-        }
-    } else {
-        if (array_key_exists('number_format', $attrs)) {
-            $value = tpl_number_format($value, $attrs);
+            // Null variable => then tag name could be a template name to include
+            // but no need for file seek if it contains "[" (array syntax) or starts with "#" (comment)
+            $tagValue = '';
+            if (!str_starts_with($tagName, '#') && !str_contains($tagName, '[')) {
+                // Try to load a template file with the tag name
+                $tagTplPath = $this->getTagTemplatePath($tagName, $templateName);
+                $tagValue   = $this->parseTemplate($tagTplPath, $data, '', $parentData, $attributes);
+            }
+
+            // Apply additional modifiers (date, truncate, default, etc.)
+            $tagValue = $this->applyModifiers($tagValue, $attributes);
         }
 
-        if (array_key_exists('string_format', $attrs)) {
-            $value = string_format($value, $attrs['string_format']);
-        }
-        #for some compatibility with Smarty
-        if (array_key_exists('sprintf', $attrs)) {
-            $value = string_format($value, $attrs['sprintf']);
+        return $this->replaceTagRaw($content, $tagFull, $tagName, $tagValue);
+    }
+
+    /**
+     * Apply modifiers to a scalar or array value (date, truncate, etc.)
+     */
+    private function applyModifiers($value, $attributes) {
+        if (!$attributes) {
+            return $value;
         }
 
-        if (array_key_exists('htmlescape', $attrs)) {
-            $value = htmlescape($value);
+        #$this->logger("DEBUG", "Applying modifiers to value: ", $value, $attributes);
+
+        // If it's not scalar but "json" is requested, we handle that
+        if (!is_scalar($value)) {
+            if (isset($attributes['json'])) {
+                // If "json=pretty" => pretty print
+                $options = (strtolower($attributes['json']) === 'pretty') ? JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK : JSON_NUMERIC_CHECK;
+                return json_encode($value, $options);
+            }
+            // Non-scalar but no json => default to empty
+            return '';
         }
 
-        if (array_key_exists('date', $attrs)) {
-            $value = sec2date($value, $attrs);
+        // number_format
+        if (isset($attributes['number_format'])) {
+            $value = $this->applyNumberFormat($value, $attributes);
         }
 
-        if (array_key_exists('truncate', $attrs)) {
-            $value = Utils::str2truncate($value, $attrs);
+        // currency
+        if (isset($attributes['currency'])) {
+            $currency = $attributes['currency'] ?: "USD";
+            $fmt      = new NumberFormatter("en_US", NumberFormatter::CURRENCY);
+            $value    = $fmt->formatCurrency($value, $currency);
         }
 
-        if (array_key_exists('strip_tags', $attrs)) {
+        // string_format or sprintf
+        if (isset($attributes['string_format'])) {
+            $value = sprintf($attributes['string_format'], $value);
+        }
+        if (isset($attributes['sprintf'])) {
+            $value = sprintf($attributes['sprintf'], $value);
+        }
+
+        // htmlescape
+        if (isset($attributes['htmlescape'])) {
+            $value = $this->htmlescape($value);
+        }
+
+        // date
+        if (isset($attributes['date'])) {
+            $value = $this->applyDateFormat($value, $attributes['date']);
+        }
+
+        // truncate
+        if (isset($attributes['truncate'])) {
+            $maxLen = (int)($attributes['truncate']);
+            if ($maxLen > 0) {
+                $value = mb_substr($value, 0, $maxLen);
+            }
+        }
+
+        // strip_tags
+        if (isset($attributes['strip_tags'])) {
             $value = strip_tags($value);
         }
 
-        if (array_key_exists('trim', $attrs)) {
+        // trim
+        if (isset($attributes['trim'])) {
             $value = trim($value);
         }
 
-        if (array_key_exists('nl2br', $attrs)) {
+        // nl2br
+        if (isset($attributes['nl2br'])) {
             $value = nl2br($value);
         }
 
-        if (array_key_exists('count', $attrs)) {
-            $value = count($value);
+        // count
+        if (isset($attributes['count'])) {
+            // if $value is something countable, use count
+            $value = (is_array($value)) ? count($value) : 0;
         }
 
-        if (array_key_exists('lower', $attrs)) {
-            $value = strtolower($value);
+        // lower
+        if (isset($attributes['lower'])) {
+            $value = mb_strtolower($value);
         }
 
-        if (array_key_exists('upper', $attrs)) {
-            $value = strtoupper($value);
+        // upper
+        if (isset($attributes['upper'])) {
+            $value = mb_strtoupper($value);
         }
 
-        if (array_key_exists('default', $attrs)) {
-            $value = str2default($value, $attrs);
+        // default
+        if (isset($attributes['default']) && (string)$value === '') {
+            $value = $attributes['default'];
         }
 
-        if (array_key_exists('urlencode', $attrs)) {
+        // urlencode
+        if (isset($attributes['urlencode'])) {
             $value = urlencode($value);
         }
 
-        if (array_key_exists('json', $attrs)) {
-            if ($attrs['json'] == 'pretty') {
-                $value = var2js($value, JSON_NUMERIC_CHECK | JSON_PRETTY_PRINT);
-            } else {
-                $value = var2js($value, JSON_NUMERIC_CHECK);
-            }
-            if (!array_key_exists('noescape', $attrs)) {
-                $value = htmlescape($value);
+        // url
+        if (isset($attributes['url'])) {
+            if (!preg_match('!^\w+://!', $value)) {
+                $value = 'https://' . $value;
             }
         }
-    }
-    return tag_replace_raw($page, $tag_full, $value, array_key_exists('inline', $attrs));
-}
 
-//#################################
-// raw tag replacer for the parse_page - i.e. doesn't change the value
-// IN: $page, $tag, $value, $is_inline
-function tag_replace_raw($page, $tag_full, $value, $is_inline) {
-    global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG, $PARSE_PAGE_OPENEND_TAG;
-
-    if ($is_inline) { //check if this inline template - replace it in special way
-        #get just tag without attrs
-        $tag = $tag_full;
-        if (preg_match('/^(\S+)/', $tag, $match)) {
-            $tag = $match[1];
+        // json (last pass, if the user wants to re-encode)
+        if (isset($attributes['json'])) {
+            // Re-encode if this is a scalar?
+            $options = (strtolower($attributes['json']) === 'pretty') ? JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK : JSON_NUMERIC_CHECK;
+            $value   = json_encode($value, $options);
         }
 
-        #replace tag+inline tpl+close tag
-        $restr = '/' . preg_quote($PARSE_PAGE_OPEN_TAG . $tag_full . $PARSE_PAGE_CLOSE_TAG, '/') . ".*?" . preg_quote($PARSE_PAGE_OPENEND_TAG . $tag . $PARSE_PAGE_CLOSE_TAG, '/') . '/si';
-
-        #quote special PHP $ and \\12345
-        $value = str_replace(array('\\', '$'), array('\\\\', '\\$'), $value); //even better, order is important
-
-        return preg_replace($restr, $value, $page);
-    } else {
-        //return preg_replace("/<~".preg_quote($tag_full,"/").">/", $value.'', $page);
-        return str_replace($PARSE_PAGE_OPEN_TAG . $tag_full . $PARSE_PAGE_CLOSE_TAG, $value, $page);
-    }
-}
-
-############### parse select tag
-# output <option value="XX">YY
-# $attrs['select'] could be an array! for <select multiple>
-function parse_select_tag($basedir, $tpl_path, $tag, $hf, $attrs) {
-    global $CONFIG;
-
-    $sel_value = hfvalue($attrs['select'], $hf);
-    if (is_array($sel_value)) {
-        $sel_value = array_flip($sel_value);
+        return $value;
     }
 
-    $result      = '';
-    $is_noescape = array_key_exists('noescape', $attrs);
-    if (array_key_exists($tag, $hf)) {
-        # hf(tag) is Array of Assoc Arrays with "id" and "iname" keys, for example rows returned from db.array('select id, iname from ...')
-        # "id" key is optional, if not present - iname will be used for values too
-        if (!is_array($hf[$tag])) {
-            logger('DEBUG', 'ParsePage warning - not an array passed to select tag = ' . $tag);
+    /**
+     * number_format attribute handling
+     */
+    private function applyNumberFormat($value, $attributes) {
+        if ($value === '') {
+            return '';
+        }
+        if (!is_numeric($value)) {
+            return $value;
+        }
+        $nfdecimals  = (int)($attributes['number_format'] ?? 2);
+        $nfpoint     = $attributes['nfpoint'] ?? '.';
+        $nfthousands = $attributes['nfthousands'] ?? ' ';
+        return number_format($value, $nfdecimals, $nfpoint, $nfthousands);
+    }
+
+    /**
+     * Convert a time/string into a date with a given format
+     */
+    private function applyDateFormat($value, string $format): string {
+        if (!$value) {
             return '';
         }
 
-        foreach ($hf[$tag] as $key => $item) {
-            $desc = $item['iname'];
-            if (array_key_exists('id', $item)) {
-                $value = trim($item['id']);
-            } else {
-                $value = trim($item['iname']);
-            }
-            parse_lang($value);
-            parse_lang($desc);
-
-            $selected = '';
-            if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value == $sel_value) {
-                $selected = ' selected';
-            }
-
-            if (!$is_noescape) {
-                $value = htmlescape($value);
-                $desc  = htmlescape($desc);
-            }
-            $result .= "<option value=\"$value\"$selected>$desc</option>\n";
-        }
-    } else {
-        # just read from the plain text file
-        if (!preg_match("/^\//", $tpl_path)) {
-            $tpl_path = "$basedir/$tpl_path";
-        }
-
-        $lines = preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'] . $tpl_path));
-
-        for ($i = 0; $i < count($lines); $i++) {
-            $arr   = preg_split("/\|/", $lines[$i]);
-            $value = $arr[0] ?? '';
-            $desc  = $arr[1] ?? '';
-            if (!strlen($value) && !strlen($desc)) {
-                continue;
-            }
-
-            parse_lang($value);
-            parse_lang($desc);
-            $desc = parse_cache_template($desc, $hf);
-
-            $selected = '';
-            if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value == $sel_value) {
-                $selected = ' selected';
-            }
-
-            if (!$is_noescape) {
-                $value = htmlescape($value);
-                $desc  = htmlescape($desc);
-            }
-            $result .= "<option value=\"$value\"$selected>$desc</option>\n";
-        }
-    }
-
-    return $result;
-}
-
-############### parse radio tag
-# output <input type=radio ...>label
-function parse_radio_tag($basedir, $tpl_path, $hf, $attrs) {
-    global $CONFIG;
-
-    $sel_value = hfvalue($attrs['radio'], $hf);
-    $name      = $attrs['name'];
-    $delim     = htmlescape_back($attrs['delim']);
-    if (!preg_match("/^\//", $tpl_path)) {
-        $tpl_path = "$basedir/$tpl_path";
-    }
-
-    $lines = preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'] . $tpl_path));
-
-    $result = '';
-    for ($i = 0; $i < count($lines); $i++) {
-        $arr   = preg_split("/\|/", $lines[$i]);
-        $value = $arr[0] ?? '';
-        $desc  = $arr[1] ?? '';
-        if (!strlen($value) && !strlen($desc)) {
-            continue;
-        }
-
-        parse_lang($desc);
-        $desc = parse_cache_template($desc, $hf);
-
-        if (!array_key_exists('noescape', $attrs)) {
-            $value = htmlescape($value);
-            $desc  = htmlescape($desc);
-        }
-
-        $str_checked = '';
-        if ($value == $sel_value) {
-            $str_checked = " checked='checked' ";
-        }
-
-        #$result.="<label class='radio $delim'><input type='radio' name=\"$name\" value=\"$value\" $str_checked>$desc</label>"; #bootstrap3
-        #$result.="<div class='form-check $delim'><label class='form-check-label'><input class='form-check-input' type='radio' name=\"$name\" value=\"$value\" $str_checked> $desc</label></div>"; #bootstrap4 normal control
-        $result .= "<div class='custom-control custom-radio $delim'><input class='custom-control-input' type='radio' id=\"$name\$$i\" name=\"$name\" value=\"$value\" $str_checked><label class='custom-control-label' for=\"$name\$$i\">$desc</label></div>"; #bootstrap4 custom control
-    }
-    return $result; #bootstrap4
-}
-
-############
-# output - just string
-function parse_selvalue_tag($basedir, $tpl_path, $tag, $hf, $attrs) {
-    global $CONFIG;
-
-    $sel_value = hfvalue($attrs['selvalue'], $hf);
-    if (!preg_match("/^\//", $tpl_path)) {
-        $tpl_path = "$basedir/$tpl_path";
-    }
-
-    $lines = preg_split("/[\r\n]+/", precache_file($CONFIG['SITE_TEMPLATES'] . $tpl_path));
-
-    $result = '';
-    if ($tag > '' && array_key_exists($tag, $hf)) {
-        # hf(tag) is Array of Assoc Arrays with "id" and "iname" keys, for example rows returned from db.array('select id, iname from ...')
-        # "id" key is optional, if not present - iname will be used for values too
-        if (!is_array($hf[$tag])) {
-            logger('DEBUG', 'ParsePage warning - not an array passed to select tag = ' . $tag);
-            return '';
-        }
-
-        foreach ($hf[$tag] as $key => $item) {
-            $desc = $item['iname'];
-            if (array_key_exists('id', $item)) {
-                $value = trim($item['id']);
-            } else {
-                $value = trim($item['iname']);
-            }
-            parse_lang($value);
-            parse_lang($desc);
-
-            if (is_array($sel_value) && array_key_exists($value, $sel_value) || $value == $sel_value) {
-                $result = $desc;
+        // recognized short codes: short, long, sql
+        switch (strtolower($format)) {
+            case '':
+                $format = 'm/d/Y';
                 break;
-            }
-        }
-    } else {
-        # from file
-        for ($i = 0; $i < count($lines); $i++) {
-            $arr   = preg_split("/\|/", $lines[$i]);
-            $value = $arr[0] ?? '';
-            $desc  = $arr[1] ?? '';
-            if (!strlen($value) && !strlen($desc)) {
-                continue;
-            }
-
-            if ($value == $sel_value) {
-                parse_lang($desc);
-                $desc = parse_cache_template($desc, $hf);
-
-                $result = $desc;
+            case 'short':
+                $format = 'm/d/Y H:i';
                 break;
-            }
-        }
-    }
-
-    return $result;
-}
-
-//return value for the selvalue
-//example:
-//  get_selvalue('/common/sel/yn.sel', 1);
-function get_selvalue($tpl, $value) {
-    return parse_selvalue_tag('', $tpl, '', array('v' => $value), array('selvalue' => 'v'));
-}
-
-# sort tags so 'inline' and 'sub' tags will be parsed first)
-function parse_page_sort_tags($tags_full) {
-    $ainline = array();
-    $atag    = array();
-
-    for ($i = 0; $i < count($tags_full); $i++) {
-        if (preg_match('/inline|sub\b/', $tags_full[$i])) {
-            $ainline[] = &$tags_full[$i];
-        } else {
-            $atag[] = &$tags_full[$i];
-        }
-    }
-
-    return array_merge($ainline, $atag);
-}
-
-//#################################
-// load file into variable
-// CACHED!!!
-global $FILE_CACHE;
-$FILE_CACHE = array();
-function precache_file($infile, $isdie = false) {
-    global $FILE_CACHE;
-    $result = '';
-
-    if (array_key_exists($infile, $FILE_CACHE)) {
-        return $FILE_CACHE[$infile];
-    }
-
-    if (file_exists($infile)) {
-        $result = file_get_contents($infile);
-    } else {
-        $msg = "ParsePage - can't open template file [$infile]";
-        if ($isdie) {
-            logger('ERROR', $msg);
-            throw new Exception();
-        } else {
-            #if no die - just log trace, it's not an issue if there are no template file
-            logger('TRACE', $msg);
-        }
-    }
-
-    $FILE_CACHE[$infile] = $result;
-    return $result;
-}
-
-##########################################################
-#Cached Template parser
-#
-function parse_cache_template($page, $hf, $out_filename = '') {
-    global $PARSE_PAGE_OPEN_TAG, $PARSE_PAGE_CLOSE_TAG, $PARSE_PAGE_OPENEND_TAG;
-    global $CONFIG;
-
-    preg_match_all("/$PARSE_PAGE_OPEN_TAG([^$PARSE_PAGE_CLOSE_TAG]+)$PARSE_PAGE_CLOSE_TAG/", $page, $out, PREG_PATTERN_ORDER);
-    $tags           = $out[1];
-    $tags[]         = 'ROOT_URL';
-    $hf['ROOT_URL'] = $CONFIG['ROOT_URL'];
-
-    foreach ($tags as $key => $tag) {
-        $page = preg_replace("/" . $PARSE_PAGE_OPEN_TAG . preg_quote($tag, "/") . $PARSE_PAGE_CLOSE_TAG . "/", hfvalue($tag, $hf), $page);
-    }
-
-    if ($out_filename && $out_filename != 's') {
-        $outdir = dirname($out_filename); #check dir
-        if (!is_dir($outdir)) {
-            mkdir($outdir, 0777);
+            case 'long':
+                $format = 'm/d/Y H:i:s';
+                break;
+            case 'sql':
+                $format = 'Y-m-d H:i:s';
+                break;
+            default:
+                // use the raw $format if it's a valid date() format
+                break;
         }
 
-        $OUTFILE = fopen($out_filename, "w") or die("Can't open out [$out_filename] file");
-        fputs($OUTFILE, $page);
-        fclose($OUTFILE);
-    } else {
-        if ($out_filename == '') { #variable mode
-            return $page;
-        } else { #screen mode
-            print $page; #no XSS here intended to output html
-        }
-    }
-}
-
-############## HELPER UTILS
-
-############# basically htmlspecialchars($str, ENT_QUOTES, 'UTF-8')
-function htmlescape($str) {
-    if (!is_scalar($str)) {
-        return $str;
-    }
-
-    $str = preg_replace("/&/", '&amp;', $str);
-    $str = preg_replace('/"/', '&quot;', $str);
-    $str = preg_replace("/'/", '&#039;', $str);
-    $str = preg_replace("/</", '&lt;', $str);
-    $str = preg_replace("/>/", '&gt;', $str);
-
-    return $str;
-}
-
-#############
-function htmlescape_back($str) {
-    $str = preg_replace("/&amp/", '&', $str);
-    $str = preg_replace('/&quot;/', '"', $str);
-    $str = preg_replace("/&#039;/", "'", $str);
-    $str = preg_replace("/&lt;/", '<', $str);
-    $str = preg_replace("/&gt;/", '>', $str);
-
-    return $str;
-}
-
-# This replaces all repeated spaces, newlines and tabs with a single space.
-function strip($str) {
-    return preg_replace("/\s+/", ' ', $str);
-}
-
-# convert time in seconds to date
-function sec2date($str, $attrs) {
-    $format = $attrs['date'];
-    switch (strtolower($format)) {
-        case '':
-            $format = 'm/d/Y';
-            break;
-        case 'short':
-            $format = 'm/d/Y H:i';
-            break;
-        case 'long':
-            $format = 'm/d/Y H:i:s';
-            break;
-        case 'sql':
-            $format = 'Y-m-d H:i:s';
-            break;
-    }
-    if ($str) {
-        if ($str == '0000-00-00 00:00:00' || $str == '0000-00-00') {
+        // If value is '0000-00-00', '0000-00-00 00:00:00', skip
+        if ($value === '0000-00-00' || $value === '0000-00-00 00:00:00') {
             return '';
         }
-        if (!preg_match("/^\d+$/", $str)) {
-            $str = strtotime($str);
+
+        // If not numeric, parse as datetime
+        if (!preg_match('/^\d+$/', $value)) {
+            $value = strtotime($value);
         }
-        return date($format, (int)$str);
-    } else {
-        return $str;
-    }
-}
 
-#format number according to rules
-#return empty string if empty string passed
-#<~tag number_format>     => 1234567890.23 => 1 234 567 890.23
-#<~tag number_format="0"> => 1234567890.23 => 1 234 567 890
-#<~tag number_format="2" nfpoint="." nfthousands=" ">
-function tpl_number_format($str, $attrs) {
-    if (!strlen($str)) {
-        return '';
+        return date($format, (int)$value);
     }
 
-    $nfdecimals  = 2;
-    $nfpoint     = ".";
-    $nfthousands = " ";
-    if ($attrs['number_format'] > '') {
-        $nfdecimals = $attrs['number_format'];
-    }
+    /**************************************************************************
+     * Replace Tag Logic
+     **************************************************************************/
 
-    if (array_key_exists('nfpoint', $attrs)) {
-        $nfpoint = $attrs['nfpoint'];
-    }
+    /**
+     * Replace all tag occurrences tag (e.g. <~tagFull>) with a raw value. If inline is true, we remove entire block from <~tagFull> to </~tagName>.
+     *
+     * @param string $content
+     * @param string $tagFull
+     * @param string $tagName
+     * @param string $replacement
+     * @param bool $isInline
+     * @return string
+     */
+    private function replaceTagRaw(string $content, string $tagFull, string $tagName, string $replacement, bool $isInline = false): string {
+        if ($isInline) {
+            // If it's an inline block, remove everything between open and close
+            $regex = '/' . $this->openTagQuoted . preg_quote($tagFull, '/') . $this->closeTagQuoted . '.*?' . $this->openEndTagQuoted . preg_quote($tagName, '/') . $this->closeTagQuoted . '/si';
 
-    if (array_key_exists('nfthousands', $attrs)) {
-        $nfthousands = $attrs['nfthousands'];
-    }
-
-    return number_format($str, $nfdecimals, $nfpoint, $nfthousands);
-}
-
-#This is used to set a default value for a variable. If the variable is unset or an empty string, the given default value is printed instead.
-function str2default($str, $attrs) {
-    if (!strlen($str)) {
-        $str = $attrs['default'];
-    }
-
-    return $str;
-}
-
-#This is used parse string via sprintf
-# useful example: <~price sprintf='%.2f'> will print 16.78 if price is 16.393293
-function string_format($str, $format) {
-    return sprintf($format, $str);
-}
-
-// Convert PHP scalar, array or hash to JS scalar/array/hash.
-function var2js($a, $options = 0) {
-    if (function_exists('json_encode')) {
-        return json_encode($a, $options);
-    }
-
-    if (is_null($a)) {
-        return 'null';
-    }
-
-    if ($a === false) {
-        return 'false';
-    }
-
-    if ($a === true) {
-        return 'true';
-    }
-
-    if (is_scalar($a)) {
-        $a = addslashes($a);
-        $a = str_replace("\n", '\n', $a);
-        $a = str_replace("\r", '\r', $a);
-        return "\"$a\"";
-    }
-    $isList = true;
-    for ($i = 0, reset($a); $i < count($a); $i++, next($a)) {
-        if (key($a) !== $i) {
-            $isList = false;
-            break;
+            // Escape special chars to avoid backrefs messing up - order is important
+            $replacement = str_replace(['\\', '$'], ['\\\\', '\\$'], $replacement);
+            return preg_replace($regex, $replacement, $content);
+        } else {
+            // Simple replacement of <~tagFull>
+            $search = $this->openTag . $tagFull . $this->closeTag;
+            return str_replace($search, $replacement, $content);
         }
     }
 
-    $result = array();
-    if ($isList) {
-        foreach ($a as $v) {
-            $result[] = var2js($v);
+    /**************************************************************************
+     * Language Parsing
+     **************************************************************************/
+
+    /**
+     * Parse language strings in a piece of text by replacing `Something` with the localized version.
+     *
+     * @param string $content modified by reference
+     * @return void
+     */
+    public function parseLanguage(string &$content): void {
+        if (!$this->langParse || !str_contains($content, '`')) {
+            return;
         }
 
-        return '[ ' . join(',', $result) . ' ]';
-    } else {
-        foreach ($a as $k => $v) {
-            $result[] = var2js($k) . ': ' . var2js($v);
+        // Replace all backtick-enclosed text with translations
+        $content = preg_replace_callback('/`([^`]*)`/', function ($m) {
+            return $this->translate($m[1]);
+        }, $content);
+    }
+
+    /**
+     * Translate a string from the loaded language file(s).
+     *
+     * @param string $str
+     * @return string
+     */
+    private function translate(string $str): string {
+        $langFile = $this->templatesRoot . $this->languageDir . "/$this->language.txt";
+
+        if (!isset(self::$langCacheGlobal[$langFile])) {
+            // Load or create empty if no file
+            self::$langCacheGlobal[$langFile] = $this->loadLanguageFile($langFile);
         }
 
-        return '{ ' . join(',', $result) . ' }';
-    }
-}
-
-################################################ LANGUAGE UTILS
-
-# parse all lang stings in large text
-# BY REFERENCE!
-function parse_lang(&$page) {
-    global $PARSE_PAGE_LANG_PARSE;
-
-    if (!$PARSE_PAGE_LANG_PARSE) {
-        return; #don't parse langs if told so
-    }
-
-    $page = preg_replace_callback("/\`([^\`]*)\`/", "replace_lang", $page);
-}
-
-#########
-# USES GLOBAL $LANG
-function replace_lang($matches) {
-    return lng($matches[1]);
-}
-
-#########
-function lng($str) {
-    global $CONFIG;
-    $l = $CONFIG['LANG'];
-    if (!$l) {
-        $l = $CONFIG['LANG_DEF'];
-    }
-
-    $result    = '';
-    $lang_file = $CONFIG['SITE_TEMPLATES'] . "/lang/$l.txt";
-
-    # logger("$str => $lang_file");
-
-    if ($l) {
-        $LANG_STR = load_lang($lang_file);
-        $lang_str = @$LANG_STR[$str];
-        $result   = $lang_str;
-    }
-
-    if (!$result) {
-        $result = $str; #if no language - return original string
-
-        #    logger("before update $result");
-        #    if ($l=='en'){  #update only if we are under English (this keep performance better)
-        if ($CONFIG['IS_LANG_UPD']) {
-            update_lang($result, $CONFIG['LANG_DEF']); #if no translation - add string to en.txt file (but only if we allowed to update)
-        }
-        #    }
-    }
-
-    return $result;
-}
-
-######### precache language file into hash
-global $LANG_CACHE;
-$LANG_CACHE = array();
-
-#$LANG - hash reference
-function load_lang($infile, $isdie = 0) {
-    global $LANG_CACHE;
-    $result = '';
-
-    if (array_key_exists($infile, $LANG_CACHE)) {
-        return $LANG_CACHE[$infile];
-    }
-
-    if (file_exists($infile)) {
-        $result = file_get_contents($infile);
-    } else {
-        if ($isdie) {
-            die("Can't open language [$infile] file");
+        // If there's a translation, return it; otherwise the original
+        $dict = self::$langCacheGlobal[$langFile];
+        if (isset($dict[$str]) && $dict[$str] !== '') {
+            return $dict[$str];
+        } else {
+            // Not found - possibly auto-update
+            if ($this->isLanguageUpdate) {
+                $this->updateLanguage($langFile, $str);
+            }
+            // Return original string
+            return $str;
         }
     }
 
-    $arr  = preg_split("/[\r\n]/", $result);
-    $hash = array();
-    foreach ($arr as $value) {
-        if (!trim($value) || !preg_match("/\=\=\=/", $value)) {
-            continue;
+    /**
+     * Load language file and parse lines in the format:  original === translation
+     */
+    private function loadLanguageFile(string $langFile): array {
+        $dict = [];
+        if (file_exists($langFile)) {
+            $lines = file($langFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (str_contains($line, '===')) {
+                    // "key === value"
+                    [$key, $val] = explode('===', $line, 2);
+                    $key        = trim($key);
+                    $val        = trim($val);
+                    $dict[$key] = $val;
+                }
+            }
         }
-
-        $a           = preg_split("/\s*\=\=\=\s*/", $value);
-        $hash[$a[0]] = $a[1];
+        return $dict;
     }
 
-    $LANG_CACHE[$infile] = $hash;
-    return $hash;
-}
-
-###########
-function update_lang($str, $lang) {
-    global $CONFIG, $LANG_CACHE;
-
-    $lang_file = $CONFIG['SITE_TEMPLATES'] . "/lang/$lang.txt";
-    $LANG_STR  = load_lang($lang_file);
-    logger('TRACE', "ParsePage notice - updating lang [$lang_file]");
-
-    if (!array_key_exists($str, $LANG_STR)) {
-        $LANG_CACHE[$lang_file][$str] = "";
-        add_lockfile($lang_file, "$str === \n");
-    }
-}
-
-//*****************************
-function parse_json($hf, $out_filename = '') {
-    $page = var2js($hf);
-
-    if ($out_filename && $out_filename != 'v' && $out_filename != 's') {
-        $outdir = dirname($out_filename); //check dir
-        if (!is_dir($outdir)) {
-            mkdir($outdir, 0777);
+    /**
+     * Appends a missing translation key to the .txt file
+     * in "KEY === " format
+     *
+     * @param string $langFile
+     * @param string $missingKey
+     * @return void
+     */
+    private function updateLanguage(string $langFile, string $missingKey): void {
+        // Make sure it’s not already in our dict
+        if (isset(self::$langCacheGlobal[$langFile][$missingKey])) {
+            return;
         }
 
-        $OUTFILE = fopen($out_filename, "w") or die("Can't open out [$out_filename] file");
-        fputs($OUTFILE, $page);
-        fclose($OUTFILE);
-    } else {
-        if ($out_filename == 'v') { #variable mode
-            return $page;
-        } else { #screen mode
-            header("Content-Type: application/json; charset=utf-8");
-            print $page;
+        self::$langCacheGlobal[$langFile][$missingKey] = '';
+        $this->logger('TRACE', "ParsePage - auto-adding missing language string [$missingKey] to $langFile");
+        // Append to file
+        // In a real system, do file-locking or something safer
+        $line = $missingKey . " === \n";
+        @file_put_contents($langFile, $line, FILE_APPEND | LOCK_EX);
+    }
+
+    /**************************************************************************
+     * Template & File Loading, Output
+     **************************************************************************/
+
+    /**
+     * Load a template file relative to templatesRoot, with caching.
+     *
+     * @param string $filename
+     * @param bool $isDieOnError If true, throw an exception if file is not found
+     * @return string
+     * @throws Exception if file is not found and $isDieOnError=true
+     */
+    private function loadTemplate(string $filename, bool $isDieOnError = false): string {
+        if (isset($this->fileCache[$filename])) {
+            #$this->logger("DEBUG", "cache hit $filename");
+            return $this->fileCache[$filename];
+        }
+
+        // if (filename contains a mask - load all files via recursive calls and return as a single template
+        if (str_contains($filename, '*')) {
+            $folder    = dirname($filename);
+            $mask      = basename($filename);
+            $path_mask = $this->templatesRoot . $folder . '/' . $mask;
+            $files     = glob($path_mask);
+            $sb        = '';
+            foreach ($files as $file) {
+                //strip off the templatesRoot
+                $file = str_replace($this->templatesRoot, '', $file);
+                $sb   .= $this->loadTemplate($file);
+            }
+            return $sb;
+        }
+
+        #$this->logger("DEBUG", "loading file $filename");
+        $full_path = $this->templatesRoot . $filename;
+
+        #$this->logger("DEBUG", "loadTemplate full path: $full_path");
+        if (file_exists($full_path)) {
+            $content                    = file_get_contents($full_path);
+            $this->fileCache[$filename] = $content;
+            return $content;
+        } else {
+            $msg = "ParsePage - cannot open template file [$filename]";
+            $this->logger('TRACE', $msg);
+            if ($isDieOnError) {
+                throw new Exception($msg);
+            } else {
+                return ''; // it's ok if no template found, just use empty string then
+            }
+        }
+    }
+
+    /**************************************************************************
+     * Helper: HTML Escape
+     **************************************************************************/
+
+    /**
+     * Safely escape HTML (similar to htmlspecialchars).
+     */
+    private function htmlescape(mixed $str): string {
+        if (!is_scalar($str)) {
+            return '';
+        }
+        return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * logger, calls external global logger()
+     *
+     * @param string $log_type 'ERROR'|'DEBUG'|'NOTICE'|'INFO'
+     * @param mixed $value value to log
+     * @param mixed $value2 optional second value (usually params for param query)
+     * @return void
+     */
+    private function logger(string $log_type, mixed $value, mixed $value2 = null): void {
+        if (!function_exists('logger')) {
+            return;
+        }
+
+        #do it separately depending if $value2 set for cleaner logs
+        if (is_null($value2)) {
+            logger($log_type, $value);
+        } else {
+            logger($log_type, $value, $value2);
         }
     }
 }

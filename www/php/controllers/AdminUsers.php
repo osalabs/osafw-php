@@ -3,7 +3,7 @@
  Admin Users controller
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2024 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class AdminUsersController extends FwDynamicController {
@@ -78,7 +78,7 @@ class AdminUsersController extends FwDynamicController {
     }
 
     public function Validate($id, $item): void {
-        $result = $this->validateRequired($item, $this->required_fields);
+        $result = $this->validateRequired($id, $item, $this->required_fields);
 
         //result here used only to disable further validation if required fields validation failed
         if ($result) {

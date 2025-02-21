@@ -3,7 +3,7 @@
  Admin Site Settings Controller class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2024 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class AdminSettingsController extends FwAdminController {
@@ -36,7 +36,7 @@ class AdminSettingsController extends FwAdminController {
 
         //other filters add to $this->list_where here
         //if search - no category
-        if ($f['s'] == '' && isset($f['icat'])) {
+        if (($f['s'] ?? '') == '' && isset($f['icat'])) {
             $this->list_where .= ' and icat=' . $this->db->quote($f['icat']);
         }
 
@@ -85,7 +85,7 @@ class AdminSettingsController extends FwAdminController {
     }
 
     public function Validate($id, $item): void {
-        $result = $this->validateRequired($item, $this->required_fields);
+        $result = $this->validateRequired($id, $item, $this->required_fields);
 
         if ($id == 0) {
             throw new ApplicationException("Wrong Settings ID");

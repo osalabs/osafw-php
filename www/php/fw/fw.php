@@ -8,7 +8,7 @@ require_once dirname(__FILE__) . "/../configs/config.php";
 require_once dirname(__FILE__) . "/FwExceptions.php";
 require_once dirname(__FILE__) . "/../FwHooks.php";
 require_once dirname(__FILE__) . "/dispatcher.php";
-require_once dirname(__FILE__) . "/parsepage.php";
+require_once dirname(__FILE__) . "/ParsePage.php";
 require_once dirname(__FILE__) . "/db.php";
 require_once dirname(__FILE__) . '/../vendor/autoload.php';
 #also directly preload common classes used in every request:
@@ -45,7 +45,7 @@ class fw {
     public const string ACTION_MORE_EDIT   = "edit";
     public const string ACTION_MORE_DELETE = "delete";
 
-    #http status codes
+    #common http response codes
     const int HTTP_OK                 = 200;
     const int HTTP_CREATED            = 201;
     const int HTTP_NO_CONTENT         = 204;
@@ -58,21 +58,25 @@ class fw {
     const int HTTP_TOO_MANY_REQUESTS  = 429;
     const int HTTP_SERVER_ERROR       = 500;
 
+
     public static ?self $instance = null;
     public static float $start_time;
 
     public Dispatcher $dispatcher;
     public DB $db;
     public FwCache $cache;
+    private ParsePage $pp_instance; #for parsePage()
 
     public string $request_url; #current request url (relative to application url)
     public stdClass $route; #current request route data, stdClass
 
+    public array $postedJson = []; #original JSON from POST request body for "application/json" requests
     public array $GLOBAL = []; #"global" vars, initialized with $CONFIG - used in template engine, also stores "_flash"
 
     public array $FormErrors = []; # for storing form id's with error messages, put to ps['error']['details'] for parser
     public object $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
-    public array $models_cache = []; #cached model instances
+    private array $models_cache = []; #cached model instances
+    private array $controllers_cache = []; #cached controller instances
 
     public string $page_layout;
     public bool $is_session = true; #if use session, can be set to false in initRequest to abort session use
@@ -104,26 +108,29 @@ class fw {
 
         #session_start(); #start session on each request - moved to FwHooks::initRequest as it's not always needed
 
+        $fw->cache = new FwCache($fw);
+
+        # and now run dispatcher
+        FwHooks::initRequest($fw, $uri);
+
+        #if request content type is "application/json" - parse JSON and put to $_REQUEST
+        if (str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
+            $fw->postedJson = Utils::parsePostedJson();
+        }
+
         if ($fw->is_session) {
             #setup user's language to use by template engine
             if (isset($_SESSION['lang'])) {
                 $fw->config->LANG = $_SESSION['lang'];
             }
             // override default ui_theme/ui_mode with user's settings
-            if (!empty($_SESSION["ui_theme"])) {
+            if (isset($_SESSION["ui_theme"])) {
                 $fw->GLOBAL["ui_theme"] = $_SESSION["ui_theme"];
             }
-            if (!empty($_SESSION["ui_mode"])) {
+            if (isset($_SESSION["ui_mode"])) {
                 $fw->GLOBAL["ui_mode"] = $_SESSION["ui_mode"];
             }
-        }
 
-        $fw->cache = new FwCache($fw);
-
-        # and now run dispatcher
-        FwHooks::initRequest($fw, $uri);
-
-        if ($fw->is_session) {
             #save flash to current var and update session
             if (isset($_SESSION['_flash'])) {
                 $fw->GLOBAL['_flash'] = $_SESSION['_flash'];
@@ -238,6 +245,48 @@ class fw {
         return $object;
     }
 
+    /**
+     * return controller object
+     * usage: $controller = UsersController::i();
+     * @param string $controller_class
+     * @return FwController
+     * @throws NoControllerException
+     */
+    public static function controller(string $controller_class): FwController {
+        #logger("NOTICE", "fw controller: $controller_class");
+        //validate it ends on "Controller"
+        if (!str_ends_with($controller_class, 'Controller')) {
+            throw new NoControllerException("Controller class name should end on 'Controller': $controller_class");
+        }
+
+        $fw        = fw::i();
+        $cache_key = strtolower($controller_class);
+        if (array_key_exists($cache_key, $fw->controllers_cache)) {
+            return $fw->controllers_cache[$cache_key];
+        }
+        try {
+            $object = new $controller_class($fw);
+        } catch (NoControllerException|NoClassException) {
+            #if no such controller class - try virtual controllers
+            logger("TRACE", "Controller class not found, trying Virtual Controller: $controller_class");
+            $controller_icode = preg_replace('/Controller$/', '', $controller_class); // strip suffix
+            $fwcon            = FwControllers::i()->oneByIcode($controller_icode);
+            if ($fwcon) {
+                // check defined access level
+                if ($fw->userAccessLevel() < $fwcon['access_level']) {
+                    throw new AuthException("Access Denied (4)");
+                }
+
+                $object = new FwVirtualController($fwcon);
+            } else {
+                throw new NoControllerException("Controller class not found: $controller_class");
+            }
+        }
+        #logger("NOTICE", "fw controller found/created: $controller_class");
+        $fw->controllers_cache[$cache_key] = $object;
+        return $object;
+    }
+
     public function __construct() {
         global $CONFIG;
         spl_autoload_register(array($this, 'autoload'));
@@ -257,72 +306,83 @@ class fw {
     }
 
     //autoload controller/model classes
-    public function autoload($class_name): void {
-        $dirs          = array();
-        $bdir          = dirname(__FILE__) . '/';
-        $is_controller = false;
-        if (str_ends_with($class_name, 'Controller')) {
-            $is_controller = true;
-            $dirs[]        = $bdir . '../controllers/';
-            #add prefixes from config, so controller classes can be in a prefix subfolders
+    public function autoload(string $class_name): void {
+        // bdir points to "/www/php/fw" directory
+        $bdir = __DIR__ . '/';
+
+        // Decide if class is a controller
+        $is_controller = str_ends_with($class_name, 'Controller');
+
+        // Prepare directories list
+        $dirs = [];
+        if ($is_controller) {
+            // For application controllers
+            $dirs[] = $bdir . '../controllers/';
+
+            // Additional subfolders for route prefixes
             foreach ($this->config->ROUTE_PREFIXES as $prefix) {
                 $dirs[] = $bdir . '../controllers' . $prefix . '/';
             }
 
-            if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController' && $class_name !== 'FwApiController') {
-                $class_name = preg_replace("/Controller$/", "", $class_name);
+            // If not a framework’s own special controller (FwController, FwAdminController, etc.)
+            // then remove the suffix from the file we look for
+            if (!str_starts_with($class_name, 'Fw')) {
+                $class_name = preg_replace('/Controller$/', '', $class_name);
             }
         } else {
+            // For models
             $dirs[] = $bdir . '../models/';
+
+            // If not a framework’s own model - remove the suffix
             if ($class_name !== 'FwModel') {
-                $class_name = preg_replace("/Model$/", "", $class_name);
+                $class_name = preg_replace('/Model$/', '', $class_name);
             }
         }
-        $dirs[] = $bdir; #also look at /www/php/fw
-        $dirs[] = $bdir . '../'; #also look at /www/php
 
-        #if under linux (not Win or Mac) - need to do a case-insensitive search in each dir
-        $is_linux = !preg_match('/win/i', PHP_OS); #WIN - windows, Darwin - mac
-        if ($is_linux) {
-            $qclass_name = preg_quote($class_name, '/');
-        }
+        // Also check fw core directory itself, then "/www/php"
+        $dirs[] = $bdir;         // "/www/php/fw"
+        $dirs[] = $bdir . '../'; // "/www/php"
 
+        // Check if OS is Linux for case sensitivity checks
+        // (store this in a property if you want to avoid checking on every autoload)
+        $is_linux = !preg_match('/win|darwin/i', PHP_OS);
+
+        // Now try to locate the actual file
         $file_found = '';
         #logger($class_name, $dirs);
         foreach ($dirs as $dir) {
-            #first, try class name directly (under win/mac it will find right away as filesystem is case-insensitive)
             $file = $dir . $class_name . '.php';
+
+            // Direct check (fast path)
             if (file_exists($file)) {
                 $file_found = $file;
                 break;
             }
 
-            #if not found - for linux - do a case-insensitive search and return first found
+            // Fallback for Linux: do a case-insensitive search if direct check failed
             if ($is_linux) {
-                $files      = glob($dir . '*.php', GLOB_NOSORT);
-                $file_found = current(preg_grep("/$qclass_name\.php$/i", $files));
-                if ($file_found) {
-                    break;
+                $pattern       = preg_quote($class_name, '/');
+                $all_php_files = glob($dir . '*.php', GLOB_NOSORT);
+                if (!empty($all_php_files)) {
+                    $matches = preg_grep("/{$pattern}\.php$/i", $all_php_files);
+                    if (!empty($matches)) {
+                        $file_found = reset($matches);
+                        break;
+                    }
                 }
             }
-
-            #if not exists - try normalized
-            #$file = $dir . ucfirst(strtolower($class_name)) . '.php'; #normalize name, i.e. users => Users
-            #if (file_exists($file)) {
-            #    $file_found = $file;
-            #    break;
-            #}
         }
 
+        // Include if found, otherwise possibly throw exception if controller missing
         if ($file_found) {
             include_once $file_found;
         } else {
             if ($is_controller) {
+                // For controllers, we usually want to fail hard
                 throw new NoControllerException("Controller class not found: $class_name");
-            } else {
-                //no exception so class_exists() can work without a crash
-                // throw new NoClassException("Class not found: $class_name");
             }
+            // For other classes, we do nothing, so class_exists() can return false
+            // (or you could throw your own NoClassException here if desired)
         }
     }
 
@@ -333,7 +393,7 @@ class fw {
         } catch (AuthException $ex) {
             $this->handlePageError(401, $ex->getMessage(), $ex);
         } catch (NoControllerException $ex) {
-            #requested controller not found - use Home->NotFoundAction
+            #requested controller not found - use Home->NotFoundAction which will check Spages and if still not found - show 404
             logger("No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
             $this->route->prefix     = '';
             $this->route->controller = 'Home';
@@ -354,7 +414,7 @@ class fw {
         } catch (NoClassMethodException) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('NOTICE', "No method found for route, checking route_default_action");
-            logger('NOTICE', "Route: ", $this->route);
+            #logger('NOTICE', "Route: ", $this->route);
 
             $default_action = $this->dispatcher->getRouteDefaultAction($this->route->controller);
             if ($default_action == self::ACTION_INDEX) {
@@ -365,7 +425,7 @@ class fw {
                 $this->route->params[0] = $this->route->id;
                 $this->route->action    = self::ACTION_SHOW;
             } elseif ($default_action == self::ACTION_ERROR) {
-                $this->handlePageError(self::HTTP_NOT_FOUND);
+                $this->handlePageError(self::HTTP_NOT_FOUND, 'Not found');
                 return;
             } else {
                 #if no default action set - this is special case action - this mean action should be got form REST's 'id'
@@ -493,6 +553,7 @@ class fw {
             if (($request_xss
                     || $route->method == "POST"
                     || $route->method == "PUT"
+                    || $route->method == "PATCH"
                     || $route->method == "DELETE"
                     || $route->action == self::ACTION_SAVE
                     || $route->action == self::ACTION_DELETE
@@ -516,11 +577,6 @@ class fw {
             $rule_level = $ACCESS_LEVELS[$path];
         } elseif (array_key_exists($path2, $ACCESS_LEVELS)) {
             $rule_level = $ACCESS_LEVELS[$path2];
-        }
-
-        if (is_null($rule_level)) {
-            #rule not found in config - try Controller.access_level
-            $rule_level = $this->dispatcher->getRouteAccessLevel($route->controller);
         }
 
         if (is_null($rule_level)) {
@@ -553,7 +609,8 @@ class fw {
                     $err_code = intval($error["code"] ?? 0);
                     if ($err_code >= 100 && $err_code <= 599) {
                         #if error http code exists
-                        header("HTTP/1.0 " . $err_code . " " . $error["message"], true, $err_code);
+                        $message = strtok($error["message"], "\n"); # extract just a first line for header
+                        header("HTTP/1.0 " . $err_code . " " . $message, true, $err_code);
                     }
                     $this->parser('/error', $ps);
                 }
@@ -638,20 +695,16 @@ class fw {
     # output format based on requested format: json, pjax or (default) full page html
     # JSON: for automatic json response support - set ps("_json") = true
     # to return only specific content for json - set ps("_json")=array(...)
-    # to override page template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
+    # to override:
+    #   base directory - set ps("_basedir")="/another_controller/another_action" (relative to SITE_TEMPLATES dir)
+    #   only controller base directory - set ps("_basedir_controller")="/another_controller" (relative to SITE_TEMPLATES dir)
+    #   layout template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
     #
-    # (not for json) to perform route_redirect - set ps("_route_redirect") = ["method" => , "controller" => , "args" => ]
-    # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
-    public function parser(): void {
-        $args       = func_get_args();
-        $basedir    = '';
-        $controller = $this->route->controller;
-        if ($this->route->prefix) {
-            $basedir    .= '/' . $this->route->prefix;
-            $controller = preg_replace('/^' . preg_quote($this->route->prefix, '/') . '/i', '', $controller);
-        }
-        $basedir      .= '/' . $controller . '/' . $this->route->action;
-        $basedir      = strtolower($basedir);
+    #   (not for json) to perform route_redirect - set ps("_route_redirect") = ["method" => , "controller" => , "args" => ]
+    #   TODO: (not for json) to perform redirect - set ps("_redirect")="url"
+    public function parser(): ?string {
+        $args         = func_get_args();
+        $basedir      = '';
         $layout       = $this->page_layout;
         $ps           = array();
         $out_filename = '';
@@ -702,22 +755,21 @@ class fw {
                     'message' => $msg,
                 ]);
             }
-
-            return; // no further processing for json
+            return null; // no further processing for json
         }
 
         if (isset($ps["_route_redirect"])) {
             $rr = $ps["_route_redirect"];
             $this->routeRedirect($rr["method"], $rr["controller"], $rr["args"]);
-            return; // no further processing
+            return null; // no further processing
         }
 
         if (isset($ps["_redirect"])) {
             self::redirect($ps["_redirect"]);
-            return; // no further processing
+            return null; // no further processing
         }
 
-        $layout = $out_format == 'pjax' ? $this->config->PAGE_LAYOUT_PJAX : $this->page_layout;
+        $layout = $out_format == 'pjax' ? $this->config->PAGE_LAYOUT_PJAX : $layout;
         if (isset($ps['_layout'])) {
             #override layout from parse strings
             $layout = $ps['_layout'];
@@ -725,13 +777,89 @@ class fw {
 
         $ps['current_time'] = time();
 
+        #override full basedir
+        if (isset($ps["_basedir"])) {
+            $basedir = $ps["_basedir"];
+            unset($ps["_basedir"]);
+        }
+        if ($basedir === '') {
+            #if basedir not passed - use current controller/action as default then check overrides
+            $controller = $this->route->controller;
+            if ($this->route->prefix) {
+                $basedir    .= '/' . $this->route->prefix;
+                $controller = preg_replace('/^' . preg_quote($this->route->prefix, '/') . '/i', '', $controller);
+            }
+            $basedir .= '/' . $controller;
+
+            #override controller basedir only
+            if (isset($ps["_basedir_controller"])) {
+                $basedir = $ps["_basedir_controller"];
+                unset($ps["_basedir_controller"]);
+            }
+            $basedir .= '/' . $this->route->action;  #add action dir to controller's directory
+        }
+        $basedir = strtolower($basedir);
+
         logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
-        parse_page($basedir, $layout, $ps, $out_filename);
+
+        $result = $this->parsePage($basedir, $layout, $ps);
+
+        if ($out_filename == 'v') {
+            #if out_filename is 'v' - just return result as string
+            return $result;
+        } elseif ($out_filename) {
+            #if out_filename is not empty - save to file
+            file_put_contents($out_filename, $result);
+        } else {
+            #if out_filename is empty - just print
+            $this->printHeaders();
+            echo $result;
+        }
+        return null;
+    }
+
+    /**
+     * return ParsePage instance (singleton)
+     * @return ParsePage
+     */
+    public function parsePageInstance(): ParsePage {
+        if (!isset($this->pp_instance)) {
+            $this->pp_instance = (new ParsePage())
+                ->setTemplatesRoot($this->config->SITE_TEMPLATES)
+                ->setRootUrl($this->config->ROOT_URL)
+                ->setGlobals(fn() => $this->GLOBAL)
+                ->setLanguage($this->config->LANG);
+        }
+        return $this->pp_instance;
+    }
+
+    /**
+     * Shortcut for ParsePage parser usage
+     * @param string $basedir
+     * @param string $layout
+     * @param array $ps
+     * @return string
+     * @throws Exception
+     */
+    public function parsePage(string $basedir, string $layout, array $ps): string {
+        return $this->parsePageInstance()->parsePage($basedir, $layout, $ps);
     }
 
     public function parserJson(array $ps): void {
         header("Content-Type: application/json; charset=utf-8");
         echo json_encode($ps);
+    }
+
+    /**
+     * Print standard+security headers
+     */
+    public function printHeaders(): void {
+        header("Content-Type: text/html; charset=utf-8");
+        header("X-Content-Type-Options: nosniff");
+        header("Content-Security-Policy: frame-ancestors 'self'");
+        header("X-Frame-Options: DENY");
+        header("X-XSS-Protection: 1; mode=block");
+        header("X-Permitted-Cross-Domain-Policies: master-only");
     }
 
     //flash - read/store flash data (available on the next request and only on it)
@@ -945,7 +1073,7 @@ class fw {
      *   sendEmailTpl( $hU['email'], 'email_invite.txt', $ps);
      */
     public function sendEmailTpl(string|array $to_email, string $tpl, array $ps, array $options = array()): bool {
-        $msg_body = parse_page('/emails', $tpl, $ps, 'v');
+        $msg_body = $this->parsePage('/emails', $tpl, $ps);
         list($msg_subj, $msg_body) = preg_split("/\n/", $msg_body, 2);
 
         return $this->sendEmail($to_email, $msg_subj, $msg_body, $options);
@@ -1151,8 +1279,8 @@ function logger(): void {
 
     if ($logtype != 'ALL') {
         //cut too long logging
-        if (strlen($strlog) > 2048) {
-            $strlog = substr($strlog, 0, 2048) . '...' . substr($strlog, -128);
+        if (strlen($strlog) > 4096) {
+            $strlog = substr($strlog, 0, 4096) . '...' . substr($strlog, -512);
         }
 
         if (!preg_match("/\n$/", $strlog)) {

@@ -3,7 +3,7 @@
 Base Fw Api Controller class for building APIs
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class FwApiController extends FwController {
@@ -24,11 +24,7 @@ class FwApiController extends FwController {
     protected string $http_origin = '';
     protected ?object $jwt_payload = null; #decoded JWT payload
 
-    protected array $posted_json = []; #original JSON from POST request body
-
     public function __construct($is_auth = true) {
-        $this->posted_json = Utils::parsePostedJson(); #API always parse posted JSON (if any) and it add to $_REQUEST
-
         parent::__construct();
 
         $this->prepare($is_auth);

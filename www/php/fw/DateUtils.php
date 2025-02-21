@@ -1,7 +1,7 @@
 <?php
 /*
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
  */
 
 class DateUtils {
@@ -156,19 +156,22 @@ class DateUtils {
             return null; #keep passed null as is, so it will go to db as NULL
         }
         if (!strlen($s)) {
-            return '';
+            return null;
         }
 
-        list($day, $month, $year) = self::ParseStrToDate($s);
-        if (strlen($day) < 2) {
-            $day = "0" . $day;
-        }
-
-        if (strlen($month) < 2) {
-            $month = "0" . $month;
-        }
-
-        return "$year-$month-$day";
+        $dt = self::f2date($s);
+        return $dt?->format('Y-m-d');
+        //
+        //        list($day, $month, $year) = self::ParseStrToDate($s);
+        //        if (strlen($day) < 2) {
+        //            $day = "0" . $day;
+        //        }
+        //
+        //        if (strlen($month) < 2) {
+        //            $month = "0" . $month;
+        //        }
+        //
+        //        return "$year-$month-$day";
     }
 
     public static function Str2Unix($str): int {

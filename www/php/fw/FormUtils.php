@@ -1,7 +1,7 @@
 <?php
 /*
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class FormUtils {
@@ -68,19 +68,34 @@ class FormUtils {
         return $result;
     }
 
-    #similar to filter(), but for checkboxes (as unchecked checkboxes doesn't passed from form)
-    #RETURN: by ref itemdb - add fields with default_value or form value
-    public static function filterCheckboxes(&$itemdb, $form, $names, $default_value = "0") {
-        if (is_array($form)) {
-            $anames = Utils::qh($names, '0'); #$dval will be 0 by default
+    /**
+     * similar to filter, but for checkboxes (as unchecked checkboxes doesn't passed from the form submit)
+     * @param array $itemdb
+     * @param array|null $form
+     * @param string|array $names_str_or_arr array or qh string with default values: "field|def_value field2|def_value2"
+     * @param bool $is_existing_fields_only if true, then only process fields existing in the item. Usually used with PATCH requests
+     * @param string $default_value default value for non-exsiting fields in item, if default not defined in $names
+     * @return bool by ref itemdb - add fields with default_value or form value
+     */
+    public static function filterCheckboxes(array &$itemdb, ?array $form, string|array $names_str_or_arr, bool $is_existing_fields_only = false, string $default_value = "0"): bool {
+        if (empty($names_str_or_arr)) {
+            return false;
+        }
+
+        if (!is_null($form)) {
+            $anames = Utils::qh($names_str_or_arr, $default_value);
             foreach ($anames as $fld => $dval) {
                 if (array_key_exists($fld, $form)) {
                     $itemdb[$fld] = $form[$fld];
                 } else {
-                    $itemdb[$fld] = $default_value === '0' ? $dval : $default_value;
+                    if (!$is_existing_fields_only) {
+                        $itemdb[$fld] = $default_value === '0' ? $dval : $default_value;
+                    }
                 }
             }
         }
+
+        return true;
     }
 
     # fore each name in $name - check if value is empty '' and make it null
@@ -207,20 +222,41 @@ class FormUtils {
      * TODO: refactor to make common code with ParsePage?
      * @param string $tpl_path
      * @param string $sel_id
+     * @param string $base_path required if tpl_path is relative (not start with "/"), then base_path used. base_path itself is relative to template root
      * @return string
      */
-    public static function selectTplName(string $tpl_path, string $sel_id): string {
+    public static function selectTplName(string $tpl_path, string $sel_id, string $base_path = ""): string {
         $result = "";
 
-        $lines = file(fw::i()->config->SITE_TEMPLATES . $tpl_path);
+        if (!str_starts_with($tpl_path, "/")) {
+            if (empty($base_path)) {
+                return $result; // base_path required for relative tpl_path
+            }
+            $tpl_path = $base_path . '/' . $tpl_path;
+        }
+
+        $config = fw::i()->config;
+
+        $path = $config->SITE_TEMPLATES . $tpl_path;
+
+        // translate to absolute path, without any ../
+        $path = realpath($path);
+
+        // path traversal validation - check if path is a subpath of FwConfig.settings["template"]
+        if (!str_starts_with($path, realpath($config->SITE_TEMPLATES))) {
+            return $result;
+        }
+
+        $pp = fw::i()->parsePageInstance();
+
+        $lines = file($config->SITE_TEMPLATES . $tpl_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             if (strlen($line) < 2) {
                 continue;
             }
 
             list($value, $desc) = explode('|', $line, 2);
-            #$desc = preg_replace("/`(.+?)`/", "", $desc);
-            parse_lang($desc); #from ParsePage
+            $pp->parseLanguage($desc);
 
             if ($desc && $value == $sel_id) {
                 $result = $desc;
@@ -231,18 +267,44 @@ class FormUtils {
         return $result;
     }
 
-    public static function selectTplOptions($tpl_path): array {
+    /**
+     * return options for select tag from the template file
+     * file format: each line - value|description
+     * @param $tpl_path
+     * @param string $base_path required if tpl_path is relative (not start with "/"), then base_path used. base_path itself is relative to template root
+     * @return array
+     */
+    public static function selectTplOptions($tpl_path, string $base_path = ""): array {
         $result = array();
 
-        $lines = file(fw::i()->config->SITE_TEMPLATES . $tpl_path);
+        if (!str_starts_with($tpl_path, "/")) {
+            if (empty($base_path)) {
+                return $result; // base_path required for relative tpl_path
+            }
+            $tpl_path = $base_path . '/' . $tpl_path;
+        }
+
+        $config = fw::i()->config;
+        $path   = $config->SITE_TEMPLATES . $tpl_path;
+
+        // translate to absolute path, without any ../
+        $path = realpath($path);
+
+        // path traversal validation - check if path is a subpath of FwConfig.settings["template"]
+        if (!str_starts_with($path, realpath($config->SITE_TEMPLATES))) {
+            return $result;
+        }
+
+        $pp = fw::i()->parsePageInstance();
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             if (strlen($line) < 2) {
                 continue;
             }
 
             list($value, $desc) = explode('|', $line, 2);
-            #$desc = preg_replace("/`(.+?)`/", "", $desc);
-            parse_lang($desc); #from ParsePage
+            $pp->parseLanguage($desc);
 
             $result[] = array(
                 'id'    => $value,
@@ -262,10 +324,10 @@ class FormUtils {
      *  $itemdb["fdate_combo"] = FormUtils::dateForCombo($item, "fdate_combo")
      * @param array $item array with keys fdate_combo_day, fdate_combo_mon, fdate_combo_year
      * @param string $field_prefix prefix for keys
-     * @return string sql date YYYY-MM-DD or null if wrong date
+     * @return string|null sql date YYYY-MM-DD or null if wrong date
      */
-    public static function dateForCombo(array $item, string $field_prefix): string {
-        $result = '';
+    public static function dateForCombo(array $item, string $field_prefix): ?string {
+        $result = null;
         $day    = intval($item[$field_prefix . "_day"]);
         $mon    = intval($item[$field_prefix . "_mon"]);
         $year   = intval($item[$field_prefix . "_year"]);
@@ -273,7 +335,7 @@ class FormUtils {
         if ($day > 0 && $mon > 0 && $year > 0) {
             $result = strtotime("$year-$mon-$day");
             if ($result === FALSE) {
-                $result = '';
+                $result = null;
             } else {
                 $result = DateUtils::Unix2SQL($result, true);
             }

@@ -3,7 +3,7 @@
 Login Controller
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class LoginController extends FwController {
@@ -76,11 +76,11 @@ class LoginController extends FwController {
         } catch (ApplicationException $ex) {
             $this->fw->GLOBAL['err_ctr'] = reqi('err_ctr') + 1;
             $this->setFormError($ex);
-            $this->routeRedirect("Index");
+            $this->routeRedirect(FW::ACTION_INDEX);
         }
     }
 
-    public function LogoffAction() {
+    public function LogoffAction(): void {
         $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGOFF, FwEntities::ICODE_USERS, $this->fw->userId());
 
         @session_start();

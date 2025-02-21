@@ -3,15 +3,18 @@
  Admin Reports Controller class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2024 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class AdminReportsController extends FwAdminController {
-    const int access_level = Users::ACL_MANAGER;
+    const string route_default_action = FW::ACTION_SHOW;
+    const int    access_level         = Users::ACL_MANAGER;
     public FwModel|Reports $model;
     public string $model_name = 'Reports';
 
     public string $base_url = '/Admin/Reports';
+
+
     public $is_admin = false;
 
     public function __construct() {

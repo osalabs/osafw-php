@@ -1,4 +1,10 @@
 <?php
+/*
+Home Controller
+
+Part of PHP osa framework  www.osalabs.com/osafw/php
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
+*/
 
 class HomeController extends FwController {
     const string route_default_action = FW::ACTION_SHOW;

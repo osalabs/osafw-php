@@ -37,7 +37,7 @@ class Utils {
         foreach ($arr as $value) {
             $result .= str_replace(' ', '&nbsp;', $value) . ' ';
         }
-        return $result;
+        return rtrim($result);
     }
 
     /**
@@ -215,10 +215,15 @@ class Utils {
      *   "other value" - use this value
      * @return array
      */
-    public static function commanstr2hash(string $sel_ids, string $value = null): array {
+    public static function commastr2hash(string $sel_ids, string $value = null): array {
         $result = array();
         $ids    = explode(",", $sel_ids);
         foreach ($ids as $i => $v) {
+            //skip empty values
+            if ($v == "") {
+                continue;
+            }
+
             if (is_null($value)) {
                 $result[$v] = $v;
             } elseif ($value == "123...") {
@@ -371,7 +376,7 @@ class Utils {
         $ps["headers"] = $headers;
 
         //output headers
-        $filedata = parse_page($tpl_dir, "xls_head.html", $ps, 'v');
+        $filedata = $fw->parsePage($tpl_dir, "xls_head.html", $ps);
         print $filedata;
 
         //output rows in chunks to save memory and keep connection alive
@@ -390,7 +395,7 @@ class Utils {
 
             //write to output every 10000 rows
             if (count($buffer) >= 10000) {
-                $filedata = parse_page($tpl_dir, "xls_rows.html", $psbuffer);
+                $filedata = $fw->parsePage($tpl_dir, "xls_rows.html", $psbuffer);
                 print $filedata;
                 $buffer = array();
             }
@@ -398,12 +403,12 @@ class Utils {
 
         //output if something left
         if (count($buffer) > 0) {
-            $filedata = parse_page($tpl_dir, "xls_rows.html", $psbuffer);
+            $filedata = $fw->parsePage($tpl_dir, "xls_rows.html", $psbuffer);
             print $filedata;
         }
 
         //output footer
-        $filedata = parse_page($tpl_dir, "xls_foot.html", $ps);
+        $filedata = $fw->parsePage($tpl_dir, "xls_foot.html", $ps);
         print $filedata;
     }
 

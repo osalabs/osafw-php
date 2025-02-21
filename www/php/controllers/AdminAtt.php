@@ -3,7 +3,7 @@
 Admin Att Controller class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2024 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class AdminAttController extends FwAdminController {
@@ -129,7 +129,7 @@ class AdminAttController extends FwAdminController {
         $item_old = array();
         if ($id > 0) {
             $item_old = $this->model->one($id);
-            $result   = $result && $this->validateRequired($item, $this->required_fields);
+            $result   = $result && $this->validateRequired($id, $item, $this->required_fields);
         } else {
             if (!count($files) || !$files[0]['size']) {
                 $result = false;

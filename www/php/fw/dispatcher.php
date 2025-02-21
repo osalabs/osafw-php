@@ -34,7 +34,9 @@ GET   /controller/new             ShowForm (show new form - ShowNew)
 GET   /controller/{id}[.format]   Show     (show in format - not for editing)
 GET   /controller/{id}/edit       ShowForm (show edit form - ShowEdit)
 GET   /controller/{id}/delete     ShowDelete
-POST/PUT  /controller/{id}        Save     (save changes to exisitng record - Update    Note:$_POST should contain data
+POST/PUT  /controller/{id}        Save     (save changes to existing record - Update    Note:$_POST should contain data
+PATCH /controller                 SaveMulti (partial update multiple records)
+PATCH /controller/{id}            Save     (save partial changes to existing record - Update. Can be used to update single/specific fields without affecting any other fields.)
 DELETE  /controller/{id}          Delete   (alternative: POST with _method=DELETE)
 
 /controller/(Action)              Action    call for arbitrary action from the controller
@@ -49,6 +51,7 @@ class Dispatcher {
         'GET'    => true,
         'POST'   => true,
         'PUT'    => true,
+        'PATCH'  => true,
         'DELETE' => true,
     );
 
@@ -84,10 +87,21 @@ class Dispatcher {
         $this->ROUTE_PREFIXES = $ROUTE_PREFIXES;
     }
 
-    # get route for method/uri with defaults
-    public function getRoute(): stdClass {
-        $method = $_SERVER['REQUEST_METHOD']; #ex: POST, GET
-        $uri    = $_SERVER['REQUEST_URI']; #ex: /add/post/12390/alksjdla?qoeewlkj
+    /**
+     * parse request URL and return controller, action, id, format, method (default GET)
+     * if url is empty - use current request url/method
+     * @param string $url
+     * @return stdClass
+     * @throws Exception
+     */
+    public function getRoute(string $url = ''): stdClass {
+        if ($url > '') {
+            $uri    = $url;
+            $method = 'GET';
+        } else {
+            $uri    = $_SERVER['REQUEST_URI']; #ex: /add/post/12390/alksjdla?qoeewlkj
+            $method = $_SERVER['REQUEST_METHOD']; #ex: POST, GET
+        }
 
         $route = $this->uriToRoute($method, $uri, $this->ROUTES);
         #logger("ROUTE found:", $route);
@@ -117,23 +131,26 @@ class Dispatcher {
         if (!$action_name) {
             throw new NoClassMethodException();
         }
-        $class_name = $controller_name . 'Controller';
-        if (!class_exists($class_name)) {
-            throw new NoControllerException();
-        }
-        $method_name = $action_name . FW::ACTION_SUFFIX;
 
-        /** @var FwController $controller */
-        $controller = new $class_name;
+        $class_name = $controller_name . 'Controller';
+        $controller = fw::controller($class_name);
         $ps         = [];
 
         try {
             $controller->checkAccess();
+
+            $method_name = $action_name . FW::ACTION_SUFFIX;
             if (!method_exists($controller, $method_name)) {
                 throw new NoClassMethodException();
             }
             //call controller's method in $method_name and expand $aparams array into method params
             $ps = $controller->$method_name(...$aparams);
+
+            // check/override _basedir from controller for non-json requests
+            if (!fw::i()->isJsonExpected() && !isset($ps['_basedir_controller']) && !empty($controller->template_basedir)) {
+                logger("TRACE", "Controller [$controller_name] template_basedir override to [$controller->template_basedir]");
+                $ps['_basedir_controller'] = $controller->template_basedir;
+            }
 
             //special case for export - IndexAction+export_format is set - call exportList without parser
             if ($method_name == FW::ACTION_INDEX . FW::ACTION_SUFFIX && $controller->export_format > '') {
@@ -227,7 +244,12 @@ class Dispatcher {
             } else {
                 $result = 'updatemulti';
             }
-
+        } elseif ($method == 'PATCH') {
+            if ($id > '') {
+                $result = 'update';
+            } else {
+                $result = 'updatemulti';
+            }
         } elseif ($method == 'DELETE' && $id > '') {
             $result = 'delete';
         } elseif ($method == 'OPTIONS') {
@@ -288,6 +310,7 @@ class Dispatcher {
             }
         }
 
+        $controller_path = '';
         $cur_controller  = 'Home';
         $cur_action      = FW::ACTION_INDEX;
         $cur_id          = '';
@@ -389,15 +412,18 @@ class Dispatcher {
 
         array_unshift($cur_aparams, $cur_id); #first param always is id
 
-        $result              = new stdClass;
-        $result->method      = $method;
-        $result->prefix      = $controller_prefix;
-        $result->controller  = $cur_controller;
-        $result->action      = $cur_action;
-        $result->id          = $cur_id;
-        $result->action_more = $cur_action_more;
-        $result->format      = $cur_format;
-        $result->params      = $cur_aparams;
+        $result                  = new stdClass;
+        $result->controller_path = $controller_path . "/" . $cur_controller; // store /Prefix/Prefix2/Controller - to use in parser a default path for templates
+        $result->request_url     = $this->request_url;
+        $result->uri             = $uri;
+        $result->method          = $method;
+        $result->prefix          = $controller_prefix;
+        $result->controller      = $cur_controller;
+        $result->action          = $cur_action;
+        $result->id              = $cur_id;
+        $result->action_more     = $cur_action_more;
+        $result->format          = $cur_format;
+        $result->params          = $cur_aparams;
 
         logger('TRACE', 'ROUTER RESULT=', $result);
         return $result;

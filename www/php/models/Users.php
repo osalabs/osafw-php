@@ -155,15 +155,48 @@ class Users extends FwModel {
         $pwd_reset_token = Utils::getRandStr(50);
 
         $item = [
-            'pwd_reset'      => $this->hashPwd($pwd_reset_token),
+            'pwd_reset'      => $pwd_reset_token,
             'pwd_reset_time' => DB::NOW(),
+        ];
+        $this->update($id, $item);
+
+        $user             = $this->one($id);
+        $user['pwd_reset_token'] = $pwd_reset_token;
+
+        Followups::i()->sendToUser(Followups::RESET_PASSWORD, $user["id"], ["passwordResetUrl" => $passwordResetUrl]);
+
+        return true;
+    }
+
+    // send email with token to confirm user's email
+    public function sendConfirmEmail(int $id): void {
+        $confirm_token = Utils::getRandStr(32);
+
+        $item = [
+            'email_token'      => $confirm_token,
+            'email_token_time' => DB::NOW(),
         ];
         $this->update($id, $item);
 
         $user            = $this->one($id);
         $user['pwd_reset_token'] = $pwd_reset_token;
 
-        return $this->fw->sendEmailTpl($user['email'], "email_pwd.txt", $user);
+        return $this->fw->sendEmailTpl($user['email'], "email_confirm.txt", $user);
+    }
+
+    // send email with token to confirm user's email
+    public function sendConfirmEmailUpdate(int $id, string $email): void {
+        $confirm_token = Utils::getRandStr(32);
+
+        $item = [
+            'email_new'        => $email,
+            'email_token'      => $confirm_token,
+            'email_token_time' => DB::NOW(),
+        ];
+        $this->update($id, $item);
+
+        $user            = $this->one($id);
+        return $this->fw->sendEmailTpl($user['email'], "email_confirm.txt", $user);
     }
 
     /**
@@ -532,6 +565,95 @@ class Users extends FwModel {
     }
 
     /**
+     * get all RBAC info for the user/resource
+     * @param int|null $users_id
+     * @param string|null $resource_icode
+     * @return array assoc array with permissions keys:
+     *     list => true if user has list permission
+     *     view => true if user has view permission
+     *     add => true if user has add permission
+     *     edit => true if user has edit permission
+     *     del => true if user has delete permission
+     */
+    public function getRBAC(?int $users_id = null, string $resource_icode = null): array {
+        if (!$this->isRoles()) {
+            return $this->allPermissions(); //if no Roles support - always allow
+        }
+
+        $result = [];
+        if (is_null($users_id)) {
+            $users_id          = $this->fw->userId();
+            $user_access_level = $this->fw->userAccessLevel();
+        } else {
+            $user              = $this->one($users_id);
+            $user_access_level = intval($user["access_level"]);
+        }
+
+        if ($user_access_level == self::ACL_SITE_ADMIN) {
+            //siteadmin doesn't have roles - has access to everything - just set all permissions to true
+            //logger('TRACE', "RBAC info (SITEADMIN):");
+            return $this->allPermissions();
+        }
+
+        if (empty($resource_icode)) {
+            $resource_icode = $this->fw->route->controller;
+        }
+
+        // read resource id
+        $resource = Resources::i()->oneByIcode($resource_icode);
+        if (empty($resource)) {
+            return $result; //if no resource defined - return empty result - basically access denied
+        }
+        $resources_id = intval($resource["id"]);
+
+        //list all permissions for the resource and all user roles
+        if ($users_id == 0) {
+            //visitor
+            $roles_ids = [Roles::i()->idVisitor()];
+        } else {
+            $roles_ids = UsersRoles::i()->colLinkedIdsByMainId($users_id);
+        }
+
+        // read all permissions for the resource and user's roles
+        $rows            = RolesResourcesPermissions::i()->listByRolesResources($roles_ids, [$resources_id]);
+        $permissions_ids = [];
+        foreach ($rows as $row) {
+            $permissions_ids[] = $row["permissions_id"];
+        }
+
+        // now read all permissions by ids and set icodes to result
+        $permissions_rows = Permissions::i()->listMulti($permissions_ids);
+        foreach ($permissions_rows as $row) {
+            $result[$row["icode"]] = true;
+        }
+
+        logger('TRACE', "RBAC info:", $result);
+        return $result;
+    }
+
+    /**
+     * return all allowed permissions as [ permissions.icode => true ]
+     * @return array
+     */
+    public function allPermissions(): array {
+        $result = [];
+        if ($this->isRoles()) {
+            $permissions = Permissions::i()->ilist();
+            foreach ($permissions as $permission) {
+                $result[$permission["icode"]] = true;
+            }
+        } else {
+            //if no Roles support - always allow all
+            $icodes = Utils::qw("list view add edit del");
+            foreach ($icodes as $icode) {
+                $result[$icode] = true;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * check if currently logged user roles has access to controller/action
      * @param int $users_id - usually currently logged user - fw.userId
      * @param string $resource_icode - resource code like controller name 'AdminUsers'
@@ -578,37 +700,38 @@ class Users extends FwModel {
      * @throws ApplicationException|DBException|NoModelException
      */
     public function isAccessByRolesResourcePermission(int $users_id, string $resource_icode, string $permission_icode): bool {
-        if ($this->isRoles()) {
-            // read resource id
-            $resource = Resources::i()->oneByIcode($resource_icode);
-            if (empty($resource)) {
-                return false; //if no resource defined - access denied
-            }
-            $resources_id = intval($resource["id"]);
-
-            $permission = Permissions::i()->oneByIcode($permission_icode);
-            if (empty($permission)) {
-                return false; //if no permission defined - access denied
-            }
-            $permissions_id = intval($permission["id"]);
-
-            // read all roles for user
-            $roles_ids = UsersRoles::i()->colLinkedIdsByMainId($users_id);
-
-            // check if any of user's roles has access to resource/permission
-            $result = RolesResourcesPermissions::i()->isExistsByResourcePermissionRoles($resources_id, $permissions_id, $roles_ids);
-            if (!$result) {
-                logger('DEBUG', "Access by Roles denied", [
-                    "resource_icode"   => $resource_icode,
-                    "permission_icode" => $permission_icode,
-                    "resources_id"     => $resources_id,
-                    "permissions_id"   => $permissions_id,
-                    "roles_ids"        => $roles_ids,
-                ]);
-            }
-        } else {
-            $result = true; //if no Roles support - always allow
+        if (!$this->isRoles()) {
+            return true; //if no Roles support - always allow
         }
+
+        // read resource id
+        $resource = Resources::i()->oneByIcode($resource_icode);
+        if (empty($resource)) {
+            return false; //if no resource defined - access denied
+        }
+        $resources_id = intval($resource["id"]);
+
+        $permission = Permissions::i()->oneByIcode($permission_icode);
+        if (empty($permission)) {
+            return false; //if no permission defined - access denied
+        }
+        $permissions_id = intval($permission["id"]);
+
+        // read all roles for user
+        $roles_ids = UsersRoles::i()->colLinkedIdsByMainId($users_id);
+
+        // check if any of user's roles has access to resource/permission
+        $result = RolesResourcesPermissions::i()->isExistsByResourcePermissionRoles($resources_id, $permissions_id, $roles_ids);
+        if (!$result) {
+            logger('DEBUG', "Access by Roles denied", [
+                "resource_icode"   => $resource_icode,
+                "permission_icode" => $permission_icode,
+                "resources_id"     => $resources_id,
+                "permissions_id"   => $permissions_id,
+                "roles_ids"        => $roles_ids,
+            ]);
+        }
+
         return $result;
     }
 
@@ -639,6 +762,10 @@ class Users extends FwModel {
         }
     }
 
+    //</editor-fold>
+
+
+    //<editor-fold desc="Customizations">
     //</editor-fold>
 
 }

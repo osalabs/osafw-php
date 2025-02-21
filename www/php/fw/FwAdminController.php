@@ -3,7 +3,7 @@
 Base Fw Controller class for standard module with list/form screens
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
  */
 
 class FwAdminController extends FwController {
@@ -93,10 +93,14 @@ class FwAdminController extends FwController {
 
         if ($this->isGet()) {
             if ($id > 0) {
+                // edit screen
                 $item = $this->model->one($id);
             } else {
-                # override any defaults here
-                $item = array_merge($item, $this->form_new_defaults);
+                // add new screen
+                $item_new = [];
+                $item_new = array_merge($item_new, $this->form_new_defaults); // use hardcoded defaults if any
+                $item_new = array_merge($item_new, $item); // override with passed defaults
+                $item     = $item_new;
             }
         } else {
             $itemdb = $this->model->one($id);
@@ -125,7 +129,8 @@ class FwAdminController extends FwController {
         }
 
         Users::i()->checkReadOnly();
-        if (reqi("refresh") == 1) {
+        $is_refresh = reqb("refresh");
+        if ($is_refresh && empty($form_id)) { //for new record - just refresh the form, for existing - also try to save
             $this->fw->routeRedirect(FW::ACTION_SHOW_FORM, null, [$form_id]);
             return null;
         }
@@ -133,7 +138,7 @@ class FwAdminController extends FwController {
         $id   = intval($form_id);
         $item = reqh('item');
 
-        $success = true;
+        $success = !$is_refresh; #if refresh - force route redirect to form
         $is_new  = ($id == 0);
 
         $this->Validate($id, $item);
@@ -146,7 +151,7 @@ class FwAdminController extends FwController {
     }
 
     public function Validate($id, $item): void {
-        $result = $this->validateRequired($item, $this->required_fields);
+        $result = $this->validateRequired($id, $item, $this->required_fields);
 
         //        if ($result){
         //            if ($this->model->isExists( $item['iname'], $id ) ){
@@ -198,26 +203,8 @@ class FwAdminController extends FwController {
             }
         }
 
-        $ctr = 0;
-        foreach ($acb as $id => $value) {
-            if ($is_delete) {
-                $this->model->deleteWithPermanentCheck($id);
-                $ctr += 1;
-            } elseif ($user_lists_id) {
-                UserLists::i()->addItemList($user_lists_id, $id);
-                $ctr += 1;
-            } elseif ($remove_user_lists_id) {
-                UserLists::i()->delItemList($remove_user_lists_id, $id);
-                $ctr += 1;
-            }
-        }
-
-        if ($is_delete) {
-            $this->fw->flash("multidelete", $ctr);
-        }
-        if ($user_lists_id) {
-            $this->fw->flash("success", "$ctr records added to the list");
-        }
+        $ctr = $this->saveMultiRows(array_keys($acb), $is_delete, $user_lists_id, $remove_user_lists_id);
+        $this->saveMultiResult($ctr, $is_delete, $user_lists_id, $remove_user_lists_id);
 
         return $this->afterSaveJson(true, ['ctr' => $ctr]);
     }

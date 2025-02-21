@@ -1,0 +1,236 @@
+{
+  "version": "1.0",
+  "defaultProvider": "unpkg",
+  "defaultDestination": "assets/lib",
+  "libraries": [
+    {
+      "library": "bootstrap@5.3.3",
+      "destination": "assets/lib/bootstrap",
+      "files": [
+        "dist/css/bootstrap.min.css",
+        "dist/css/bootstrap.min.css.map",
+        "dist/js/bootstrap.bundle.min.js",
+        "dist/js/bootstrap.bundle.min.js.map"
+      ]
+    },
+    {
+      "library": "bootstrap-icons@1.11.3",
+      "destination": "assets/lib/bootstrap-icons",
+      "files": [
+        "font/fonts/bootstrap-icons.woff2",
+        "font/fonts/bootstrap-icons.woff",
+        "font/bootstrap-icons.min.css"
+      ]
+    },
+    {
+      "library": "bootstrap-select@1.14.0-beta3",
+      "destination": "assets/lib/bootstrap-select",
+      "files": [
+        "dist/css/bootstrap-select.min.css",
+        "dist/css/bootstrap-select.css.map",
+        "dist/js/bootstrap-select.min.js",
+        "dist/js/bootstrap-select.min.js.map"
+      ]
+    },
+
+    {
+      "library": "jquery@3.7.1",
+      "destination": "assets/lib/jquery",
+      "files": [
+        "dist/jquery.min.js",
+        "dist/jquery.min.map"
+      ]
+    },
+    {
+      "library": "jquery-form@4.3.0",
+      "destination": "assets/lib/jquery-form",
+      "files": [
+        "dist/jquery.form.min.js",
+        "dist/jquery.form.min.js.map"
+      ]
+    },
+    {
+      "library": "jquery-ui@1.14.1",
+      "destination": "assets/lib/jquery-ui",
+      "files": [
+        "dist/jquery-ui.min.js"
+      ]
+    },
+    {
+      "library": "jquery-hotkeys@0.2.2",
+      "destination": "assets/lib/jquery-hotkeys",
+      "files": [
+        "jquery-hotkeys.js"
+      ]
+    },
+    {
+      "provider": "jsdelivr",
+      "library": "chart.js@3.9.1",
+      "destination": "assets/lib/chartjs",
+      "files": [
+        "dist/chart.min.js"
+      ]
+    },
+
+    {
+      "library": "bootstrap-markdown@2.10.0",
+      "destination": "assets/lib/bootstrap-markdown",
+      "files": [
+        "js/bootstrap-markdown.js",
+        "css/bootstrap-markdown.min.css"
+      ]
+    },
+    {
+      "library": "turndown@7.2.0",
+      "destination": "assets/lib/turndown",
+      "files": [
+        "dist/turndown.js"
+      ]
+    },
+    {
+      "library": "markdown-it@14.1.0",
+      "destination": "assets/lib/markdown-it",
+      "files": [
+        "dist/markdown-it.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-sub@2.0.0",
+      "destination": "assets/lib/markdown-it-sub",
+      "files": [
+        "dist/markdown-it-sub.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-sup@2.0.0",
+      "destination": "assets/lib/markdown-it-sup",
+      "files": [
+        "dist/markdown-it-sup.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-abbr@2.0.0",
+      "destination": "assets/lib/markdown-it-abbr",
+      "files": [
+        "dist/markdown-it-abbr.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-ins@4.0.0",
+      "destination": "assets/lib/markdown-it-ins",
+      "files": [
+        "dist/markdown-it-ins.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-mark@4.0.0",
+      "destination": "assets/lib/markdown-it-mark",
+      "files": [
+        "dist/markdown-it-mark.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-container@4.0.0",
+      "destination": "assets/lib/markdown-it-container",
+      "files": [
+        "dist/markdown-it-container.min.js"
+      ]
+    },
+    {
+      "library": "markdown-it-attrs@4.2.0",
+      "destination": "assets/lib/markdown-it-attrs",
+      "files": [
+        "markdown-it-attrs.browser.js"
+      ]
+    },
+
+    {
+      "library": "vue@3.5.13",
+      "destination": "assets/lib/vue",
+      "files": [
+        "dist/vue.global.js",
+        "dist/vue.global.prod.js",
+        "dist/vue.esm-browser.js",
+        "dist/vue.esm-browser.prod.js"
+      ]
+    },
+    {
+      "library": "@vue/devtools-api@7.6.8",
+      "destination": "assets/lib/vue-devtools-api"
+    },
+    {
+      "library": "@vue/devtools-kit@7.6.8",
+      "destination": "assets/lib/vue-devtools-kit"
+    },
+    {
+      "library": "@vue/devtools-shared@7.6.8",
+      "destination": "assets/lib/vue-devtools-shared"
+    },
+    {
+      "library": "perfect-debounce@1.0.0",
+      "destination": "assets/lib/perfect-debounce",
+      "files": [
+        "dist/index.mjs"
+      ]
+    },
+    {
+      "library": "hookable@5.5.3",
+      "destination": "assets/lib/hookable",
+      "files": [
+        "dist/index.mjs"
+      ]
+    },
+    {
+      "library": "birpc@0.2.19",
+      "destination": "assets/lib/birpc",
+      "files": [
+        "dist/index.mjs"
+      ]
+    },
+    {
+      "library": "vue-demi@0.14.10",
+      "destination": "assets/lib/vue-demi",
+      "files": [
+        "lib/index.mjs"
+      ]
+    },
+    {
+      "library": "pinia@2.3.0",
+      "destination": "assets/lib/pinia",
+      "files": [
+        "dist/pinia.esm-browser.js"
+      ]
+    },
+    {
+      "library": "mande@2.0.9",
+      "destination": "assets/lib/mande",
+      "files": [
+        "dist/mande.mjs",
+        "dist/mande.prod.mjs"
+      ]
+    },
+    {
+      "library": "@vueform/multiselect@2.6.11",
+      "destination": "assets/lib/vueform-multiselect",
+      "files": [
+        "dist/multiselect.js",
+        "themes/default.css"
+      ]
+    },
+    {
+      "library": "vue-draggable-next@2.2.1",
+      "destination": "assets/lib/vue-draggable-next",
+      "files": [
+        "dist/vue-draggable-next.esm-browser.js"
+      ]
+    },
+    {
+      "library": "bootstrap-simple-autocomplete@1.1.0",
+      "destination": "assets/lib/bootstrap-simple-autocomplete",
+      "files": [
+        "bootstrap-simple-autocomplete.js",
+        "bootstrap-simple-autocomplete.mjs"
+      ]
+    }
+  ]
+}

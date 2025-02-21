@@ -3,7 +3,7 @@
 Base Fw Model class
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
  */
 
 abstract class FwModel {
@@ -99,6 +99,14 @@ abstract class FwModel {
     }
 
     /**
+     * return table schema for the model
+     * @return array
+     */
+    public function schema(): array {
+        return $this->db->tableSchema($this->getTable());
+    }
+
+    /**
      * standard stub for check access for particular record
      * @param string|int $id
      * @param string $action specific action code to check like view or edit
@@ -161,6 +169,10 @@ abstract class FwModel {
     }
 
     public function oneByIcode(string $icode): array {
+        if (empty($icode)) {
+            return []; #return empty array for empty id
+        }
+
         $cache_key = $this->cache_prefix_bycode . $icode;
         $row       = $this->fw->cache->getRequestValue($cache_key);
         if (is_null($row)) {
@@ -176,6 +188,18 @@ abstract class FwModel {
         return $row;
     }
 
+    /**
+     * @throws NotFoundException
+     */
+    public function oneByIcodeOrFail(string $icode): array {
+        $item = $this->oneByIcode($icode);
+        if (empty($item) || $item["status"] === self::STATUS_DELETED) {
+            throw new NotFoundException();
+        }
+
+        return $item;
+    }
+
     public function listFields(): array {
         $rows = $this->db->arrp("EXPLAIN " . $this->qTable());
         foreach ($rows as $key => $row) {
@@ -189,7 +213,7 @@ abstract class FwModel {
 
     # list multiple records by multiple ids
     public function listMulti(array $ids): array {
-        return $this->db->arrp("SELECT * from {$this->qTable()} where " . $this->db->qid($this->field_id) . $this->db->insql($ids));
+        return $this->db->arr($this->getTable(), [$this->field_id => $this->db->opIN($ids)]);
     }
 
     /**
@@ -647,22 +671,6 @@ abstract class FwModel {
 
     //<editor-fold desc="support for junction models/tables">
 
-    // convert from C# to PHP:
-    //    public virtual ArrayList listByMainId(int main_id, Hashtable def = null)
-    //    {
-    //        if (string.IsNullOrEmpty(junction_field_main_id))
-    //            throw new NotImplementedException();
-    //        return db.array(table_name, DB.h(junction_field_main_id, main_id));
-    //    }
-    //
-    //    //similar to listByMainId but by linked_id
-    //    public virtual ArrayList listByLinkedId(int linked_id, Hashtable def = null)
-    //    {
-    //        if (string.IsNullOrEmpty(junction_field_linked_id))
-    //            throw new NotImplementedException();
-    //        return db.array(table_name, DB.h(junction_field_linked_id, linked_id));
-    //    }
-
     /**
      * list records from junction table by main_id
      * @param int $main_id
@@ -739,7 +747,7 @@ abstract class FwModel {
                 }
             }
 
-            $lookup_rows = $this->sortByCheckedPrio($lookup_rows);
+            $lookup_rows = $this->filterAndSortChecked($lookup_rows, $def);
         }
         return $lookup_rows;
     }
@@ -772,7 +780,7 @@ abstract class FwModel {
                 }
             }
 
-            $lookup_rows = $this->sortByCheckedPrio($lookup_rows);
+            $lookup_rows = $this->filterAndSortChecked($lookup_rows, $def);
         }
         return $lookup_rows;
     }
@@ -792,27 +800,29 @@ abstract class FwModel {
             foreach ($rows as $k => $row) {
                 $rows[$k]['is_checked'] = in_array($row[$this->field_id], $ids);
             }
-
             // now sort so checked values will be at the top
-            $result = [];
-            if ($is_checked_only) {
-                foreach ($rows as $row) {
-                    if ($row['is_checked']) {
-                        $result[] = $row;
-                    }
-                }
-            } else {
-                usort($rows, function ($a, $b) {
-                    return $b['is_checked'] - $a['is_checked'];
-                });
-                $result = $rows;
-            }
+            $result = $this->filterAndSortChecked($rows, $def);
         } elseif ($is_checked_only) {
             // return no items if no checked
             $result = [];
         }
 
         return $result;
+    }
+
+    protected function filterAndSortChecked(array $rows, array $def = null): array {
+        $is_checked_only = $def['lookup_checked_only'] ?? false;
+        if ($is_checked_only) {
+            $result = [];
+            foreach ($rows as $row) {
+                if ($row['is_checked']) {
+                    $result[] = $row;
+                }
+            }
+            return $result;
+        } else {
+            return $this->sortByCheckedPrio($rows);
+        }
     }
 
     /**
@@ -824,7 +834,7 @@ abstract class FwModel {
      */
     public function listWithChecked(array|string $hsel_ids, array $def = null): array {
         if (!is_array($hsel_ids)) {
-            $hsel_ids = FormUtils::ids2multi($hsel_ids);
+            $hsel_ids = explode(",", $hsel_ids);
         }
         $rows = $this->setMultiListChecked($this->ilist(), $hsel_ids, $def);
         return $rows;
@@ -1040,11 +1050,15 @@ abstract class FwModel {
     // override in your specific models when necessary
     public function prepareSubtable(array &$list_rows, int $related_id, array $def = null): void {
         $model_name = $def != null ? (string)$def["model"] : get_class($this);
-        foreach ($list_rows as $k => $row) {
-            $list_rows[$k]["model"] = $model_name;
+        foreach ($list_rows as $k => &$row) {
             //if row_id starts with "new-" - set flag is_new
             $list_rows[$k]["is_new"] = str_starts_with($row["id"], "new-");
+            // for non-Vue - add def to each row
+            if (!$this->fw->isJsonExpected()) {
+                $row["def"] = $def;
+            }
         }
+        unset($row);
     }
 
     public function prepareSubtableAddNew(array &$list_rows, int $related_id, array $def = null): void {
@@ -1075,103 +1089,6 @@ abstract class FwModel {
     public function updatePrio(int $id, int $prio): int {
         return $this->db->update($this->table_name, [$this->field_prio => $prio], [$this->field_id => $id]);
     }
-
-    /**
-     *     // reorder prio column
-     * public bool reorderPrio(string sortdir, int id, int under_id, int above_id)
-     * {
-     * if (sortdir != "asc" && sortdir != "desc")
-     * throw new ApplicationException("Wrong sort directrion");
-     *
-     * if (string.IsNullOrEmpty(field_prio))
-     * return false;
-     *
-     * int id_prio = Utils.f2int(one(id)[field_prio]);
-     *
-     * // detect reorder
-     * if (under_id > 0)
-     * {
-     * // under id present
-     * int under_prio = Utils.f2int(one(under_id)[field_prio]);
-     * if (sortdir == "asc")
-     * {
-     * if (id_prio < under_prio)
-     * {
-     * // if my prio less than under_prio - make all records between old prio and under_prio as -1
-     * updatePrioRange(-1, id_prio, under_prio);
-     * // and set new id prio as under_prio
-     * updatePrio(id, under_prio);
-     * }
-     * else
-     * {
-     * // if my prio more than under_prio - make all records between old prio and under_prio as +1
-     * updatePrioRange(+1, (under_prio + 1), id_prio);
-     * // and set new id prio as under_prio+1
-     * updatePrio(id, under_prio + 1);
-     * }
-     * }
-     * else
-     * // desc
-     * if (id_prio < under_prio)
-     * {
-     * // if my prio less than under_prio - make all records between old prio and under_prio-1 as -1
-     * updatePrioRange(-1, id_prio, under_prio - 1);
-     * // and set new id prio as under_prio-1
-     * updatePrio(id, under_prio - 1);
-     * }
-     * else
-     * {
-     * // if my prio more than under_prio - make all records between under_prio and old prio as +1
-     * updatePrioRange(+1, under_prio, id_prio);
-     * // and set new id prio as under_prio
-     * updatePrio(id, under_prio);
-     * }
-     * }
-     * else if (above_id > 0)
-     * {
-     * // above id present
-     * int above_prio = Utils.f2int(one(above_id)[field_prio]);
-     * if (sortdir == "asc")
-     * {
-     * if (id_prio < above_prio)
-     * {
-     * // if my prio less than under_prio - make all records between old prio and above_prio-1 as -1
-     * updatePrioRange(-1, id_prio, above_prio - 1);
-     * // and set new id prio as under_prio
-     * updatePrio(id, above_prio - 1);
-     * }
-     * else
-     * {
-     * // if my prio more than under_prio - make all records between above_prio and old prio as +1
-     * updatePrioRange(+1, above_prio, id_prio);
-     * // and set new id prio as under_prio+1
-     * updatePrio(id, above_prio);
-     * }
-     * }
-     * else
-     * // desc
-     * if (id_prio < above_prio)
-     * {
-     * // if my prio less than under_prio - make all records between old prio and above_prio as -1
-     * updatePrioRange(-1, id_prio, above_prio);
-     * // and set new id prio as above_prio
-     * updatePrio(id, above_prio);
-     * }
-     * else
-     * {
-     * // if my prio more than under_prio - make all records between above_prio+1 and old prio as +1
-     * updatePrioRange(+1, above_prio + 1, id_prio);
-     * // and set new id prio as under_prio+1
-     * updatePrio(id, above_prio + 1);
-     * }
-     * }
-     * else
-     * // bad reorder call - ignore
-     * return false;
-     *
-     * return true;
-     * }
-     */
 
     // reorder prio column
     public function reorderPrio(string $sortdir, int $id, int $under_id, int $above_id): bool {
@@ -1258,12 +1175,12 @@ abstract class FwModel {
 
     /**
      * fetch one record and prepare for json output
-     * @param int $accounts_id
+     * @param int $id
      * @param array $options
      * @return array
      */
-    public function oneForJson(int $accounts_id, array $options = []): array {
-        $item = $this->one($accounts_id);
+    public function oneForJson(int $id, array $options = []): array {
+        $item = $this->one($id);
         return $this->filterForJson($item);
     }
 
@@ -1273,44 +1190,40 @@ abstract class FwModel {
      * @return array
      */
     public function filterForJson(array $item): array {
-        $result = [];
-
-        //first, remove sensitive fields
-        $hfields_exclude = Utils::qh($this->json_fields_exclude);
-        foreach ($item as $key => $value) {
-            if (!array_key_exists($key, $hfields_exclude)) {
-                $result[$key] = $value;
+        // remove sensitive
+        $excluded = Utils::qh($this->json_fields_exclude);
+        foreach ($item as $k => $v) {
+            if (isset($excluded[$k])) {
+                unset($item[$k]);
             }
         }
 
-        return $result;
-        //TODO then perform necessary transformations
-        //        $table_schema = $this->getTableSchema();
-        //        //iterate over item.Keys, but make it static array to avoid "collection was modified" error
-        //        $keys = array_keys($item);
-        //        foreach ($keys as $fieldname) {
-        //            $fieldname_lc = strtolower($fieldname);
-        //            if (!array_key_exists($fieldname_lc, $table_schema)) {
-        //                continue;
-        //            }
-        //
-        //            $field_schema = $table_schema[$fieldname_lc];
-        //
-        //            $fw_type    = $field_schema["fw_type"];
-        //            $fw_subtype = $field_schema["fw_subtype"];
-        //            if ($fw_subtype == "date") {
-        //                //if field is exactly DATE - show only date part without time - in YYYY-MM-DD format
-        //                $item[$fieldname] = DateUtils::str2SQL($item[$fieldname]);
-        //            } elseif ($fw_type == "datetime") {
-        //                //if field is exactly DATETIME - show in YYYY-MM-DD HH:MM:SS format
-        //                $item[$fieldname] = DateUtils::str2SQL($item[$fieldname], true);
-        //            } elseif ($fw_subtype == "bit") {
-        //                //if field is exactly BIT - convert from True/False to 1/0
-        //                $item[$fieldname] = Utils::f2bool($item[$fieldname]) ? 1 : 0;
-        //            }
-        //            // ADD OTHER CONVERSIONS HERE if necessary
-        //        }
+        // now do conversions if your tableSchema can tell you fw_type/subtype
+        $table_schema = $this->schema();
 
+        foreach (array_keys($item) as $fieldname) {
+            $field_lc = strtolower($fieldname);
+            if (!isset($table_schema[$field_lc])) {
+                continue;
+            }
+
+            $fw_type    = $table_schema[$field_lc]['fw_type'] ?? '';
+            $fw_subtype = $table_schema[$field_lc]['fw_subtype'] ?? '';
+
+            if ($fw_subtype == 'date') {
+                //if field is exactly DATE - show only date part without time - in YYYY-MM-DD format
+                $item[$fieldname] = DateUtils::Str2DateOnly($item[$fieldname]);
+            } elseif ($fw_type == 'datetime') {
+                //if field is exactly DATETIME - show in YYYY-MM-DD HH:MM:SS format
+                //$item[$fieldname] = $item[$fieldname];
+            } elseif ($fw_subtype == 'bit') {
+                //if field is exactly BIT - convert from True/False to 1/0
+                $item[$fieldname] = boolval($item[$fieldname]) ? 1 : 0;
+            }
+            // ADD OTHER CONVERSIONS HERE if necessary
+        }
+
+        return $item;
     }
 
     /**
