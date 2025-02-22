@@ -1,3 +1,7 @@
+# assets - comment to include downloaded libs into repository
+www/assets/lib/*
+!www/assets/lib/.gitkeep
+
 doc/
 .idea/
 
