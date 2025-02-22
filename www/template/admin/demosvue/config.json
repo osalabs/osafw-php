@@ -27,7 +27,7 @@
     "save_fields_checkboxes": {
         "is_checkbox":"0"
     },
-    "save_fields_nullable": "demo_dicts_id att_id fdate_pop fdatetime",
+    "save_fields_nullable": "demo_dicts_id att_id fdate_pop",
 
     "form_new_defaults": {
         "iname": ""
@@ -40,19 +40,64 @@
     "related_field_name": "demo_dicts_id",
 
     "is_dynamic_index": true,
-    "list_view": "(select d.*, dd.iname as demo_dicts_iname, DATE_FORMAT(d.fdate_pop, '%c/%e/%Y') as fdate_pop_str from demos d LEFT OUTER JOIN demo_dicts dd ON dd.id=d.demo_dicts_id) t",
-    "view_list_defaults": "demo_dicts_iname iname email add_time status",
+    "list_view": "(select d.*, dp.iname as parent_iname, dd.iname as demo_dicts_iname, da.iname as dict_link_auto_iname, DATE_FORMAT(d.fdate_pop, '%c/%e/%Y') as fdate_pop_str from demos d  LEFT OUTER JOIN demos dp ON dp.id=d.parent_id LEFT OUTER JOIN demo_dicts dd ON dd.id=d.demo_dicts_id LEFT OUTER JOIN demo_dicts da ON da.id=d.dict_link_auto_id) t",
+    "view_list_defaults": "demo_dicts_iname iname email fdate_pop_str is_checkbox fyesno fradio fint ffloat add_time status",
     "###view_list_map": "demo_dicts_iname|DemoDicts iname|Title email|Email add_time|Added&nbsp;on status|Status id|id",
     "view_list_map": {
+        "id": "id",
+        "parent_iname": "Parent",
         "demo_dicts_iname": "DemoDicts",
         "iname": "Title",
+        "idesc": "Description",
         "email": "Email",
-        "add_time": "Added on",
+        "fint": "Integer",
+        "ffloat": "Float",
+        "dict_link_auto_iname": "DemoDicts AC",
+        "dict_link_multi": "DemoDicts Multi",
+        "fcombo": "Combo",
+        "fradio": "Radio",
+        "fyesno": "Y/N",
+        "is_checkbox": "CB",
+        "fdate_combo": "Date Combo",
+        "fdate_pop_str": "Date Popup",
+        "ftime": "Time",
+        "att_id": "Att",
         "status": "Status",
-        "fdate_pop_str": "Date popup",
-        "id": "id"
+        "add_time": "Added on",
+        "add_users_id": "Added by",
+        "upd_time": "Updated on",
+        "upd_users_id": "Updated by"
     },
     "view_list_custom": "iname status demo_dicts_iname",
+
+    "is_dynamic_index_edit": true,
+    "list_edit" : "demos",
+    "edit_list_defaults": "demo_dicts_id iname email fdate_pop is_checkbox fyesno fradio fint ffloat add_time status",
+    "edit_list_map": {
+        "id": "id",
+        "parent_id": "Parent",
+        "demo_dicts_id": "DemoDicts",
+        "iname": "Title",
+        "idesc": "Description",
+        "email": "Email",
+        "fint": "Integer",
+        "ffloat": "Float",
+        "dict_link_auto_id": "DemoDicts AC",
+        "dict_link_multi": "DemoDicts Multi",
+        "fcombo": "Combo",
+        "fradio": "Radio",
+        "fyesno": "Y/N",
+        "is_checkbox": "CB",
+        "fdate_combo": "Date Combo",
+        "fdate_pop": "Date Popup",
+        "ftime": "Time",
+        "att_id": "Att",
+        "status": "Status",
+        "add_time": "Added on",
+        "add_users_id": "Added by",
+        "upd_time": "Updated on",
+        "upd_users_id": "Updated by"
+    },
 
     "is_dynamic_show": true,
     "show_fields": [
@@ -70,7 +115,7 @@
                     "lookup_model": "Demos",
                     "lookup_field": "iname",
                     "type": "plaintext_link",
-                    "admin_url": "/Admin/DemosDynamic"
+                    "admin_url": "/Admin/DemosVue"
                 },
                 {
                     "field": "demo_dicts_id",
@@ -105,24 +150,39 @@
                     "type": "plaintext"
                 },
                 {
-                  "type": "row",
-                  "class": "form-row"
+                    "type": "row",
+                    "class": ""
                 },
                     {
-                        "field": "fint",
-                        "label": "Integer number",
-                        "type": "plaintext",
-                        "class": false
+                        "type": "col",
+                        "class": "col-lg-6"
+                    },
+                        {
+                            "field": "fint",
+                            "label": "Integer",
+                            "type": "plaintext",
+                            "class_label": "col-md-3 col-lg-6",
+                            "class_contents": "col-3"
+                        },
+                    {
+                        "type": "col_end"
                     },
                     {
-                        "field": "ffloat",
-                        "label": "Float number",
-                        "type": "float",
-                        "class_label": "col-md-3",
-                        "class": false
+                        "type": "col",
+                        "class": "col-lg-6"
+                    },
+                        {
+                            "field": "ffloat",
+                            "label": "Real",
+                            "type": "float",
+                            "class_label": "col-md-3 col-lg-6",
+                            "class_contents": "col-3"
+                        },
+                    {
+                        "type": "col_end"
                     },
                 {
-                  "type": "row_end"
+                    "type": "row_end"
                 },
                 {
                     "field": "fcombo",
@@ -264,7 +324,7 @@
                     "type": "select",
                     "is_option0": true,
                     "option0_title": "- none -",
-                    "class_contents": "col-md-3",
+                    "class_contents": "col-md-6",
                     "attrs_control": "data-noautosave=\"true\""
                 },
                 {
@@ -273,8 +333,17 @@
                     "lookup_model": "DemoDicts",
                     "type": "select",
                     "is_option_empty": true,
-                    "class_contents": "col-md-3",
-                    "class_control": "on-refresh"
+                    "class_contents": "col-md-6",
+                    "class_control": "on-refresh",
+                    "append": [
+                      {
+                        "event": "add",
+                        "class": "",
+                        "icon": "bi bi-plus",
+                        "label": "",
+                        "hint": "Add New"
+                      }
+                    ]
                 },
                 {
                     "field": "iname",
@@ -308,33 +377,46 @@
                 },
                 {
                     "field": "email",
-                    "label": "Email (unique field)",
+                    "label": "Email (unique)",
                     "type": "email",
                     "required": true,
                     "validate": "exists isemail",
                     "maxlength": 128
                 },
                 {
-                  "type": "row",
-                  "class": "form-row"
+                    "type": "row",
+                    "class": "row form-row"
                 },
                     {
                         "field": "fint",
-                        "label": "Integer number",
+                        "label": "Integer",
                         "type": "number",
                         "min": 0,
                         "max": 999999,
-                        "class": false
+                        "class_label": "col-3",
+                        "class_contents": "col-md-3",
+                        "class": false,
+                        "prepend": [
+                          {
+                            "event": "check",
+                            "class": "",
+                            "icon": "bi bi-check",
+                            "label": "",
+                            "hint": "Check"
+                          }
+                        ]
                     },
                     {
                         "field": "ffloat",
-                        "label": "Float number",
+                        "label": "Real",
                         "type": "number",
                         "step": 0.1,
+                        "class_label": "col-3",
+                        "class_contents": "col",
                         "class": false
                     },
                 {
-                  "type": "row_end"
+                    "type": "row_end"
                 },
 
                 {
@@ -342,7 +424,7 @@
                     "label": "Combo",
                     "type": "select",
                     "lookup_tpl": "/common/sel/fcombo.sel",
-                    "class_contents": "col-md-3"
+                    "class_contents": "col-md-6"
                 },
                 {
                     "field": "fradio",
@@ -374,7 +456,7 @@
                     "field": "fdate_pop",
                     "label": "Date popup",
                     "type": "date_popup",
-                    "class_contents": "col-md-3"
+                    "class_contents": "col-md-4"
                 },
                 {
                     "field": "fdatetime",
@@ -405,7 +487,7 @@
                     "field": "dict_link_auto_id",
                     "label": "DemoDicts Autocomplete",
                     "type": "autocomplete",
-                    "autocomplete_url": "/Admin/Demos/(Autocomplete)?q=",
+                    "autocomplete_url": "/Admin/DemosVue/(Autocomplete)?q=",
                     "lookup_model": "DemoDicts",
                     "lookup_field": "iname",
                     "help_text": "will add new items to DemoDicts"
@@ -443,14 +525,15 @@
                 {
                     "field": "_att_links",
                     "label": "Multiple Attachments",
-                    "type": "att_links_edit"
+                    "type": "att_links_edit",
+                    "att_post_prefix": "att"
                 },
                 {
                     "field": "status",
                     "label": "Status",
                     "type": "select",
                     "lookup_tpl": "/common/sel/status.sel",
-                    "class_contents": "col-md-3"
+                    "class_contents": "col-md-6"
                 },
                 {
                     "field": "add_time",
