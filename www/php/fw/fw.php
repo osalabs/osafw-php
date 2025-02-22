@@ -1237,11 +1237,13 @@ function reqjson(string $name): array {
     return $result;
 }
 
-########################## for debug
-# IN: [logtype (ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
-# OUT: none, just write to $site_error_log
-# If not ALL - limit output to 2048 chars per call
-# example: logger('DEBUG', 'hello there', $var);
+/**
+ * logger
+ * IN: [logtype (ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
+ * If not ALL - limit output to 4096 chars per call
+ * Example: logger('DEBUG', 'hello there', $var);
+ * @return void just write to error_log and/or Sentry
+ */
 function logger(): void {
     $args = func_get_args();
     if (FwHooks::logger($args)) {
@@ -1250,64 +1252,155 @@ function logger(): void {
     }
 
     global $CONFIG;
-    $log_level = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']];
+    $iparam              = 0; #index of first parameter
+    $is_explicit_logtype = false;
 
-    if (!$log_level) {
-        #don't log if logger is off (for production)
+    $logtype = 'DEBUG'; #default log level is for usual debugging
+    if (count($args) > 0 && is_string($args[0]) && preg_match("/^(TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL)$/", $args[0], $m)) {
+        $is_explicit_logtype = true;
+        $logtype             = $m[1];
+        $iparam              += 1;
+    }
+
+    $log_level = fw::$LOG_LEVELS[$logtype];
+    if ($log_level > fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']]) {
+        #skip logging if requested level more than config's log level
         return;
     }
 
-    $logtype = 'DEBUG'; #default log type
-    if (count($args) > 0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL)$/", $args[0], $m)) {
-        $logtype = $m[1];
-        array_shift($args);
+    $is_log = ($CONFIG['LOG_DESTINATION'] > '');
+    if ($is_log) {
+        #only make backtrace if there is an error log - i.e. for local developer debugging, don't - for PROD (can save ~10% CPU)
+
+        #get info about caller - we interested in file/function/line called the topmost logger
+        $arr = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 7);
+        #error_log(var_export($arr, true), $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['LOG_DESTINATION']);
+        #arr[0] -> FwHooks::logger
+        #arr[1] -> fw::logger - get filename and line from here
+        #arr[2] -> function called fw::logger - get function name from here
+
+        #skip any upper logger calls and for sql queries - get place where it's called
+        $i = 1;
+        do {
+            $line      = $arr[$i]['line'] ?? '';
+            $file_name = $arr[$i]['file'] ?? '';
+            $func_name = $arr[$i + 1]['function'] ?? '';
+            $i++;
+        } while ($func_name == 'logger' || isset($arr[$i]) && ($arr[$i]['class'] ?? '') == 'DB');
+
+        #remove unnecessary site_root path
+        $file_name = str_replace(strtolower($CONFIG['SITE_ROOT']), '', strtolower($file_name));
     }
 
-    if (fw::$LOG_LEVELS[$logtype] > $log_level) {
-        return; #skip logging if requested level more than config's log level
+    #extract message from first param
+    if (is_scalar($args[$iparam])) {
+        $message = $args[$iparam];
+    } else {
+        $message = @var_export($args[$iparam], true); #@ to supress Warning: var_export does not handle circular references
     }
+    $strlog = $message;
 
-    $arr      = debug_backtrace(); #0-logger(),1-func called logger,...
-    $func     = ($arr[1] ?? '');
-    $function = $func['function'] ?? '';
-    $line     = $arr[1]['line'] ?? '';
-    $file     = $func['file'] ?? '';
-
-    //remove unnecessary site_root_offline path
-    $file = str_replace(strtolower($CONFIG['SITE_ROOT']), "", strtolower($file));
-
-    $date   = new DateTime();
-    $strlog = $date->format("Y-m-d H:i:s.v") . ' ' . getmypid() . ' ' . $logtype . ' ' . $file . '::' . $function . '(' . $line . ') ';
-    foreach ($args as $str) {
-        if (is_scalar($str)) {
-            $strlog .= $str;
+    #now process params
+    $sentryParams = array();
+    for ($i = $iparam + 1; $i < count($args); $i++) {
+        if (is_array($args[$i]) || is_scalar($args[$i])) {
+            $sentryParams[] = $args[$i];
         } else {
-            $strlog .= print_r($str, true);
+            $sentryParams[] = @var_export($args[$i], true);
         }
-        $strlog .= "\n";
+
+        if (is_scalar($args[$i])) {
+            $strlog .= " " . $args[$i];
+        } else {
+            $strlog .= "\n" . @var_export($args[$i], true);
+        }
     }
 
-    if ($logtype != 'ALL') {
-        //cut too long logging
-        if (strlen($strlog) > 4096) {
-            $strlog = substr($strlog, 0, 4096) . '...' . substr($strlog, -512);
-        }
+    if ($is_log) {
+        #add caller info for Sentry
+        $sentryParams[] = array("line" => $line, "file" => $file_name, "function" => $func_name);
+    }
 
-        if (!preg_match("/\n$/", $strlog)) {
+    //cut too long logging
+    $TXT_LIMIT = $CONFIG['LOG_LIMIT'] ?? 4096;
+    if (strlen($strlog) > $TXT_LIMIT) {
+        $strlog = substr($strlog, 0, $TXT_LIMIT) . '...' . substr($strlog, -512);
+    }
+
+    if ($is_log) {
+        #log enabled - write it
+        $date   = new DateTime();
+        $prefix = $date->format("Y-m-d H:i:s.v") . ' ' . getmypid() . ' ' . $logtype . ' ' . $file_name . '::' . $func_name . '(' . $line . ') ';
+
+        if (!str_ends_with($strlog, "\n")) {
             $strlog .= "\n";
         }
+        error_log($prefix . $strlog, $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['LOG_DESTINATION']);
     }
 
-    @error_log($strlog, $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']); #using @ to prevent warnings if log not writable
+    if (!empty($CONFIG['LOG_SENTRY_DSN'])) {
+        try {
+            #Sentry enabled - send it
+            $bc_level = Sentry\Breadcrumb::LEVEL_INFO;
+            if ($logtype == 'FATAL') {
+                $bc_level = Sentry\Breadcrumb::LEVEL_FATAL;
+                if ($args[$iparam] instanceof Throwable) {
+                    #caputre as Exception
+                    Sentry\withScope(function (Sentry\State\Scope $scope) use ($args, $iparam, $sentryParams): void {
+                        $scope->setExtra('extra', $sentryParams);
+                        Sentry\captureException($args[$iparam]);
+                    });
+                } else {
+                    #just normal Message capture
+                    Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $sentryParams): void {
+                        $scope->setExtra('extra', $sentryParams);
+                        Sentry\captureMessage($message, Sentry\Severity::fatal());
+                    });
+                }
+            } elseif ($logtype == 'ERROR') {
+                $bc_level = Sentry\Breadcrumb::LEVEL_ERROR;
+                Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $sentryParams): void {
+                    $scope->setExtra('extra', $sentryParams);
+                    Sentry\captureMessage($message, Sentry\Severity::error());
+                });
+            } elseif ($logtype == 'WARN') {
+                $bc_level = Sentry\Breadcrumb::LEVEL_WARNING;
+                Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $sentryParams): void {
+                    $scope->setExtra('extra', $sentryParams);
+                    Sentry\captureMessage($message, Sentry\Severity::warning());
+                });
+            } elseif ($logtype == 'INFO') {
+                Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $sentryParams): void {
+                    $scope->setExtra('extra', $sentryParams);
+                    Sentry\captureMessage($message, Sentry\Severity::info());
+                });
+            } elseif ($logtype == "DEBUG") {
+                if ($is_explicit_logtype) {
+                    #only sent to Sentry as separate event if log type set explicitly
+                    $bc_level = Sentry\Breadcrumb::LEVEL_DEBUG;
+                    Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $sentryParams): void {
+                        $scope->setExtra('extra', $sentryParams);
+                        Sentry\captureMessage($message, Sentry\Severity::debug());
+                    });
+                }
+            }
 
-    #Sentry support - if enabled also log to Sentry breadcrumbs
-    if (isset($_raven)) {
-        $_raven->breadcrumbs->record(array(
-            'message' => $strlog,
-            'level'   => strtolower($logtype),
-        ));
+            // do not breadcrumb too detailed TRACE stuff
+            if ($log_level <= fw::$LOG_LEVELS["DEBUG"]) {
+                //https://docs.sentry.io/enriching-error-data/breadcrumbs/?platform=php
+                Sentry\addBreadcrumb(new Sentry\Breadcrumb(
+                    $bc_level,
+                    Sentry\Breadcrumb::TYPE_DEFAULT,
+                    'log', //TODO category
+                    $strlog
+                ));
+            }
+        } catch (Exception) {
+            // do nothing with this exception. it's here to make sure we don't die on failed sentry log.
+        }
     }
 }
+
 
 ########################### for debugging with output right into the browser or console
 function rw($var): void {

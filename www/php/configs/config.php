@@ -68,9 +68,10 @@ $FW_CONFIG = array(
         'IS_LOG'     => true, #enable logging via fw
     ),
 
-    'site_error_log'   => $site_root_offline . '/logs/osafw.log',
-    'LOG_MESSAGE_TYPE' => 3, #3 - default to $site_error_log
+    'LOG_DESTINATION'  => $site_root_offline . '/logs/osafw.log',
+    'LOG_MESSAGE_TYPE' => 3, #3 - default to LOG_DESTINATION
     'LOG_LEVEL'        => 'DEBUG', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'LOG_LIMIT'        => 4096, #size limit for log messages
     'LOG_SENTRY_DSN'   => '', #if set - log to Sentry
     'IS_DEV'           => false, #NEVER set to true on live environments
     'IS_TEST'          => false, #if true - test mode, emails sent to current user or test_email
@@ -161,17 +162,11 @@ $CONFIG = array_replace_recursive($FW_CONFIG, $SITE_CONFIG);
 
 $GLOBALS['CONFIG'] = $CONFIG;
 
-if (!empty($CONFIG['site_error_log'])) {
+if (!empty($CONFIG['LOG_DESTINATION'])) {
     ini_set("log_errors", 1);
-    ini_set("error_log", $CONFIG['site_error_log']);
+    ini_set("error_log", $CONFIG['LOG_DESTINATION']);
 } else {
-    if (!empty($CONFIG['php_error_log'])) {
-        ini_set("log_errors", 1);
-        ini_set("error_log", $CONFIG['php_error_log']);
-        ini_set("log_errors_max_len", 0);
-    } else {
-        ini_set("log_errors", 0);
-    }
+    ini_set("log_errors", 0);
 }
 
 if (!empty($CONFIG["CACHE_SESSIONS"])) {

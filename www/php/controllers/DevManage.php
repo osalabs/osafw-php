@@ -51,7 +51,7 @@ class DevManageController extends FwController {
 
     public function DumpLogAction() {
         $seek    = reqi("seek");
-        $logpath = $this->fw->config->site_error_log;
+        $logpath = $this->fw->config->LOG_DESTINATION;
         rw("Dump of last " . $seek . " bytes of the site log");
 
         $fs = fopen($logpath, "r");
