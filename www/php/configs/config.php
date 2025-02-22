@@ -19,7 +19,7 @@ if (PHP_SAPI === 'cli') {
     }
 }
 ######### set all variables to defaults with detection of base dirs
-$site_root         = dirname(dirname(dirname(__FILE__)));# level up as we are under /configs dir
+$site_root         = dirname(__FILE__, 3);# level up as we are under /configs dir
 $site_root_offline = dirname($site_root);
 
 #!note, these will be empty if script run from command line
@@ -28,7 +28,7 @@ if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SER
     $proto = 'https';
 } else {
     $proto = 'http';
-};
+}
 
 $root_domain0 = preg_replace("/[^a-zA-Z0-9\-:.]/", "", ($_SERVER['HTTP_HOST'] ?? '')); #sanitize as it is also used as config filename
 $root_domain  = $root_domain0 ? $proto . "://" . $root_domain0 : '';

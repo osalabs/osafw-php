@@ -155,7 +155,7 @@ class FormUtils {
                 $pg = array(
                     'pagenum'      => $i,
                     'pagenum_show' => $i + 1,
-                    'is_cur_page'  => ($pagenum == $i) ? true : false,
+                    'is_cur_page'  => $pagenum == $i,
                 );
                 if ($i == $from_page) {
                     if ($pagenum > $PAD_PAGES) {

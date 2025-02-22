@@ -148,11 +148,11 @@ class Spages extends FwModel {
     /**
      * Generate parsepage array of plain list with levelers based on tree structure from getPagesTree()
      * @param array $pages_tree result of getPagesTree(), not muted
-     * @param integer $level optional, used in recursive calls
+     * @param int $level optional, used in recursive calls
      * @return array                parsepage array with "leveler" array added to each row with level>0
      * RECURSIVE!
      */
-    public function getPagesTreeList(&$pages_tree, $level = 0) {
+    public function getPagesTreeList(array $pages_tree, int $level = 0): array {
         $result = array();
 
         if ($pages_tree) {
@@ -178,11 +178,11 @@ class Spages extends FwModel {
      * Generate HTML with options for select with indents for hierarcy
      * @param string $selected_id selected id
      * @param array   &$pages_tree result of getPagesTree()
-     * @param integer $level optional, used in recursive calls
+     * @param int $level optional, used in recursive calls
      * @return string               HTML with options
      * RECURSIVE!
      */
-    public function getPagesTreeSelectHtml($selected_id, &$pages_tree, $level = 0) {
+    public function getPagesTreeSelectHtml(string $selected_id, array $pages_tree, int $level = 0): string {
         $result = array();
         if ($pages_tree) {
             foreach ($pages_tree as $row) {
@@ -213,7 +213,7 @@ class Spages extends FwModel {
     #return correct url - TODO
     public function getUrl($id, $icode, $url = null) {
         if ($url > '') {
-            if (preg_match("!^/!", $url)) {
+            if (str_starts_with($url, "/")) {
                 $url = $this->fw->config->ROOT_URL . $url;
             }
             return $url;
@@ -227,8 +227,8 @@ class Spages extends FwModel {
         }
     }
 
-    public function str2icode($str) {
-        $str = Trim($str);
+    public function str2icode($str): string {
+        $str = trim($str);
         $str = preg_replace("/[^\w ]/g", " ", $str);
         $str = preg_replace("/ +/g", "-", $str);
         return $str;
@@ -244,7 +244,7 @@ class Spages extends FwModel {
 
         #for navigation
         $pages_tree  = $this->tree('status=0', [], "parent_id, prio desc, iname"); #published only
-        $ps['pages'] = $this->getPagesTreeList($pages_tree, 0);
+        $ps['pages'] = $this->getPagesTreeList($pages_tree);
 
         $item = $this->oneByFullUrl($full_url);
         if (!$item || $item['status'] == 127) { #don't show deleted too

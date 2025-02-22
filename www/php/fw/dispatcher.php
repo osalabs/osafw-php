@@ -154,7 +154,7 @@ class Dispatcher {
 
             //special case for export - IndexAction+export_format is set - call exportList without parser
             if ($method_name == FW::ACTION_INDEX . FW::ACTION_SUFFIX && $controller->export_format > '') {
-                $controller->exportList($aparams);
+                $controller->exportList();
                 $ps = null; // disable parser
             }
 

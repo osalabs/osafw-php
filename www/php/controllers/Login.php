@@ -38,7 +38,7 @@ class LoginController extends FwController {
 
         try {
             $login = trim($item['login']);
-            $pwd = $item['pwdh'];
+            $pwd   = $item['pwdh'];
             if (($item["chpwd"] ?? '') == "1") {
                 $pwd = $item['pwd'];
             }
@@ -54,7 +54,7 @@ class LoginController extends FwController {
             }
 
             if (!strlen($login) || !strlen($pwd)) {
-                $this->setError("REGISTER", True);
+                $this->setError("REGISTER");
                 throw new ApplicationException("");
             }
 

@@ -1218,7 +1218,7 @@ abstract class FwModel {
                 //$item[$fieldname] = $item[$fieldname];
             } elseif ($fw_subtype == 'bit') {
                 //if field is exactly BIT - convert from True/False to 1/0
-                $item[$fieldname] = boolval($item[$fieldname]) ? 1 : 0;
+                $item[$fieldname] = $item[$fieldname] ? 1 : 0;
             }
             // ADD OTHER CONVERSIONS HERE if necessary
         }

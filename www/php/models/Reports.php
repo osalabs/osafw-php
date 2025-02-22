@@ -7,14 +7,14 @@
 */
 
 class Reports extends FwModel {
-    public $report_code = '';
-    public $format = '';  #report format, if empty - html, other options: html, csv, pdf, xls
-    public $f = array();  #report filters/options
+    public string $report_code = '';
+    public string $format = '';  #report format, if empty - html, other options: html, csv, pdf, xls
+    public array $f = [];  #report filters/options
     #render options for html to pdf/xls/etc... convertor
-    public $render_options = array(
+    public array $render_options = [
         'cmd'       => '--page-size Letter --print-media-type', #--quiet
         'landscape' => true,
-    );
+    ];
 
     public function __construct() {
         parent::__construct();
@@ -22,7 +22,7 @@ class Reports extends FwModel {
         #$this->table_name = '';
     }
 
-    public function cleanupRepcode($repcode) {
+    public function cleanupRepcode(string $repcode): string {
         return strtolower(preg_replace("[^\w-]", "", $repcode));
     }
 
@@ -31,7 +31,7 @@ class Reports extends FwModel {
      * @param string $repcode 'abc-something-summary'
      * @return string          'AbcSomethingSummary'
      */
-    public function repcodeToClass($repcode) {
+    public function repcodeToClass(string $repcode): string {
         $result = '';
 
         $pieces = explode('-', $repcode);
@@ -46,9 +46,9 @@ class Reports extends FwModel {
      * Create instance of report class by repcode
      * @param string $repcode cleaned report code
      * @param array $f filters passed from request
-     * @return instance       instance of report class
+     * @return static       instance of report class
      */
-    public function createInstance($repcode, $f) {
+    public function createInstance(string $repcode, array $f): static {
         $report_class_name = $this->repcodeToClass($repcode);
         if (!$report_class_name) {
             throw new ApplicationException('Wrong Report Code');
@@ -70,22 +70,25 @@ class Reports extends FwModel {
 
     /**
      * init specific report instance
-     * @param string $value [description]
-     * @return [type]        [description]
+     * @param string $repcode
+     * @param array $f
+     * @return Reports
      */
-    public function init($repcode, $f) {
+    public function init(string $repcode, array $f): self {
         $this->report_code = $repcode;
         $this->f           = $f;
         $this->format      = $f['format'];
+
+        return $this;
     }
 
     #override in specific report class
-    public function getReportFilters() {
+    public function getReportFilters(): array {
         return $this->f;
     }
 
     #override in specific report class
-    public function getReportData() {
+    public function getReportData(): array {
         return array();
     }
 
@@ -98,7 +101,7 @@ class Reports extends FwModel {
     # for docx - use VsWord https://github.com/vench/vsword
     # for xls - just html with .xlsx
     # for csv required - $ps['rep']['rows'], $ps['rep']['headers']
-    public function render($ps) {
+    public function render($ps): void {
         $common_dir = '/admin/reports/common';
         $base_dir   = '/admin/reports/' . strtolower($this->report_code);
 
@@ -151,33 +154,34 @@ class Reports extends FwModel {
                 break;
 
             case 'docx':
-                $ps['IS_PRINT_MODE'] = true;
-                $ps['IS_EXPORT_DOC'] = true;
-
-                ini_set('display_errors', '0'); #disable "Strict Standards" errors in VsWord
-                error_reporting(0);
-                require_once $this->fw->config->SITE_ROOT . '/php/vsword/VsWord.php';
-                VsWord::autoLoad();
-
-                $html = $this->fw->parsePage($base_dir, $common_dir . '/docx.html', $ps);
-
-                $doc    = new VsWord();
-                $parser = new HtmlParser($doc);
-                $parser->parse($html);
-                $tmpfname = Utils::getTmpFilename();
-                $doc->saveAs($tmpfname);
-
-                $filename    = $this->report_code . '-' . date('Ymd', time()) . '.docx'; #Ymd-His
-                $disposition = 'attachment';
-                //output to browser
-                header('Content-type: application/msword');
-                header('Content-Disposition: ' . $disposition . '; filename="' . $filename . '"');
-
-                readfile($tmpfname); //read file content and output to browser
-                //echo $html;
-
-                unlink($tmpfname);
-                break;
+                // TODO
+                //                $ps['IS_PRINT_MODE'] = true;
+                //                $ps['IS_EXPORT_DOC'] = true;
+                //
+                //                ini_set('display_errors', '0'); #disable "Strict Standards" errors in VsWord
+                //                error_reporting(0);
+                //                require_once $this->fw->config->SITE_ROOT . '/php/vsword/VsWord.php';
+                //                VsWord::autoLoad();
+                //
+                //                $html = $this->fw->parsePage($base_dir, $common_dir . '/docx.html', $ps);
+                //
+                //                $doc    = new VsWord();
+                //                $parser = new HtmlParser($doc);
+                //                $parser->parse($html);
+                //                $tmpfname = Utils::getTmpFilename();
+                //                $doc->saveAs($tmpfname);
+                //
+                //                $filename    = $this->report_code . '-' . date('Ymd', time()) . '.docx'; #Ymd-His
+                //                $disposition = 'attachment';
+                //                //output to browser
+                //                header('Content-type: application/msword');
+                //                header('Content-Disposition: ' . $disposition . '; filename="' . $filename . '"');
+                //
+                //                readfile($tmpfname); //read file content and output to browser
+                //                //echo $html;
+                //
+                //                unlink($tmpfname);
+                //                break;
 
             case 'xls':
                 $ps['IS_PRINT_MODE'] = true;

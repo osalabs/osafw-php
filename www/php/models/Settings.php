@@ -68,7 +68,7 @@ class Settings extends FwModel {
     }
 
     public function isExists($icode, $not_id = NULL): bool {
-        return parent::isExists($icode, 'icode', $not_id);
+        return $this->isExistsByField($icode, 'icode', $not_id);
     }
 
 }

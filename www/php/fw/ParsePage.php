@@ -1318,11 +1318,10 @@ class ParsePage {
      * Load a template file relative to templatesRoot, with caching.
      *
      * @param string $filename
-     * @param bool $isDieOnError If true, throw an exception if file is not found
      * @return string
      * @throws Exception if file is not found and $isDieOnError=true
      */
-    private function loadTemplate(string $filename, bool $isDieOnError = false): string {
+    private function loadTemplate(string $filename): string {
         if (isset($this->fileCache[$filename])) {
             #$this->logger("DEBUG", "cache hit $filename");
             return $this->fileCache[$filename];
@@ -1354,11 +1353,7 @@ class ParsePage {
         } else {
             $msg = "ParsePage - cannot open template file [$filename]";
             $this->logger('TRACE', $msg);
-            if ($isDieOnError) {
-                throw new Exception($msg);
-            } else {
-                return ''; // it's ok if no template found, just use empty string then
-            }
+            return ''; // it's ok if no template found, just use empty string then
         }
     }
 

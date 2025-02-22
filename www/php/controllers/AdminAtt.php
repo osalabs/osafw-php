@@ -97,7 +97,7 @@ class AdminAttController extends FwAdminController {
             $this->fw->flash("updated", 1);
 
             // Proceed upload - for edit - just one file
-            $this->model->uploadOne($id, $files[0] ?? [], false);
+            $this->model->uploadOne($id, $files[0] ?? []);
         } else {
             $addedAtt = $this->model->uploadMulti($itemdb);
             if ($addedAtt) {
