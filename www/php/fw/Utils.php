@@ -137,24 +137,13 @@ class Utils {
         return bin2hex(random_bytes($len));
     }
 
-    //get icode with a given length based on a full set A-Za-z0-9
-    //default length is 4
-    public static function getIcode(int $len = 4): string {
-        $result = '';
-        $chars  = array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-        for ($i = ord('A'); $i <= ord('Z'); $i++) {
-            $chars[] = chr($i);
-        }
-
-        for ($i = ord('a'); $i <= ord('z'); $i++) {
-            $chars[] = chr($i);
-        }
-
-        for ($i = 0; $i < $len; $i++) {
-            $result .= $chars[mt_rand(0, count($chars) - 1)];
-        }
-
-        return $result;
+    /**
+     * generate standard icode code - basically UUID without dashes
+     * @return string
+     * @throws \Random\RandomException
+     */
+    public static function icode(): string {
+        return str_replace("-", "", self::uuid());
     }
 
     /**

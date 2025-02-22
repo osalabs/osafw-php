@@ -1,4 +1,4 @@
--- (c) 2004-2024 oSa
+-- (c) 2004-2025 oSa
 -- FOR MySQL 8.x
 
 -- CREATE DATABASE xxx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -27,6 +27,35 @@ CREATE TABLE fwentities
     upd_users_id INT UNSIGNED          DEFAULT 0,
 
     UNIQUE INDEX UX_fwentities_icode (icode)
+) ENGINE = InnoDB;
+
+-- virtual controllers
+DROP TABLE IF EXISTS fwcontrollers;
+CREATE TABLE fwcontrollers
+(
+    id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+    icode             VARCHAR(128) NOT NULL DEFAULT '', -- controller class without Controller suffix: AdminDemos
+    url               VARCHAR(128) NOT NULL DEFAULT '', -- controller url: /Admin/Demos
+    iname             VARCHAR(128) NOT NULL DEFAULT '', -- human readable name
+    idesc             TEXT,
+
+    model             VARCHAR(255) NOT NULL DEFAULT '', -- model class name controller is based on
+    is_lookup         TINYINT      NOT NULL DEFAULT 0,  -- 1 if this is lookup controller (show in Lookup Manager)
+    igroup            NVARCHAR(64) NOT NULL DEFAULT '', -- group name, if set - tables grouped under same group name
+    access_level      TINYINT      NOT NULL DEFAULT 0,  -- min view access level
+    access_level_edit TINYINT      NOT NULL DEFAULT 0,  -- min edit access level
+
+    config            TEXT,                             -- config.json - use/create if file not exists /template/admin/demos/config.json
+
+    status            TINYINT      NOT NULL DEFAULT 0,  -- 0-ok, 10-inactive, 127-deleted
+    add_time          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    add_users_id      INT UNSIGNED          DEFAULT 0,
+    upd_time          DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id      INT UNSIGNED          DEFAULT 0,
+
+    UNIQUE INDEX UX_fwcontrollers_icode (icode),
+    UNIQUE INDEX UX_fwcontrollers_url (url)
 ) ENGINE = InnoDB;
 
 -- upload categories
@@ -103,45 +132,54 @@ CREATE TABLE att_links
 DROP TABLE IF EXISTS users;
 CREATE TABLE users
 (
-    id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    icode                   VARCHAR(64) CHARACTER SET utf8 NOT NULL,              -- public id, basically UUID, use if needed
 
-    email          VARCHAR(128) NOT NULL DEFAULT '',
-    pwd            VARCHAR(255) NOT NULL DEFAULT '',            -- hashed password
-    access_level   TINYINT      NOT NULL,                       -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
-    is_readonly    TINYINT      NOT NULL DEFAULT 0,             -- 1 if user is readonly
+    email                   VARCHAR(255)                   NOT NULL DEFAULT '',
+    pwd                     VARCHAR(255)                   NOT NULL DEFAULT '',   -- hashed password
+    access_level            TINYINT                        NOT NULL,              -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
+    is_readonly             TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user is readonly
 
-    fname          VARCHAR(32)  NOT NULL DEFAULT '',
-    lname          VARCHAR(32)  NOT NULL DEFAULT '',
-    iname          VARCHAR(128) AS (CONCAT(fname, ' ', lname)), -- calculated column
+    fname                   VARCHAR(32)                    NOT NULL DEFAULT '',
+    lname                   VARCHAR(32)                    NOT NULL DEFAULT '',
+    iname                   VARCHAR(128) AS (CONCAT(fname, ' ', lname)),          -- calculated column
 
-    title          VARCHAR(128) NOT NULL DEFAULT '',
+    title                   VARCHAR(128)                   NOT NULL DEFAULT '',
 
-    address1       VARCHAR(128) NOT NULL DEFAULT '',
-    address2       VARCHAR(64)  NOT NULL DEFAULT '',
-    city           VARCHAR(64)  NOT NULL DEFAULT '',
-    state          VARCHAR(4)   NOT NULL DEFAULT '',
-    zip            VARCHAR(16)  NOT NULL DEFAULT '',
-    phone          VARCHAR(16)  NOT NULL DEFAULT '',
+    address1                VARCHAR(128)                   NOT NULL DEFAULT '',
+    address2                VARCHAR(64)                    NOT NULL DEFAULT '',
+    city                    VARCHAR(64)                    NOT NULL DEFAULT '',
+    state                   VARCHAR(4)                     NOT NULL DEFAULT '',
+    zip                     VARCHAR(16)                    NOT NULL DEFAULT '',
+    phone                   VARCHAR(16)                    NOT NULL DEFAULT '',
 
-    lang           VARCHAR(16)  NOT NULL DEFAULT 'en',          -- user interface language
-    ui_theme       TINYINT      NOT NULL DEFAULT 0,             -- 0--default theme
-    ui_mode        TINYINT      NOT NULL DEFAULT 0,             -- 0--auto, 10-light, 20-dark
+    lang                    VARCHAR(16)                    NOT NULL DEFAULT 'en', -- user interface language
+    ui_theme                TINYINT                        NOT NULL DEFAULT 0,    -- 0--default theme
+    ui_mode                 TINYINT                        NOT NULL DEFAULT 0,    -- 0--auto, 10-light, 20-dark
 
-    idesc          TEXT,
-    att_id         INT UNSIGNED,                                -- avatar
+    idesc                   TEXT,
+    att_id                  INT UNSIGNED,                                         -- avatar
 
-    login_time     DATETIME,
-    pwd_reset      VARCHAR(255) NULL,
-    pwd_reset_time DATETIME     NULL,
-    mfa_secret     VARCHAR(64),                                 -- mfa secret code, if empty - no mfa for the user configured
-    mfa_recovery   VARCHAR(1024),                               -- mfa recovery hashed codes, space-separated
-    mfa_added      DATETIME,                                    -- last datetime when mfa setup or resynced
+    login_time              DATETIME,
+    pwd_reset               VARCHAR(255)                   NULL,                  -- used for password reset token and initial confirmation token
+    pwd_reset_time          DATETIME                       NULL,
+    mfa_secret              VARCHAR(64),                                          -- mfa secret code, if empty - no mfa for the user configured
+    mfa_recovery            VARCHAR(1024),                                        -- mfa recovery hashed codes, space-separated
+    mfa_added               DATETIME,                                             -- last datetime when mfa setup or resynced
 
-    status         TINYINT      NOT NULL DEFAULT 0, /*0-ok, 127-deleted*/
-    add_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    add_users_id   INT UNSIGNED          DEFAULT 0,
-    upd_time       DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
-    upd_users_id   INT UNSIGNED          DEFAULT 0,
+    -- for email change procedures
+    email_new               VARCHAR(255)                            DEFAULT '',   -- new email
+    email_token             VARCHAR(255)                            DEFAULT '',
+    email_token_time        DATETIME,
+
+    email_bounced           TINYINT                        NOT NULL DEFAULT 0,    -- 1 if email bounced
+    is_marked_spam          TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user marked as spam (disable emails)
+
+    status                  TINYINT                        NOT NULL DEFAULT 0, /*0-active, 10-inactive, 20-new/unconfirmed email, 127-deleted*/
+    add_time                DATETIME                       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    add_users_id            INT UNSIGNED                            DEFAULT 0,
+    upd_time                DATETIME                       NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id            INT UNSIGNED                            DEFAULT 0,
 
     FOREIGN KEY (att_id) REFERENCES att (id),
 
@@ -291,40 +329,6 @@ CREATE TABLE activity_logs
     INDEX IX_activity_logs_item_id (item_id),
     INDEX IX_activity_logs_idate (idate),
     INDEX IX_activity_logs_users_id (users_id)
-) ENGINE = InnoDB;
-
--- Lookup Manager Tables
-DROP TABLE IF EXISTS lookup_manager_tables;
-CREATE TABLE lookup_manager_tables
-(
-    id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-
-    tname          VARCHAR(255) NOT NULL DEFAULT '', /* table name */
-    iname          VARCHAR(255) NOT NULL DEFAULT '', /* human table name */
-    idesc          TEXT, /* table internal description */
-
-    is_one_form    TINYINT      NOT NULL DEFAULT 0, /* 1 - lookup table contains one row, use form view */
-    is_custom_form TINYINT      NOT NULL DEFAULT 0, /* 1 - use custom form template, named by lowercase(tname) */
-    header_text    TEXT, /* text to show in header when editing table */
-    footer_text    TEXT, /* text to show in footer when editing table */
-    column_id      VARCHAR(255), /* table id column, if empty - use id */
-
-    list_columns   TEXT, /* comma-separated field list to display on list view, if defined - no table edit mode available */
-    columns        TEXT, /* comma-separated field list to display, if empty - all fields displayed */
-    column_names   TEXT, /* comma-separated column list of column names, if empty - use field name */
-    column_types   TEXT, /* comma-separated column list of column types/lookups (" "-string(default),readonly,textarea,checkbox,tname.IDfield:INAMEfield-lookup table), if empty - use standard input[text] */
-    column_groups  TEXT, /* comma-separated column list of groups column related to, if empty - don't include column in group */
-    url            VARCHAR(255) NOT NULL DEFAULT '', /* if defined - redirected to this URL instead of LookupManager forms */
-
-    access_level   TINYINT, /* min access level, if NULL - use Lookup Manager's acl */
-
-    status         TINYINT      NOT NULL DEFAULT 0, /* 0-ok, 127-deleted */
-    add_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP, /* date record added */
-    add_users_id   INT UNSIGNED          DEFAULT 0, /* user added record */
-    upd_time       DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
-    upd_users_id   INT UNSIGNED          DEFAULT 0,
-
-    UNIQUE INDEX UX_lookup_manager_tables_tname (tname)
 ) ENGINE = InnoDB;
 
 -- User Custom Views

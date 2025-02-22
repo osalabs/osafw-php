@@ -62,6 +62,9 @@ class Users extends FwModel {
 
     // overridden to generate and hash password if not provided
     public function add($item): int {
+        if (!array_key_exists('icode', $item)) {
+            $item['icode'] = Utils::icode();
+        }
         if (!array_key_exists('pwd', $item)) {
             $item['pwd'] = Utils::getRandStr(8); #generate password
         }

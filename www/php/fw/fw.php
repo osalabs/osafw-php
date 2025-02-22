@@ -391,7 +391,7 @@ class fw {
             $this->auth($this->route);
             $this->renderRoute($this->route);
         } catch (AuthException $ex) {
-            $this->handlePageError(401, $ex->getMessage(), $ex);
+            $this->handlePageError(self::HTTP_UNAUTHORIZED, $ex->getMessage(), $ex);
         } catch (NoControllerException $ex) {
             #requested controller not found - use Home->NotFoundAction which will check Spages and if still not found - show 404
             logger("No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
