@@ -7,7 +7,7 @@
 
 */
 
-#for command line scripts - override host (must contain "verified.email") from arg OR use path for staging/develop
+#for command line scripts - override host (must contain "example.com") from arg OR use path for staging/develop
 $_dirname = dirname(__FILE__);
 if (PHP_SAPI === 'cli') {
     if (isset($argv[1]) && filter_var($argv[1], FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
