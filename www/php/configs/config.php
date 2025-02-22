@@ -70,7 +70,8 @@ $FW_CONFIG = array(
 
     'site_error_log'   => $site_root_offline . '/logs/osafw.log',
     'LOG_MESSAGE_TYPE' => 3, #3 - default to $site_error_log
-    'LOG_LEVEL'        => 'INFO', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'LOG_LEVEL'        => 'DEBUG', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'LOG_SENTRY_DSN'   => '', #if set - log to Sentry
     'IS_DEV'           => false, #NEVER set to true on live environments
     'IS_TEST'          => false, #if true - test mode, emails sent to current user or test_email
 
@@ -90,6 +91,7 @@ $FW_CONFIG = array(
     'PAGE_LAYOUT_PJAX_NOJS' => '/layout_pjax_nojs.html',
     'PAGE_LAYOUT_MIN'       => '/layout_min.html',
     'PAGE_LAYOUT_PRINT'     => '/layout_print.html',
+    'PAGE_LAYOUT_VUE'       => '/layout_vue.html',
     "is_list_btn_left"      => false, #true - show list buttons on the left, false - on the right
     "ui_theme"              => 0, #0 default theme
     "ui_mode"               => 0, #0 default mode(auto)
@@ -119,10 +121,12 @@ $FW_CONFIG = array(
         '/AdminAtt/Select' => 1,
     ),
 
+    'IS_API'      => null, #null - disable, true - only allow API controllers, false - only allow NON-API controllers (to enable same code deployment for API and NON-API)
+
     #multilanguage support settings
-    'LANG_DEF'              => 'en',        #default language - en, ru, ua, ...
-    'LANG'                  => 'en',        #to be updated according to user session
-    'IS_LANG_UPD'           => false,       #false - don't update lang files, true - update lang files with new strings
+    'LANG_DEF'    => 'en',        #default language - en, ru, ua, ...
+    'LANG'        => 'en',        #to be updated according to user session
+    'IS_LANG_UPD' => false,       #false - don't update lang files, true - update lang files with new strings
 
     'IS_MFA_ENFORCES' => false, #true - enforce MFA for all users, false - use user settings
     'CRYPT_KEY'       => '', #define in site/dev specific config
@@ -130,22 +134,32 @@ $FW_CONFIG = array(
 
     'PDF_CONVERTER' => '"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"', #(optional) path to html to pdf converter for reports, if empty - try to use Dompdf
 
+    "CACHE_SESSIONS" => "", #memcached for sessions as server:11211
+    "CACHE"          => [ #list of memcached nodes for FwCache
+                          #"server:11211"
+    ],
+
     ########### place site specific configuration variables here:
-    'SITE_VERSION'  => '0.24.1121', #also used to re-load css/js to avoid browser caching
-    'SITE_NAME'     => 'Site Name',
-    'SITE_VAR'      => false,
+    'SITE_VERSION'   => '0.25.0222', #also used to re-load css/js to avoid browser caching
+    'SITE_NAME'      => 'Site Name',
+    'SITE_VAR'       => false,
+
 );
 
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', 1);
 
 #load $SITE_CONFIG config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
-$conf_server_name = str_replace(':', '_', strtolower($root_domain0));
-if (include_once($conf_server_name . '.php')) {
+$conf_server_name    = str_replace(':', '_', strtolower($root_domain0));
+$SITE_CONFIG         = [];
+$is_load_more_config = ($conf_server_name > '' && $conf_server_name != 'api.example.com'); #for production (i.e. defaults) we don't have additional configs, so don't even try to load them to save IO
+if ($is_load_more_config && @include_once($conf_server_name . '.php')) {
     #set loaded config name
     $overrides['loaded_config'] = $conf_server_name;
 }
 $CONFIG = array_replace_recursive($FW_CONFIG, $SITE_CONFIG);
+
+$GLOBALS['CONFIG'] = $CONFIG;
 
 if (!empty($CONFIG['site_error_log'])) {
     ini_set("log_errors", 1);
@@ -158,6 +172,12 @@ if (!empty($CONFIG['site_error_log'])) {
     } else {
         ini_set("log_errors", 0);
     }
+}
+
+if (!empty($CONFIG["CACHE_SESSIONS"])) {
+    ini_set("session.save_handler", "memcached");
+    ini_set("session.lazy_write", 0);
+    session_save_path($CONFIG["CACHE_SESSIONS"]);
 }
 
 /*

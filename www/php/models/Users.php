@@ -117,9 +117,9 @@ class Users extends FwModel {
 
     public function listSelectOptions(array $def = null): array {
         $where = '';
-        if (($def['lookup_params'] ?? '') == 'account') {
-            $where .= " AND accounts_id=" . intval($def['i']['id'] ?? 0);
-        }
+        //        if (($def['lookup_params'] ?? '') == 'account') {
+        //            $where .= " AND accounts_id=" . intval($def['i']['id'] ?? 0);
+        //        }
 
         $sql = "SELECT id, CONCAT(fname,' ',lname) as iname FROM {$this->qTable()} WHERE status=@status $where ORDER BY " . $this->getOrderBy();
         return $this->db->arrp($sql, ['status' => FwModel::STATUS_ACTIVE]);

@@ -16,8 +16,32 @@ class FwHooks {
      * @return void
      */
     public static function initRequest(FW $fw, string $uri): void {
+        if ($fw->config->LOG_SENTRY_DSN) {
+            Utils::initSentry($fw->config->LOG_SENTRY_DSN, '', '');
+        }
 
         if (!$fw->isOffline()) {
+            #check for dual mode
+            if (!is_null($fw->config->IS_API)) {
+                #ensure that we only access api or non-api routes
+                if ($fw->config->IS_API) {
+                    #api mode - uri should start with /vXXX
+                    if (!preg_match('/^\/v\d+/', $uri)) {
+                        logger("attempt to access non-api uri: $uri");
+                        header("HTTP/1.1 404 Not Found");
+                        echo "API endpoint not found";
+                        exit; #hard stop
+                    }
+                    $_SERVER['HTTP_ACCEPT'] = 'application/json'; #force json response for API
+                } else {
+                    #non-api mode - uri should not start with /vXXX
+                    if (preg_match('/^\/v\d+/', $uri)) {
+                        logger("attempt to access api uri: $uri");
+                        header("HTTP/1.1 404 Not Found");
+                        exit; #hard stop
+                    }
+                }
+            }
 
             session_start(); #session starts only here
 

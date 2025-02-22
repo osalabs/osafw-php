@@ -594,13 +594,15 @@ class fw {
      * @throws Exception
      */
     public function handlePageError(int $error_code, string $error_message = '', ?Exception $ex = null): void {
-        #Sentry support
-        global $_raven;
-        if (isset($_raven)) {
-            $_raven->captureException($ex, array("message" => $error_message));
-        }
-
         if ($ex) {
+            if ($ex instanceof UserException || $ex instanceof AuthException) {
+                #UserException and ValidationException here
+                #no need to always log user errors as those are known caused by user bad input, uncomment if necessary to debug
+                #logger('WARN', "UserException : $code", $message);
+            } else {
+                logger("FATAL", "Exception: " . $ex->getMessage(), $ex);
+            }
+
             $ps = FwHooks::handleException($ex);
             if ($ps) {
                 // only process exceptions there and only return here if we actually returned something
@@ -616,22 +618,19 @@ class fw {
                 }
                 return;
             }
+
+        } else {
+            logger('ERROR', "handlePageError : $error_code $error_message");
+        }
+        if ($error_code >= self::HTTP_SERVER_ERROR) {
+            logger($ex->getTraceAsString());
         }
 
+        #check custom error route
         $route              = null;
         $custom_error_route = $this->dispatcher->ROUTES[$error_code] ?? '';
         if ($custom_error_route > '') {
             $route = @$this->dispatcher->str2route($custom_error_route);
-        }
-
-        if ($ex) {
-            logger("FATAL", "Dispatcher - handlePageError exception: " . $ex->getMessage(), $ex);
-        } else {
-            logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
-        }
-
-        if ($error_code >= self::HTTP_SERVER_ERROR) {
-            logger($ex->getTraceAsString());
         }
 
         $is_error_processed = false;
@@ -654,12 +653,23 @@ class fw {
 
             $err_msg = $error_message ?: ($err_code_desc ?: "PAGE NOT YET IMPLEMENTED [$uri]");
 
+            #legacy framework format
+            //        $ps = [
+            //            '_json'    => true,
+            //            'success'  => false,
+            //            'err_code' => $code,
+            //            'err_msg'  => $message
+            //        ];
+
             $ps = array(
                 '_json' => true, #also allow return urls by json
                 'error' => [
                     'code'    => $error_code,
                     'message' => $err_msg,
                     'time'    => time(),
+                    //optional:
+                    //'category' => 'EXCEPTION',
+                    //'details'  => []
                 ],
             );
 

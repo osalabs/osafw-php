@@ -1144,4 +1144,92 @@ class Utils {
         setcookie($name, '', time() - 3600, '/');
     }
 
+    /**
+     * get client IP address
+     * @return string IP address from HTTP_X_FORWARDED_FOR or REMOTE_ADDR
+     */
+    public static function getIP(): string {
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            // This can be spoofed, but our production server are always behind our balancer
+            $ips = explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip  = trim(end($ips));
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        }
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            $ip = '';
+        }
+
+        return $ip;
+    }
+
+    /**
+     * initialize Sentry error logging if $sentryEndpoint is not empty
+     * REQUIRES: composer require sentry/sdk
+     * @param string $sentryEndpoint
+     * @param string $release
+     * @param string $environment
+     * @return void
+     */
+    public static function initSentry(string $sentryEndpoint, string $release, string $environment): void {
+        if (empty($sentryEndpoint)) {
+            return;
+        }
+
+        try {
+            \Sentry\init([
+                'dsn'                => $sentryEndpoint,
+                'release'            => $release,
+                'environment'        => $environment,
+                'traces_sample_rate' => 1,
+                'error_types'        => E_ALL & ~E_NOTICE,
+            ]);
+            $real_ip = self::getIP();
+            self::setSentryTag("real-ip", $real_ip);
+            \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($real_ip): void {
+                $scope->setUser([
+                    'ip_address' => $real_ip
+                ]);
+            });
+        } catch (Exception) {
+            // do nothing with this exception. it's here to make sure we don't die on failed sentry log.
+        }
+    }
+
+    /**
+     * sets sentry user
+     * @param string $email
+     * @param string $id user id
+     */
+    public static function setSentryScope(string $email, string $id): void {
+        try {
+            \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($email, $id): void {
+                $user = [
+                    'id' => $id,
+                ];
+                if (!empty($email)) {
+                    $user['email'] = $email;
+                }
+                $real_ip = self::getIP();
+                if ($real_ip) {
+                    $user['ip_address'] = $real_ip;
+                }
+                $scope->setUser($user);
+                //$scope->setLevel(\Sentry\Severity::warning());
+                //$scope->setExtra('character_name', 'Mighty Fighter');
+            });
+        } catch (Exception $e) {
+            logger("WARN", "setSentryScope", $e->getMessage());
+        }
+    }
+
+    public static function setSentryTag($tag, $value): void {
+        if ((string)$value === '') {
+            return; #do not add empty value tags, Sentry will complain about it
+        }
+        \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($tag, $value): void {
+            $scope->setTag($tag, (string)$value);
+        });
+    }
+
 }

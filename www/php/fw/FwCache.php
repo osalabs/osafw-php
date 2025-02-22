@@ -4,7 +4,7 @@ Fw Cache class
 Application-level cache
 2 types of cache:
 - request methods - caches only for current request lifetime in memory
-- use with memcached by setting fw->config->cache to array of servers and then use fw->cache->get/set/remove
+- use with memcached by setting fw->config->CACHE to array of servers and then use fw->cache->get/set/remove
 
 You may overload it with something more specific.
 For example, good caching class - http://www.phpfastcache.com/
@@ -22,11 +22,11 @@ class FwCache {
     private array $lock_tokens = []; // Store lock tokens per key
 
     public function __construct(FW $fw) {
-        $cache_servers = $fw->config->cache ?? [];
+        $cache_servers = $fw->config->CACHE ?? [];
         if ($cache_servers) {
             //check if memcached extension is loaded
             if (!extension_loaded('memcached')) {
-                throw new Exception('Memcached extension is not loaded, but config->cache is set');
+                throw new Exception('Memcached extension is not loaded, but config->CACHE is set');
             }
 
             $this->handler = new Memcached();
