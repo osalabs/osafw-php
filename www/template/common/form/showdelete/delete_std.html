@@ -1,8 +1,8 @@
 <form id="FDel" class="fw-card" method="post" action="<~ROOT_URL><~base_url>/<~i[id]>">
   <input type="hidden" name="_method" value="DELETE">
   <input type="hidden" name="XSS" value="<~SESSION[XSS]>">
+  <input type="hidden" name="related_id" value="<~related_id>">
   <input type="hidden" name="return_url" value="<~return_url>">
-  <~/common/form/relid>
 
   <fieldset>
     <legend>`Confirm delete for record id`=<~i[id]> <~i[iname]></legend>

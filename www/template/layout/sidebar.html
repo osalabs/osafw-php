@@ -8,6 +8,7 @@
       <~./beta if="GLOBAL[is_test]">
    </h3>
 </div>
+<div class="text-center text-secondary-emphasis"><small><~current_time date="sql"><br><~GLOBAL[version] truncate="14" trword="0"></small></div>
 <ul class="nav nav-pills flex-column mb-auto mt-3">
   <~logged_menu if="SESSION[user_id]" inline>
     <li class="nav-item">
@@ -57,7 +58,7 @@
         </a>
       </li>
       <li class="nav-item">
-        <a href="<~/admin/lookupmanager/url>" class="nav-link link-body-emphasis <~/common/active ifeq="GLOBAL[controller]" value="AdminLookupManager">">
+        <a href="<~/admin/lookups/url>" class="nav-link link-body-emphasis <~/common/active ifeq="GLOBAL[controller]" value="AdminLookups">">
           <i class="bi bi-search"></i> `Lookup Manager`
         </a>
       </li>
@@ -67,7 +68,7 @@
       <li class="nav-item"><a href="#" class="nav-link disabled">`Admin Menu`</a></li>
       <li class="nav-item">
         <a href="<~/admin/users/url>" class="nav-link link-body-emphasis <~/common/active ifeq="GLOBAL[controller]" value="AdminUsers">">
-          <i class="bi bi-person-lines-fill"></i> `Manage Members`
+          <i class="bi bi-person-lines-fill"></i> `Users`
         </a>
       </li>
       <li class="nav-item" >

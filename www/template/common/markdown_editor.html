@@ -3,9 +3,58 @@
   https://www.jqueryscript.net/text/Easy-WYSIWYG-Markdown-Rditor-For-Bootstrap-Bootstrap-Markdown.html
 -->
 
-<link href="<~GLOBAL[ASSETS_URL]>/css/glyphicons.css" rel="stylesheet">
-<link href="<~GLOBAL[ASSETS_URL]>/css/bootstrap-markdown.min.css" rel="stylesheet">
+<link href="<~GLOBAL[ASSETS_URL]>/lib/bootstrap-markdown/css/bootstrap-markdown.min.css" rel="stylesheet">
 <style>
+/* emulate glyphicons classes from bootstrap icons */
+.glyphicon::before, [class*=" glyphicon-"]::before, [class^="glyphicon-"]::before {
+  display: inline-block;
+  font-family: bootstrap-icons !important;
+  font-style: normal;
+  font-weight: 400 !important;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  vertical-align: -.125em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.glyphicon-bold::before {
+  content: "\f5f0";
+}
+.glyphicon-italic::before {
+  content: "\f5f4";
+}
+.glyphicon-header::before{
+  content: "\f5f1";
+}
+.glyphicon-link::before {
+  content: "\f470";
+}
+.glyphicon-picture::before {
+  content: "\f42a";
+}
+.glyphicon-list::before {
+  content: "\f478";
+}
+.glyphicon-th-list::before {
+  content: "\f475";
+}
+.glyphicon-asterisk::before {
+  content: "\f2c8";
+}
+.glyphicon-comment::before {
+  content: "\f190";
+}
+.glyphicon-search::before {
+  content: "\f52a";
+}
+.glyphicon-fullscreen::before {
+  content: "\f14d";
+}
+.glyphicon-fullscreen::before {
+  content: "\f14d";
+}
+
 .md-editor,
 .md-editor.activeX
 {
@@ -41,10 +90,18 @@
 }
 </style>
 
-<script src="<~GLOBAL[ASSETS_URL]>/js/markdown-it.min.js"></script>
-<script src="<~GLOBAL[ASSETS_URL]>/js/turndown.min.js"></script>
-<script src="<~GLOBAL[ASSETS_URL]>/js/bootstrap-markdown.min.js"></script>
-<script src="<~GLOBAL[ASSETS_URL]>/js/jquery.hotkeys.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it/dist/markdown-it.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-sub/dist/markdown-it-sub.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-sup/dist/markdown-it-sup.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-abbr/dist/markdown-it-abbr.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-ins/dist/markdown-it-ins.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-mark/dist/markdown-it-mark.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-container/dist/markdown-it-container.min.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/markdown-it-attrs/markdown-it-attrs.browser.js"></script>
+
+<script src="<~GLOBAL[ASSETS_URL]>/lib/turndown/dist/turndown.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/bootstrap-markdown/js/bootstrap-markdown.js"></script>
+<script src="<~GLOBAL[ASSETS_URL]>/lib/jquery-hotkeys/jquery-hotkeys.js"></script>
 <script>
   $(document).ready(function() {
 
@@ -69,7 +126,40 @@
       breaks:     true,
       linkify:    true
     };
-    var md = window.markdownit(mdOptions);
+    var md = window.markdownit(mdOptions)
+      .use(window.markdownitSub)
+      .use(window.markdownitSup)
+      .use(window.markdownitAbbr)
+      .use(window.markdownitIns)
+      .use(window.markdownitMark)
+      .use(window.markdownitContainer, 'foobar', {
+        validate: name => name.trim().length, // allow any container names
+        //add container token as a class + other class attrs
+        render: (tokens, idx) => {
+          if (tokens[idx].nesting === 1) {
+              // from tokens[idx].attrs array, get only elements where [0]=="class"
+              var class_name = tokens[idx].info.trim();
+              if (tokens[idx].attrs) {
+                  var aclasses = tokens[idx].attrs.filter(function (el) {
+                      return el[0] == 'class';
+                  });
+                  class_name += ' ' + aclasses.map(function (el) {
+                      return el[1];
+                  }).join(' ');
+              }
+              return '<div class="'+class_name+'">\n';
+          } else  {
+            return '</div>\n';
+          }
+        }
+      })
+      .use(window.markdownItAttrs)
+      ;
+
+    //add bootstrap table class for tables
+    md.renderer.rules.table_open = function(tokens, idx) {
+      return '<table class="table">';
+    };
 
     $("textarea.markdown")
     .on('paste', function (e){
@@ -93,8 +183,8 @@
     })
     .markdown({
       //hide&disable default add image btn
-      hiddenButtons: 'cmdImage',
-      disabledButtons: 'cmdImage',
+      hiddenButtons: 'cmdUrl cmdImage',
+      disabledButtons: 'cmdUrl cmdImage',
       resize: 'vertical', //by default manual textarea resize is disabled
       //iconlibrary: 'glyph',
       parser: function (v) {
@@ -104,6 +194,39 @@
         [{
           name: "groupCustom",
           data: [{
+            name: "cmdAddUrl",
+            toggle: false,
+            title: "Add Link",
+            hotkey: 'Ctrl+L',
+            icon: {
+              glyph: 'glyphicon glyphicon-link'
+            },
+            callback: async function(e){
+              // Give [] surround the selection and prepend the link
+              var chunk, cursor, selected = e.getSelection(), content = e.getContent(), link;
+
+              if (selected.length === 0) {
+                // Give extra word
+                chunk = e.__localize('enter link description here');
+              } else {
+                chunk = selected.text;
+              }
+
+              link = await prompt(e.__localize('Insert Hyperlink'),'http://');
+
+              var urlRegex = new RegExp('^((http|https)://|(mailto:)|(//)|(/))[a-z0-9]', 'i');
+              if (link !== null && link !== '' && link !== 'http://' && urlRegex.test(link)) {
+                var sanitizedLink = $('<div>'+link+'</div>').text();
+
+                // transform selection and set the cursor into chunked text
+                e.replaceSelection('['+chunk+']('+sanitizedLink+')');
+                cursor = selected.start+1;
+
+                // Set the cursor
+                e.setSelection(cursor,cursor+chunk.length);
+              }
+            }//end callback
+          },{
             name: "cmdAddImage",
             toggle: false,
             title: "Add Image",
@@ -119,8 +242,8 @@
               var chunk, cursor, selected = e.getSelection(), content = e.getContent();
 
               var att_category = e.$textarea.data('att-category') ?? 'general';
-              modal_att_open(att_category, function (e2, id, iname, url) {
-                chunk="![]("+url+")";
+              modal_att_open(att_category, function (e2, id, iname, url, is_image) {
+                chunk=(is_image?"!":"")+"["+iname+"]("+url+")";
 
                 // transform selection and set the cursor into chunked text
                 e.replaceSelection(chunk);
