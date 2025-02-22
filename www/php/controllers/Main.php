@@ -98,7 +98,7 @@ class MainController extends FwController {
         #$one["url"] = "/Admin/Reports/sample";
         $one["rows"] = $this->db->arrp("select access_level, count(*) as ivalue from users group by access_level order by count(*) desc");
         foreach ($one["rows"] as $key => $row) {
-            $one["rows"][$key]['ilabel'] = get_selvalue('/common/sel/access_level.sel', $row['access_level']);
+            $one["rows"][$key]['ilabel'] = FormUtils::selectTplName('/common/sel/access_level.sel', $row['access_level']);
         }
         $panes['piechart'] = $one;
 
@@ -176,4 +176,4 @@ class MainController extends FwController {
 
         $this->fw->redirect($this->base_url);
     }
-    }
+}

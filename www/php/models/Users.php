@@ -18,8 +18,8 @@ class Users extends FwModel {
     public const int ACL_ADMIN      = 90;
     public const int ACL_MANAGER    = 80;
     public const int ACL_EMPLOYEE   = 50;
-    public const int ACL_USER          = 1; //min access level for users
-    public const int ACL_VISITOR       = 0; //non-logged visitor
+    public const int ACL_USER       = 1; //min access level for users
+    public const int ACL_VISITOR    = 0; //non-logged visitor
 
     public static $PERM_COOKIE_NAME = 'perm';
     public static $PERM_COOKIE_DAYS = 356;
@@ -160,10 +160,10 @@ class Users extends FwModel {
         ];
         $this->update($id, $item);
 
-        $user             = $this->one($id);
+        $user                    = $this->one($id);
         $user['pwd_reset_token'] = $pwd_reset_token;
 
-        Followups::i()->sendToUser(Followups::RESET_PASSWORD, $user["id"], ["passwordResetUrl" => $passwordResetUrl]);
+        $this->fw->sendEmailTpl($user['email'], "email_pwd.txt", $user);
 
         return true;
     }
@@ -178,10 +178,10 @@ class Users extends FwModel {
         ];
         $this->update($id, $item);
 
-        $user            = $this->one($id);
-        $user['pwd_reset_token'] = $pwd_reset_token;
+        $user                = $this->one($id);
+        $user['email_token'] = $confirm_token;
 
-        return $this->fw->sendEmailTpl($user['email'], "email_confirm.txt", $user);
+        $this->fw->sendEmailTpl($user['email'], "email_confirm.txt", $user);
     }
 
     // send email with token to confirm user's email
@@ -195,8 +195,8 @@ class Users extends FwModel {
         ];
         $this->update($id, $item);
 
-        $user            = $this->one($id);
-        return $this->fw->sendEmailTpl($user['email'], "email_confirm.txt", $user);
+        $user = $this->one($id);
+        $this->fw->sendEmailTpl($user['email'], "email_confirm.txt", $user);
     }
 
     /**
