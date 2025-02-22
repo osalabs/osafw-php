@@ -141,7 +141,7 @@ ini_set('session.cookie_secure', 1);
 
 #load $SITE_CONFIG config which may override any variables: some.domain.name[:port] -> config.some.domain.name[_port].php
 $conf_server_name = str_replace(':', '_', strtolower($root_domain0));
-if (include_once('config.' . $conf_server_name . '.php')) {
+if (include_once($conf_server_name . '.php')) {
     #set loaded config name
     $overrides['loaded_config'] = $conf_server_name;
 }
