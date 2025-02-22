@@ -1232,4 +1232,60 @@ class Utils {
         });
     }
 
+    /**
+     * Helper to send logs/events to Sentry based on the log type.
+     * @param string $logType
+     * @param bool $isExplicitLogType
+     * @param string $message
+     * @param array $extraParams
+     * @return void
+     */
+    public static function sendToSentry(string $logType, bool $isExplicitLogType, string $message, array $extraParams): void {
+        // Map fw log types to Sentry severities
+        // (You can adjust these to your preference.)
+        $levelMap = [
+            'FATAL'  => Sentry\Severity::fatal(),
+            'ERROR'  => Sentry\Severity::error(),
+            'WARN'   => Sentry\Severity::warning(),
+            'INFO'   => Sentry\Severity::info(),
+            'DEBUG'  => Sentry\Severity::debug(),
+            'NOTICE' => Sentry\Severity::info(),
+            'TRACE'  => Sentry\Severity::debug(),
+            'ALL'    => Sentry\Severity::debug(),
+        ];
+
+        // Default to "info" if not found
+        $severity = $levelMap[$logType] ?? Sentry\Severity::info();
+
+        // Decide if we want to capture a full separate Sentry event
+        // for this logType or just add a breadcrumb
+        $shouldCaptureAsEvent = (
+            in_array($logType, ['FATAL', 'ERROR', 'WARN', 'INFO'], true)
+            || ($logType === 'DEBUG' && $isExplicitLogType)
+        );
+
+        // If it’s an actual Throwable at the front, send as exception
+        if ($logType === 'FATAL' && isset($extraParams[0]) && $extraParams[0] instanceof Throwable) {
+            Sentry\withScope(function (Sentry\State\Scope $scope) use ($extraParams) {
+                $scope->setExtra('extra', $extraParams);
+                Sentry\captureException($extraParams[0]);
+            });
+        } elseif ($shouldCaptureAsEvent) {
+            Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $severity, $extraParams) {
+                $scope->setExtra('extra', $extraParams);
+                Sentry\captureMessage($message, $severity);
+            });
+        }
+
+        // Add a breadcrumb if level <= DEBUG
+        // That means “TRACE” or “DEBUG” become breadcrumbs
+        if (fw::$LOG_LEVELS[$logType] <= fw::$LOG_LEVELS['DEBUG']) {
+            Sentry\addBreadcrumb(new Sentry\Breadcrumb(
+                Sentry\Breadcrumb::LEVEL_INFO,  // or map it more precisely
+                Sentry\Breadcrumb::TYPE_DEFAULT,
+                'log',
+                $message
+            ));
+        }
+    }
 }
