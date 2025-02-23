@@ -34,7 +34,7 @@ class SignupController extends FwAdminController {
     }
 
     public function ShowFormAction($form_id): ?array {
-        $id = $form_id + 0;
+        $id = intval($form_id);
 
         if ($this->isGet()) {
             if ($id > 0) {
@@ -49,8 +49,9 @@ class SignupController extends FwAdminController {
         }
 
         $ps = array(
-            'id' => $id,
-            'i'  => $item,
+            'id'           => $id,
+            'i'            => $item,
+            'hide_sidebar' => true,
         );
 
         return $ps;

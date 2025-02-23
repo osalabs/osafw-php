@@ -140,6 +140,13 @@ $FW_CONFIG = array(
                           #"server:11211"
     ],
 
+    #google api related - oauth2, maps, etc
+    'GOOGLE'         => [
+        'CLIENT_ID'     => '',
+        'CLIENT_SECRET' => '',
+        'REDIRECT_URI'  => '',
+    ],
+
     ########### place site specific configuration variables here:
     'SITE_VERSION'   => '0.25.0222', #also used to re-load css/js to avoid browser caching
     'SITE_NAME'      => 'Site Name',
