@@ -260,28 +260,42 @@ class Utils {
     }
 
     /**
+     * get random key from weighted array
+     * @param $arr array assoc array : 'some key' => int weight
+     * @return int|string
+     */
+    public static function getRandomFromWeightedArray(array $arr): int|string {
+        $result = '';
+        $rand   = mt_rand(1, (int)array_sum($arr));
+
+        foreach ($arr as $key => $value) {
+            $rand -= $value;
+            if ($rand <= 0) {
+                $result = $key;
+                break;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * array of values to csv-formatted string for one line, order defiled by $fields
-     * @param array $row hash values for csv line
+     * @param array $row [ field => value, ...]
      * @param array $fields plain array - field names
-     * @return string one csv line with properly quoted values and "\n" at the end
+     * @return string one csv line with properly quoted values with quotes and newlines and "\n" at the end
      */
     public static function toCSVRow(array $row, array $fields): string {
         $result = '';
-
-        foreach ($fields as $fld) {
-            $str = strval($row[$fld]);
-            if (preg_match('/[^\x20-\x7f]/', $str)) {
-                //non-ascii data - convert to hex
-                $str = bin2hex($str);
+        foreach ($fields as $field) {
+            $value = $row[$field] ?? '';
+            // check if value needs to be quoted
+            if (str_contains($value, ',') || str_contains($value, '"') || str_contains($value, "\n")) {
+                $value = '"' . str_replace('"', '""', $value) . '"';
             }
-            if (preg_match('/[",]/', $str)) {
-                //quote string
-                $str = '"' . str_replace('"', '""', nl2br($str)) . '"';
-            }
-            $result .= (($result) ? "," : "") . $str;
+            $result .= $value . ',';
         }
-
-        return $result . "\n";
+        return rtrim($result, ',') . "\n";
     }
 
     /**
@@ -679,6 +693,23 @@ class Utils {
         return $result;
     }
 
+    /**
+     * calculate sha256 hash
+     * @param string $str
+     * @return string
+     */
+    public static function sha256(string $str): string {
+        return hash('sha256', $str);
+    }
+
+    /**
+     * calculate sha256 hash and return binary string
+     * @param string $str
+     * @return string
+     */
+    public static function sha256bin(string $str): string {
+        return hash('sha256', $str, true);
+    }
 
     /**
      * simple encrypt or decrypt a string with vector/key
@@ -694,10 +725,10 @@ class Utils {
         $encrypt_method = "AES-256-CBC";
 
         // hash
-        $key = hash('sha256', $k);
+        $key = self::sha256($k);
 
         // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
-        $iv = substr(hash('sha256', $v), 0, 16);
+        $iv = substr(self::sha256($v), 0, 16);
 
         if ($action == 'encrypt') {
             $output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
