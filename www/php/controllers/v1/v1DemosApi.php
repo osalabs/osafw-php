@@ -32,13 +32,13 @@ class v1DemosApiController extends BaseApiController {
         ], $this->list_filter['limit'], $this->list_filter['offset'], $this->list_orderby);
 
         $ps = [
-            'items'    => $this->model->filterListForJson($rows),
-            'metadata' => [
-                'count'     => $this->model->getCount(), #this is total records, not rows
-                'limit'     => $this->list_filter['limit'],
-                'offset'    => $this->list_filter['offset'],
-                'sortField' => $this->list_filter['sortby'],
-                'sortOrder' => $this->list_filter['sortdir'],
+            self::LIST_ITEMS_NAME => $this->model->filterListForJson($rows),
+            self::META_NAME       => [
+                self::LIST_COUNT_NAME      => $this->model->getCount(), #this is total records, not rows
+                self::LIST_LIMIT_NAME      => $this->list_filter['limit'],
+                self::LIST_OFFSET_NAME     => $this->list_filter['offset'],
+                self::LIST_SORT_FIELD_NAME => $this->list_filter['sortby'],
+                self::LIST_SORT_ORDER_NAME => $this->list_filter['sortdir'],
             ]
         ];
         return ['_json' => $ps];
@@ -49,7 +49,7 @@ class v1DemosApiController extends BaseApiController {
         $item = $this->model->filterForJson($item);
 
         $ps = [
-            'item' => $item
+            self::ITEM_NAME => $item
         ];
         return ['_json' => $ps];
     }
@@ -75,7 +75,7 @@ class v1DemosApiController extends BaseApiController {
 
         #return new/updated record
         $ps = [
-            'item' => $this->model->oneForJson($id)
+            self::ITEM_NAME => $this->model->oneForJson($id)
         ];
         return ['_json' => $ps];
     }

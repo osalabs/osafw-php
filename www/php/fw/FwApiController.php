@@ -21,6 +21,17 @@ class FwApiController extends FwController {
         'v1users.confirm',
     ];
 
+    #standard names used in JSON response
+    protected const string META_NAME            = "metadata";
+    protected const string LIST_ITEMS_NAME      = "items";
+    protected const string LIST_COUNT_NAME      = "count";
+    protected const string LIST_LIMIT_NAME      = "limit";
+    protected const string LIST_OFFSET_NAME     = "offset";
+    protected const string LIST_SORT_FIELD_NAME = "sortField";
+    protected const string LIST_SORT_ORDER_NAME = "sortOrder";
+    protected const string ITEM_NAME            = "item";
+
+
     protected string $http_origin = '';
     protected ?object $jwt_payload = null; #decoded JWT payload
 

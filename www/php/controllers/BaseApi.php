@@ -30,7 +30,7 @@ API general design:
       - request - can have query params for filtering
       - response - HTTP=200, object:
         {
-            PLURAL_ENTITY_NAME(i.e. users, orders,...): [{key => value,...},...], // array of objects
+            items: [{key => value,...},...], // array of objects
             metadata: {
                 // any additional info
             }
@@ -39,7 +39,7 @@ API general design:
       - request - body is a json object {key => value} to add.
       - response - HTTP=201, object:
         {
-            SINGULAR_ENTITY_NAME(i.e. user, orders,...): {id: ID, key => value,...}, // entity object where ID is an id of added record
+            item: {id: ID, key => value,...}, // entity object where ID is an id of added record
             metadata: {
                 // any additional info
             }
@@ -49,7 +49,7 @@ API general design:
     - GET - get record by ID
       - response - HTTP=200, object:
         {
-            SINGULAR_ENTITY_NAME(i.e. user, list,...): {id: ID, key => value,...}, // entity object where ID is an id of added record
+            item: {id: ID, key => value,...}, // entity object where ID is an id of added record
             metadata: {
                 // any additional info
             }
@@ -58,7 +58,7 @@ API general design:
       - request - body is a json object {key => value} with fields to update.
       - response - HTTP=200, object:
         {
-            SINGULAR_ENTITY_NAME(i.e. user, list,...): {id: ID, key => value,...}, // entity object where ID is an id of added record
+            item: {id: ID, key => value,...}, // entity object where ID is an id of added record
             metadata: {
                 // any additional info
             }
