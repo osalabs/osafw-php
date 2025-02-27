@@ -495,19 +495,37 @@ class Utils {
     }
 
     /**
-     * return nanoID (2.1 trillion unique IDs)
+     * return random ID (2.18 x 10^14 = 218.3 trillion unique IDs for 8 chars, useful up to 15 million generations because of birthday paradox)
+     * @param int $length
      * @return string
      * @throws \Random\RandomException
      */
-    public static function nanoID(): string {
-        $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz-';
-        $size     = 21;
-        $id       = '';
-        for ($i = 0; $i < $size; $i++) {
-            $id .= $alphabet[random_int(0, 63)];
+    public static function randomID(int $length = 8): string {
+        $chars    = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $maxIndex = strlen($chars) - 1;
+        $bytes    = random_bytes($length);
+        $result   = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $idx    = ord($bytes[$i]) % ($maxIndex + 1);
+            $result .= $chars[$idx];
         }
-        return $id;
+
+        return $result;
     }
+
+    // implementation for javascript frontend:
+    //    function randomID(length = 8) {
+    //        const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    //        let result = '';
+    //        const randomValues = new Uint8Array(length);
+    //        crypto.getRandomValues(randomValues);
+    //
+    //        for (let i = 0; i < length; i++) {
+    //            result += chars[randomValues[i] % chars.length];
+    //        }
+    //        return result;
+    //    }
 
     /**
      * return path to tmp directory with prefix
