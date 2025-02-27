@@ -37,7 +37,7 @@ class LoginController extends FwController {
         return $ps;
     }
 
-    public function SaveAction() {
+    public function SaveAction(): void {
         $item = reqh('item');
 
         try {
@@ -129,6 +129,17 @@ class LoginController extends FwController {
             if (array_key_exists('error', $token)) {
                 throw new ApplicationException("Error fetching access token");
             }
+            #token looks like:
+            //array(
+            //    'access_token'  => 'xxx',
+            //    'expires_in'    => 3599,
+            //    'refresh_token' => 'xxx',
+            //    'scope'         => 'https://www.googleapis.com/auth/userinfo.email https://mail.google.com/ openid https://www.googleapis.com/auth/userinfo.profile',
+            //    'token_type'    => 'Bearer',
+            //    'id_token'      => 'xxx',
+            //    'created'       => 1717174381,
+            //);
+
             #$token = json_encode($token);
             #$this->client->setAccessToken($token);
 
@@ -145,10 +156,17 @@ class LoginController extends FwController {
                 throw new ApplicationException("Google account has no email");
             }
 
+            #get received scopes
+            $scopes = $token['scope'];
+
             #check if user already registered
             $dbuser = Users::i()->oneByEmail($email);
             if ($dbuser) {
                 $users_id = $dbuser['id'];
+                #update scopes
+                Users::i()->update($users_id, [
+                    'oauth_scopes' => $scopes,
+                ]);
             } else {
                 #register
                 $users_id = Users::i()->add([
@@ -156,7 +174,8 @@ class LoginController extends FwController {
                     'fname'        => $user['name'],
                     'access_level' => Users::ACL_USER,
                     'status'       => Users::STATUS_ACTIVE,
-                    'pwd'          => '' #empty password for google users
+                    'pwd'          => '', #empty password for google users
+                    'oauth_scopes' => $scopes,
                 ]);
             }
 

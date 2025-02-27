@@ -132,54 +132,56 @@ CREATE TABLE att_links
 DROP TABLE IF EXISTS users;
 CREATE TABLE users
 (
-    id                      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    icode                   VARCHAR(64) CHARACTER SET utf8 NOT NULL,              -- public id, basically UUID, use if needed
+    id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    icode            VARCHAR(64) CHARACTER SET utf8 NOT NULL,              -- public id, basically UUID, use if needed
 
-    email                   VARCHAR(255)                   NOT NULL DEFAULT '',
-    pwd                     VARCHAR(255)                   NOT NULL DEFAULT '',   -- hashed password
-    access_level            TINYINT                        NOT NULL,              -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
-    is_readonly             TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user is readonly
+    email            VARCHAR(255)                   NOT NULL DEFAULT '',
+    pwd              VARCHAR(255)                   NOT NULL DEFAULT '',   -- hashed password
+    access_level     TINYINT                        NOT NULL,              -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
+    is_readonly      TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user is readonly
 
-    fname                   VARCHAR(32)                    NOT NULL DEFAULT '',
-    lname                   VARCHAR(32)                    NOT NULL DEFAULT '',
-    iname                   VARCHAR(128) AS (CONCAT(fname, ' ', lname)),          -- calculated column
+    fname            VARCHAR(32)                    NOT NULL DEFAULT '',
+    lname            VARCHAR(32)                    NOT NULL DEFAULT '',
+    iname            VARCHAR(128) AS (CONCAT(fname, ' ', lname)),          -- calculated column
 
-    title                   VARCHAR(128)                   NOT NULL DEFAULT '',
+    title            VARCHAR(128)                   NOT NULL DEFAULT '',
 
-    address1                VARCHAR(128)                   NOT NULL DEFAULT '',
-    address2                VARCHAR(64)                    NOT NULL DEFAULT '',
-    city                    VARCHAR(64)                    NOT NULL DEFAULT '',
-    state                   VARCHAR(4)                     NOT NULL DEFAULT '',
-    zip                     VARCHAR(16)                    NOT NULL DEFAULT '',
-    phone                   VARCHAR(16)                    NOT NULL DEFAULT '',
+    address1         VARCHAR(128)                   NOT NULL DEFAULT '',
+    address2         VARCHAR(64)                    NOT NULL DEFAULT '',
+    city             VARCHAR(64)                    NOT NULL DEFAULT '',
+    state            VARCHAR(4)                     NOT NULL DEFAULT '',
+    zip              VARCHAR(16)                    NOT NULL DEFAULT '',
+    phone            VARCHAR(16)                    NOT NULL DEFAULT '',
 
-    lang                    VARCHAR(16)                    NOT NULL DEFAULT 'en', -- user interface language
-    ui_theme                TINYINT                        NOT NULL DEFAULT 0,    -- 0--default theme
-    ui_mode                 TINYINT                        NOT NULL DEFAULT 0,    -- 0--auto, 10-light, 20-dark
+    lang             VARCHAR(16)                    NOT NULL DEFAULT 'en', -- user interface language
+    ui_theme         TINYINT                        NOT NULL DEFAULT 0,    -- 0--default theme
+    ui_mode          TINYINT                        NOT NULL DEFAULT 0,    -- 0--auto, 10-light, 20-dark
 
-    idesc                   TEXT,
-    att_id                  INT UNSIGNED,                                         -- avatar
+    idesc            TEXT,
+    att_id           INT UNSIGNED,                                         -- avatar
 
-    login_time              DATETIME,
-    pwd_reset               VARCHAR(255)                   NULL,                  -- used for password reset token and initial confirmation token
-    pwd_reset_time          DATETIME                       NULL,
-    mfa_secret              VARCHAR(64),                                          -- mfa secret code, if empty - no mfa for the user configured
-    mfa_recovery            VARCHAR(1024),                                        -- mfa recovery hashed codes, space-separated
-    mfa_added               DATETIME,                                             -- last datetime when mfa setup or resynced
+    login_time       DATETIME,
+    pwd_reset        VARCHAR(255)                   NULL,                  -- used for password reset token and initial confirmation token
+    pwd_reset_time   DATETIME                       NULL,
+    mfa_secret       VARCHAR(64),                                          -- mfa secret code, if empty - no mfa for the user configured
+    mfa_recovery     VARCHAR(1024),                                        -- mfa recovery hashed codes, space-separated
+    mfa_added        DATETIME,                                             -- last datetime when mfa setup or resynced
+
+    oauth_scopes     TEXT,                                                 -- space-separated list of scopes for oauth2: openid email profile
 
     -- for email change procedures
-    email_new               VARCHAR(255)                            DEFAULT '',   -- new email
-    email_token             VARCHAR(255)                            DEFAULT '',
-    email_token_time        DATETIME,
+    email_new        VARCHAR(255)                            DEFAULT '',   -- new email
+    email_token      VARCHAR(255)                            DEFAULT '',
+    email_token_time DATETIME,
 
-    email_bounced           TINYINT                        NOT NULL DEFAULT 0,    -- 1 if email bounced
-    is_marked_spam          TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user marked as spam (disable emails)
+    email_bounced    TINYINT                        NOT NULL DEFAULT 0,    -- 1 if email bounced
+    is_marked_spam   TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user marked as spam (disable emails)
 
-    status                  TINYINT                        NOT NULL DEFAULT 0, /*0-active, 10-inactive, 20-new/unconfirmed email, 127-deleted*/
-    add_time                DATETIME                       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    add_users_id            INT UNSIGNED                            DEFAULT 0,
-    upd_time                DATETIME                       NULL ON UPDATE CURRENT_TIMESTAMP,
-    upd_users_id            INT UNSIGNED                            DEFAULT 0,
+    status           TINYINT                        NOT NULL DEFAULT 0, /*0-active, 10-inactive, 20-new/unconfirmed email, 127-deleted*/
+    add_time         DATETIME                       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    add_users_id     INT UNSIGNED                            DEFAULT 0,
+    upd_time         DATETIME                       NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id     INT UNSIGNED                            DEFAULT 0,
 
     FOREIGN KEY (att_id) REFERENCES att (id),
 
