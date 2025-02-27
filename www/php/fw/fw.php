@@ -236,11 +236,11 @@ class fw {
             return $fw->models_cache[$cache_key];
         }
         #logger("MODEL CACHE MISS:" . $model_class);
-        try {
-            $object = new $model_class($fw);
-        } catch (NoClassException) {
+        if (!class_exists($model_class)) {
             throw new NoModelException("Model class not found: $model_class");
         }
+
+        $object                       = new $model_class($fw);
         $fw->models_cache[$cache_key] = $object;
         return $object;
     }
@@ -250,7 +250,9 @@ class fw {
      * usage: $controller = UsersController::i();
      * @param string $controller_class
      * @return FwController
+     * @throws AuthException
      * @throws NoControllerException
+     * @throws NoModelException
      */
     public static function controller(string $controller_class): FwController {
         #logger("NOTICE", "fw controller: $controller_class");
@@ -266,7 +268,7 @@ class fw {
         }
         try {
             $object = new $controller_class($fw);
-        } catch (NoControllerException|NoClassException) {
+        } catch (NoControllerException|NoClassException) { #class autoload can throw this
             #if no such controller class - try virtual controllers
             logger("TRACE", "Controller class not found, trying Virtual Controller: $controller_class");
             $controller_icode = preg_replace('/Controller$/', '', $controller_class); // strip suffix
@@ -364,7 +366,7 @@ class fw {
                 $pattern       = preg_quote($class_name, '/');
                 $all_php_files = glob($dir . '*.php', GLOB_NOSORT);
                 if (!empty($all_php_files)) {
-                    $matches = preg_grep("/{$pattern}\.php$/i", $all_php_files);
+                    $matches = preg_grep("/$pattern\.php$/i", $all_php_files);
                     if (!empty($matches)) {
                         $file_found = reset($matches);
                         break;
@@ -1316,7 +1318,7 @@ function logger(mixed ...$params): void {
     if ($isLogEnabled) {
         $now    = (new DateTime())->format('Y-m-d H:i:s.v');
         $pid    = getmypid();
-        $prefix = "{$now} {$pid} {$logType} {$fileName}::{$funcName}({$line}) ";
+        $prefix = "$now $pid $logType $fileName::$funcName($line) ";
 
         if (!str_ends_with($message, "\n")) {
             $message .= "\n";

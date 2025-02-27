@@ -175,7 +175,7 @@ class DateUtils {
     }
 
     public static function Str2Unix($str): int {
-        $dt = new \DateTime(strval($str));
+        $dt = new DateTime(strval($str));
         return $dt->getTimestamp();
     }
 
@@ -207,7 +207,7 @@ class DateUtils {
         }
         try {
             return new DateTime($s);
-        } catch (Exception $e) {
+        } catch (Exception) {
             return null;
         }
     }

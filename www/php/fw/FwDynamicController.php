@@ -439,7 +439,7 @@ class FwDynamicController extends FwController {
         $result          = true;
         $required_fields = Utils::qw($def["required_fields"] ?? "");
         if (count($required_fields) == 0) {
-            return $result; //nothing to validate
+            return true; //nothing to validate
         }
 
         $row_errors = array();
@@ -450,7 +450,7 @@ class FwDynamicController extends FwController {
             $field = $def["field"];
             foreach ($row_errors as $field_name => $value) {
                 // row input names format: item-<~field>#<~id>[field_name]
-                $this->fw->FormErrors["item-{$field}#{$row_id}[{$field_name}]"] = true;
+                $this->fw->FormErrors["item-$field#{$row_id}[$field_name]"] = true;
             }
             $this->fw->FormErrors["REQUIRED"] = true; // also set global error
         }
@@ -490,7 +490,7 @@ class FwDynamicController extends FwController {
             }
 
             $this->fw->flash("error", $msg);
-            return fw::redirect("{$this->base_url}/{$id}/delete");
+            return fw::redirect("$this->base_url/$id/delete");
         }
 
         $this->model->delete($id);
@@ -537,6 +537,8 @@ class FwDynamicController extends FwController {
      * Autocomplete action for related items
      * @return array|null
      * @throws ApplicationException
+     * @throws DBException
+     * @throws NoModelException
      */
     public function AutocompleteAction(): ?array {
         $q = reqs("q"); //required - query string
@@ -572,7 +574,7 @@ class FwDynamicController extends FwController {
     }
 
     ###################### support for customizable list screen
-    public function UserViewsAction($form_id): ?array {
+    public function UserViewsAction(): ?array {
         $ps = array(
             'rows'             => $this->getViewListArr($this->getViewListUserFields(), true),
             'select_userviews' => UserViews::i()->listSelectByIcode($this->base_url),
@@ -659,10 +661,9 @@ class FwDynamicController extends FwController {
 
             // save fields
             // order by value
-            $ordered = array();
-            foreach ($fld as $key => $value) {
-                $ordered[$key] = intval($value);
-            }
+            $ordered = array_map(function ($value) {
+                return intval($value);
+            }, $fld);
             asort($ordered);
             $anames = array_keys($ordered);
             $fields = implode(" ", $anames);
@@ -1077,7 +1078,7 @@ class FwDynamicController extends FwController {
      * @param array $fields
      * @return void
      * @throws DBException
-     * @throws NoModelException
+     * @throws NoModelException|ApplicationException
      */
     protected function processSaveShowFormFieldsAfter(int $id, array $fields): void {
         $subtable_del = reqh("subtable_del");
@@ -1109,19 +1110,16 @@ class FwDynamicController extends FwController {
                 Att::i()->uploadMulti($itemdb);
 
             } elseif ($type == "multicb") {
+                if ($this->isPatch() && is_null(req($field . "_multi", null))) {
+                    continue;
+                }
                 if (empty($def["model"])) {
                     // multiple checkboxes -> non-junction model single comma-delimited field
                     // if PATCH - only update is post param is present (otherwise it will delete all records)
-                    if ($this->isPatch() && is_null(req($field . "_multi", null))) {
-                        continue;
-                    }
                     $fields_update[$field] = FormUtils::multi2ids(reqh($field . "_multi")); // multiple checkboxes -> single comma-delimited field
                 } else {
                     //junction model based
                     // if PATCH - only update is post param is present (otherwise it will delete all records)
-                    if ($this->isPatch() && is_null(req($field . "_multi", null))) {
-                        continue;
-                    }
 
                     if ($def["is_by_linked"] ?? false) {
                         //by linked id
@@ -1212,7 +1210,6 @@ class FwDynamicController extends FwController {
      * @param FwModel|null $sub_model optional subtable model, if not passed def[model] will be used
      * @return int
      * @throws DBException
-     * @throws NoModelException
      */
     public function modelAddOrUpdateSubtableDynamic(int $main_id, string $row_id, array $fields, array $def, ?FwModel $sub_model = null): int {
         if ($sub_model === null) {

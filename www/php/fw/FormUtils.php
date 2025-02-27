@@ -8,8 +8,8 @@ class FormUtils {
     public const int MAX_PAGE_ITEMS = 25; //default max number of items on list screen
 
     #simple email check
-    public static function isEmail($email) {
-        return preg_match("/[^@]+\@[^@]+/", $email);
+    public static function isEmail($email): bool {
+        return (bool)preg_match("/[^@]+@[^@]+/", $email);
     }
 
     #validate phones in forms:
@@ -22,11 +22,11 @@ class FormUtils {
     }
 
     #very simple date validation
-    public static function isDate($str) {
+    public static function isDate($str): bool {
         $result = true;
         try {
-            $date = new DateTime($str);
-        } catch (Exception $e) {
+            new DateTime($str);
+        } catch (Exception) {
             $result = false;
         }
         return $result;
@@ -49,19 +49,17 @@ class FormUtils {
      */
     public static function filter(array $form, array|string $names_str_or_arr, bool $is_exists = true): array {
         $result = array();
-        if (is_array($form)) {
-            $anames = Utils::qw($names_str_or_arr);
+        $anames = Utils::qw($names_str_or_arr);
 
-            #copy fields
-            foreach ($anames as $name) {
-                if (!$is_exists || array_key_exists($name, $form)) {
-                    $v = $form[$name];
-                    #if form contains array - convert to comma-separated string (it's from select multiple)
-                    if (is_array($v)) {
-                        $v = implode(',', $v);
-                    }
-                    $result[$name] = $v;
+        #copy fields
+        foreach ($anames as $name) {
+            if (!$is_exists || array_key_exists($name, $form)) {
+                $v = $form[$name];
+                #if form contains array - convert to comma-separated string (it's from select multiple)
+                if (is_array($v)) {
+                    $v = implode(',', $v);
                 }
+                $result[$name] = $v;
             }
         }
 
@@ -100,9 +98,9 @@ class FormUtils {
 
     # fore each name in $name - check if value is empty '' and make it null
     # TODO: remove nullable processing and rely on DB lib instead (as DB knows field types)
-    public static function filterNullable(&$itemdb, $names) {
+    public static function filterNullable(&$itemdb, $names): void {
         $anames = Utils::qw($names);
-        foreach ($anames as $key => $fld) {
+        foreach ($anames as $fld) {
             if (array_key_exists($fld, $itemdb) && ($itemdb[$fld] === '' || $itemdb[$fld] == '0')) {
                 $itemdb[$fld] = null;
             }
@@ -130,7 +128,7 @@ class FormUtils {
 
 
     #RETURN: array of pages for pagination
-    public static function getPager($count, $pagenum, $pagesize = NULL) {
+    public static function getPager($count, $pagenum, $pagesize = NULL): array {
         if (is_null($pagesize)) {
             $pagesize = self::MAX_PAGE_ITEMS;
         }
@@ -198,7 +196,7 @@ class FormUtils {
             $asel[$k] = trim($v);
         }
 
-        foreach ($rows as $k => $row) {
+        foreach ($rows as $row) {
             $text = $row['iname'];
             if (array_key_exists('id', $row)) {
                 $val = $row['id'];
@@ -363,7 +361,7 @@ class FormUtils {
     #sample:
     # many <input name="dict_link_multi[<~id>]"...>
     # itemdb("dict_link_multi") = FormUtils.multi2ids(fw.FORM("dict_link_multi"))
-    public static function multi2ids($hitems) {
+    public static function multi2ids($hitems): string {
         if (!is_array($hitems) || !count($hitems)) {
             return '';
         }
@@ -372,7 +370,7 @@ class FormUtils {
     }
 
     #similar to multi2ids, but uses array_values instead array_keys
-    public static function multiv2ids($hitems) {
+    public static function multiv2ids($hitems): string {
         if (!is_array($hitems) || !count($hitems)) {
             return '';
         }
@@ -381,16 +379,16 @@ class FormUtils {
     }
 
     # from string of ids: "1,2,3,4" to hash (id => 1)
-    public static function ids2multi($str) {
+    public static function ids2multi($str): array {
         $result = array();
         $arr    = explode(',', $str);
-        foreach ($arr as $key => $value) {
+        foreach ($arr as $value) {
             $result[$value] = 1;
         }
         return $result;
     }
 
-    public static function col2comma_str($acol) {
+    public static function col2comma_str($acol): string {
         return implode(',', $acol);
     }
 

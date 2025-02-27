@@ -69,7 +69,7 @@ class FwApiController extends FwController {
      * @return void
      */
     protected function setHeaders(): void {
-        header("Access-Control-Allow-Origin: {$this->http_origin}");
+        header("Access-Control-Allow-Origin: $this->http_origin");
         header("Access-Control-Allow-Credentials: true");
     }
 
@@ -158,7 +158,8 @@ class FwApiController extends FwController {
 
             \Firebase\JWT\JWT::$leeway = 30; # allow 30 seconds difference
             try {
-                $payload = \Firebase\JWT\JWT::decode($encoded_token, $this->fw->config->JWT_SECRET, ['HS256']);
+                $headers = new stdClass();
+                $payload = \Firebase\JWT\JWT::decode($encoded_token, new \Firebase\JWT\Key($this->fw->config->JWT_SECRET, 'HS256'), $headers);
                 #validate payload
                 //                if (isset($payload->exp) && DateUtils::isExpired($payload->exp, 0)) {
                 //                    throw new AuthException("JWT token expired", FW::HTTP_UNAUTHORIZED); # exp - expiration time

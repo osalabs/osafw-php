@@ -56,8 +56,7 @@ class FwVirtualController extends FwVueController {
             # no controller-specific config, then check /common/virtual/config.json
             $conf_file = $this->fw->config->SITE_TEMPLATES . '/common/virtual/config.json';
             if (file_exists($conf_file)) {
-                $is_conf_found = true;
-                $file_config   = json_decode(file_get_contents($conf_file), true);
+                $file_config = json_decode(file_get_contents($conf_file), true);
                 if (!$file_config) {
                     logger("WARN", "Error decoding config from $conf_file");
                 } else {

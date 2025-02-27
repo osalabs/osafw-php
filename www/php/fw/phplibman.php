@@ -61,12 +61,13 @@ class PhpLibMan {
      * Main entry point to install (download/copy) all libraries from the configuration.
      *
      * @param bool $continueOnError If false, will throw on the first error; otherwise logs and continues.
+     * @throws Throwable
      */
     public function install(bool $continueOnError = true): void {
         $this->logger("Starting LibMan install...", self::LOG_LEVEL_KEY);
 
         if (!$this->config) {
-            throw new \RuntimeException("LibMan: no config loaded");
+            throw new RuntimeException("LibMan: no config loaded");
         }
         if (empty($this->config->libraries)) {
             $this->logger("No libraries in config; nothing to do", self::LOG_LEVEL_KEY);
@@ -85,15 +86,15 @@ class PhpLibMan {
                 $files       = $libEntry->files ?? [];
 
                 if (!$libraryName) {
-                    throw new \RuntimeException(
-                        "Library entry #{$idx} missing 'library' field."
+                    throw new RuntimeException(
+                        "Library entry #$idx missing 'library' field."
                     );
                 }
 
                 // Normalize destination folder
                 $destFullPath = $this->normalizePath($destination);
                 if (!is_dir($destFullPath) && !mkdir($destFullPath, 0777, true)) {
-                    throw new \RuntimeException("Could not create destination folder: $destFullPath");
+                    throw new RuntimeException("Could not create destination folder: $destFullPath");
                 }
 
                 $this->logger("Installing from $provider, library=$libraryName => $destination", self::LOG_LEVEL_KEY);
@@ -127,7 +128,7 @@ class PhpLibMan {
                                 $src         = $cachePath . DIRECTORY_SEPARATOR . $srcRelative;
                                 $dst         = $destFullPath . DIRECTORY_SEPARATOR . $dstRelative;
                             } else {
-                                throw new \RuntimeException("Invalid file spec format in 'files'");
+                                throw new RuntimeException("Invalid file spec format in 'files'");
                             }
                             $this->copyOneFile($src, $dst);
                         }
@@ -136,7 +137,7 @@ class PhpLibMan {
                         $this->copyRecursive($cachePath, $destFullPath);
                     }
                 }
-            } catch (\Throwable $ex) {
+            } catch (Throwable $ex) {
                 if (!$continueOnError) {
                     throw $ex;
                 }
@@ -172,11 +173,11 @@ class PhpLibMan {
         if (!is_dir($folderPath)) {
             return;
         }
-        $this->logger("Removing old files from $folderPath", self::LOG_LEVEL_DEBUG);
+        $this->logger("Removing old files from $folderPath");
 
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($folderPath, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($folderPath, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($items as $item) {
             if ($item->isDir()) {
@@ -200,7 +201,7 @@ class PhpLibMan {
                 $srcRel = $fileSpec->src ?? '';
                 $dstRel = $fileSpec->to ?? $srcRel;
             } else {
-                throw new \RuntimeException("Invalid file spec format in 'files'");
+                throw new RuntimeException("Invalid file spec format in 'files'");
             }
 
             $srcFull = rtrim($localRoot, '\\/') . DIRECTORY_SEPARATOR . ltrim($srcRel, '\\/');
@@ -208,10 +209,10 @@ class PhpLibMan {
 
             $dstDir = dirname($dstFull);
             if (!is_dir($dstDir) && !mkdir($dstDir, 0777, true)) {
-                throw new \RuntimeException("Could not create subfolder: $dstDir");
+                throw new RuntimeException("Could not create subfolder: $dstDir");
             }
             if (!is_file($srcFull)) {
-                throw new \RuntimeException("File not found in local source: $srcFull");
+                throw new RuntimeException("File not found in local source: $srcFull");
             }
             $this->copyOneFile($srcFull, $dstFull);
         }
@@ -222,7 +223,7 @@ class PhpLibMan {
      */
     protected function copyEntireLocalFolder(string $localRoot, string $destFullPath): void {
         if (!is_dir($localRoot)) {
-            throw new \RuntimeException("Source path '$localRoot' is not a directory.");
+            throw new RuntimeException("Source path '$localRoot' is not a directory.");
         }
         $this->copyRecursive($localRoot, $destFullPath);
     }
@@ -237,7 +238,6 @@ class PhpLibMan {
 
         // Construct the cache path
         $cacheRoot = $this->getCacheRoot();
-        $scopeDir  = $scope ?: $libraryName;
         // put scope and sub-library together. For example:
         //   if library is "@vue/devtools-api@7.6.8"
         //   scope => "@vue"   subLib => "devtools-api"   version => "7.6.8"
@@ -253,10 +253,10 @@ class PhpLibMan {
         if (is_dir($finalPath)) {
             $dirTime = filemtime($finalPath);
             if (time() - $dirTime > 86400) {
-                $this->logger("Cache dir is outdated: $finalPath", self::LOG_LEVEL_DEBUG);
+                $this->logger("Cache dir is outdated: $finalPath");
                 $this->removeRecursive($finalPath);
             } else {
-                $this->logger("Cache hit for $provider|$libraryName => $finalPath", self::LOG_LEVEL_DEBUG);
+                $this->logger("Cache hit for $provider|$libraryName => $finalPath");
                 return $finalPath;
             }
         }
@@ -265,9 +265,9 @@ class PhpLibMan {
         // For cdnjs/jsdelivr/unpkg partial files, we might either do a file-by-file fetch, or do a npm approach.
         // Here we’ll treat everything like a npm package if it has a @version. If cdnjs, we might want a different approach.
         $this->logger("Cache miss => downloading library $libraryName from $provider", self::LOG_LEVEL_KEY);
-        $this->logger(" => $finalPath", self::LOG_LEVEL_DEBUG);
+        $this->logger(" => $finalPath");
         if (!mkdir($finalPath, 0777, true)) {
-            throw new \RuntimeException("Could not create cache folder: $finalPath");
+            throw new RuntimeException("Could not create cache folder: $finalPath");
         }
 
         // For now let's just do the “npm registry” approach if $provider is unpkg/jsdelivr/cdnjs:
@@ -288,7 +288,7 @@ class PhpLibMan {
         $pkgInfo     = json_decode($json, false);
 
         if (json_last_error() !== JSON_ERROR_NONE || empty($pkgInfo->versions->$version->dist->tarball)) {
-            throw new \RuntimeException("Could not find tarball for '$pkgName@$version'");
+            throw new RuntimeException("Could not find tarball for '$pkgName@$version'");
         }
 
         $tarUrl = $pkgInfo->versions->$version->dist->tarball;
@@ -296,16 +296,16 @@ class PhpLibMan {
         // 2) Download to temp .tgz
         $tempTgz = tempnam(sys_get_temp_dir(), 'libman_');
         if (!$tempTgz) {
-            throw new \RuntimeException("Failed to create temp file for tarball");
+            throw new RuntimeException("Failed to create temp file for tarball");
         }
         $realTgz = $tempTgz . '.tgz';
         rename($tempTgz, $realTgz);
 
-        $this->logger("Downloading tarball: $tarUrl => $realTgz", self::LOG_LEVEL_DEBUG);
+        $this->logger("Downloading tarball: $tarUrl => $realTgz");
         $this->downloadFile($tarUrl, $realTgz);
 
         // 3) Extract to the cache path
-        $phar = new \PharData($realTgz);
+        $phar = new PharData($realTgz);
         $phar->extractTo($destFullPath, null, true);
         unset($phar);
         @unlink($realTgz);
@@ -313,7 +313,7 @@ class PhpLibMan {
         // If everything extracted under 'package/', move up one level:
         $packageDir = $destFullPath . DIRECTORY_SEPARATOR . 'package';
         if (is_dir($packageDir)) {
-            $this->logger("Moving extracted 'package/' contents to $destFullPath", self::LOG_LEVEL_DEBUG);
+            $this->logger("Moving extracted 'package/' contents to $destFullPath");
             $this->moveDirectoryContentsUpOneLevel($packageDir, $destFullPath);
             @rmdir($packageDir);
         }
@@ -340,19 +340,19 @@ class PhpLibMan {
     public function clearCache(?string $provider = null): void {
         $cacheRoot = $this->getCacheRoot();
         if (!is_dir($cacheRoot)) {
-            $this->logger("Cache root does not exist or is not a directory: $cacheRoot", self::LOG_LEVEL_DEBUG);
+            $this->logger("Cache root does not exist or is not a directory: $cacheRoot");
             return;
         }
         if ($provider) {
             $path = $cacheRoot . DIRECTORY_SEPARATOR . $provider;
             if (is_dir($path)) {
-                $this->logger("Clearing cache for provider=$provider => $path", self::LOG_LEVEL_DEBUG);
+                $this->logger("Clearing cache for provider=$provider => $path");
                 $this->removeRecursive($path);
             } else {
-                $this->logger("No cache directory found for provider=$provider => $path", self::LOG_LEVEL_DEBUG);
+                $this->logger("No cache directory found for provider=$provider => $path");
             }
         } else {
-            $this->logger("Clearing ALL cache => $cacheRoot", self::LOG_LEVEL_DEBUG);
+            $this->logger("Clearing ALL cache => $cacheRoot");
             $this->removeRecursive($cacheRoot);
         }
     }
@@ -363,7 +363,7 @@ class PhpLibMan {
     protected function getCacheRoot(): string {
         $cacheRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . '.librarymanager' . DIRECTORY_SEPARATOR . 'cache';
         if (!is_dir($cacheRoot) && !mkdir($cacheRoot, 0777, true)) {
-            throw new \RuntimeException("Could not create cache root: $cacheRoot");
+            throw new RuntimeException("Could not create cache root: $cacheRoot");
         }
         return $cacheRoot;
     }
@@ -373,15 +373,15 @@ class PhpLibMan {
      */
     protected function loadConfig(): void {
         if (!is_file($this->jsonPath)) {
-            throw new \RuntimeException("LibMan: JSON file not found at $this->jsonPath");
+            throw new RuntimeException("LibMan: JSON file not found at $this->jsonPath");
         }
         $raw = file_get_contents($this->jsonPath);
         if (!$raw) {
-            throw new \RuntimeException("LibMan: could not read file $this->jsonPath");
+            throw new RuntimeException("LibMan: could not read file $this->jsonPath");
         }
         $decoded = json_decode($raw, false);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException("LibMan: invalid JSON in $this->jsonPath");
+            throw new RuntimeException("LibMan: invalid JSON in $this->jsonPath");
         }
         $this->config = $decoded;
     }
@@ -391,10 +391,10 @@ class PhpLibMan {
      * to handle potential errors/exceptions.
      */
     protected function httpGet(string $url): string {
-        $this->logger("HTTP GET: $url", self::LOG_LEVEL_DEBUG);
+        $this->logger("HTTP GET: $url");
         $data = @file_get_contents($url);
         if ($data === false) {
-            throw new \RuntimeException("Failed to GET: $url");
+            throw new RuntimeException("Failed to GET: $url");
         }
         return $data;
     }
@@ -404,7 +404,7 @@ class PhpLibMan {
      * and store into $localPath.
      */
     protected function downloadFile(string $url, string $localPath): void {
-        $this->logger("Downloading file from $url => $localPath", self::LOG_LEVEL_DEBUG);
+        $this->logger("Downloading file from $url => $localPath");
         $data = $this->httpGet($url);
         file_put_contents($localPath, $data);
     }
@@ -415,7 +415,7 @@ class PhpLibMan {
     protected function copyRecursive(string $sourceDir, string $destDir): void {
         $dir = opendir($sourceDir);
         if (!$dir) {
-            throw new \RuntimeException("Unable to read $sourceDir for copying");
+            throw new RuntimeException("Unable to read $sourceDir for copying");
         }
         @mkdir($destDir, 0777, true);
 
@@ -441,12 +441,12 @@ class PhpLibMan {
     protected function copyOneFile(string $src, string $dst): void {
         $dstDir = dirname($dst);
         if (!is_dir($dstDir) && !mkdir($dstDir, 0777, true)) {
-            throw new \RuntimeException("Could not create subfolder: $dstDir");
+            throw new RuntimeException("Could not create subfolder: $dstDir");
         }
 
-        $this->logger("Copying file: $src => $dst", self::LOG_LEVEL_DEBUG);
+        $this->logger("Copying file: $src => $dst");
         if (!@copy($src, $dst)) {
-            throw new \RuntimeException("Failed to copy $src => $dst");
+            throw new RuntimeException("Failed to copy $src => $dst");
         }
     }
 
@@ -457,9 +457,9 @@ class PhpLibMan {
         if (!is_dir($dirPath)) {
             return;
         }
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dirPath, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dirPath, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
         );
         foreach ($items as $item) {
             if ($item->isDir()) {
@@ -510,17 +510,17 @@ class PhpLibMan {
         $pos = strrpos($libraryName, '@');
         if ($pos === 0) {
             // Means the entire string starts with '@' but no second '@'
-            throw new \RuntimeException("Invalid library spec: $libraryName. No version found.");
+            throw new RuntimeException("Invalid library spec: $libraryName. No version found.");
         } elseif ($pos === false) {
             // No '@' at all => can't parse a version
-            throw new \RuntimeException("Invalid library spec: $libraryName. Must have version.");
+            throw new RuntimeException("Invalid library spec: $libraryName. Must have version.");
         }
 
         $pkgName = substr($libraryName, 0, $pos);
         $version = substr($libraryName, $pos + 1);
 
         if (!$pkgName || !$version) {
-            throw new \RuntimeException("Invalid library spec: $libraryName. Missing name or version.");
+            throw new RuntimeException("Invalid library spec: $libraryName. Missing name or version.");
         }
 
         return [$pkgName, $version];

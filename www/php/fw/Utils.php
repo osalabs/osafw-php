@@ -106,7 +106,7 @@ class Utils {
      * @param bool $is_strict if true only A-Za-z0-9_ chars allowed, if false - also allows "-"
      * @return string normalized name with only allowed chars
      */
-    public static function routeFixChars(string $str, $is_strict = false): string {
+    public static function routeFixChars(string $str, bool $is_strict = false): string {
         if ($is_strict) {
             return preg_replace("/[^A-Za-z0-9_]+/", "", $str);
         } else {
@@ -310,7 +310,6 @@ class Utils {
         }
 
         #headers - if no fields set - read first row and get header names
-        $headers_str = '';
         if (!count($fields)) {
             if (!count($rows)) {
                 return "";
@@ -325,7 +324,7 @@ class Utils {
         $headers_str = implode(',', $fields_header);
 
         echo $headers_str . "\n";
-        foreach ($rows as $key => $row) {
+        foreach ($rows as $row) {
             echo self::toCSVRow($row, $fields);
         }
     }
@@ -547,7 +546,7 @@ class Utils {
             if ($ts > 3600) {
                 try {
                     unlink($file);
-                } catch (Exception $e) {
+                } catch (Exception) {
                     //ignore errors as it just cleanup, should not affect main logic, could be access denied
                 }
             }
@@ -1004,13 +1003,13 @@ class Utils {
     }
 
     /**
-     * prefix string with http:// if not already
-     * @param string $str url like "google.com" or "http://google.com"
-     * @return string url with http:// prefix
+     * prefix string with https:// if not already
+     * @param string $str url like "google.com" or "https://google.com"
+     * @return string url with https:// prefix
      */
     public static function str2url(string $str): string {
         if (!preg_match('!^\w+://!', $str)) {
-            $str = "http://" . $str;
+            $str = "https://" . $str;
         }
         return $str;
     }

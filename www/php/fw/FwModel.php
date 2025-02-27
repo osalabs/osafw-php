@@ -313,7 +313,7 @@ abstract class FwModel {
      * @throws DBException
      */
     public function ilist(array $statuses = null): array {
-        $where = '';
+        $where = '1=1';
         if (strlen($this->field_status)) {
             if ($statuses && count($statuses) > 0) {
                 $where .= " and " . $this->db->qid($this->field_status) . $this->db->insqli($statuses);
@@ -324,7 +324,7 @@ abstract class FwModel {
 
         $orderby = $this->field_iname > '' ? $this->db->qid($this->field_iname) : null;
 
-        return $this->db->arrp("SELECT * from {$this->qTable()} WHERE 1=1 $where ORDER BY $orderby");
+        return $this->db->arrp("SELECT * from {$this->qTable()} WHERE $where ORDER BY $orderby");
     }
 
     /**
@@ -332,7 +332,7 @@ abstract class FwModel {
      * @param array|null $statuses
      * @param int|null $since_days
      * @return int
-     * @throws DBException
+     * @throws DBException|DateMalformedStringException
      */
     public function getCount(array $statuses = null, ?int $since_days = null): int {
         $where = [];

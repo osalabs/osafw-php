@@ -132,7 +132,6 @@ class FwVueController extends FwDynamicController {
      * set data for list_rows scope for Vue controller
      * @param array $ps
      * @return void
-     * @throws DBException
      * @throws NoModelException
      */
     protected function setScopeListRows(array &$ps): void {
@@ -286,11 +285,9 @@ class FwVueController extends FwDynamicController {
             $model_name = strval($def["lookup_model"] ?? "");
             $dtype      = strval($def["type"] ?? '');
             if ($dtype == "autocomplete" || $dtype == "plaintext_autocomplete") {
-                $ac_model = $this->fw->model($model_name);
-                if ($ac_model != null) {
-                    $ac_item                      = $ac_model->one($item[$field_name]);
-                    $item[$field_name . "_iname"] = $ac_item["iname"] ?? '';
-                }
+                $ac_model                     = $this->fw->model($model_name);
+                $ac_item                      = $ac_model->one($item[$field_name]);
+                $item[$field_name . "_iname"] = $ac_item["iname"] ?? '';
             } elseif ($dtype == "multi" || $dtype == "multicb" || $dtype == "multicb_prio") {
                 //multiple values either from lookup model or junction model
                 $multi_model = null;

@@ -18,7 +18,7 @@ class FwCache {
 
     static array $storage = array(); #this is request storage
 
-    private $handler = null; # Memcached handler
+    private ?Memcached $handler = null; # Memcached handler
     private array $lock_tokens = []; // Store lock tokens per key
 
     public function __construct(FW $fw) {
@@ -234,7 +234,7 @@ class FwCache {
                 $code = $this->handler->getResultCode();
 
                 // Only set the key if the error code indicates that the key was not found
-                if ($code == \Memcached::RES_NOTFOUND || $code == \Memcached::RES_NOTSTORED) {
+                if ($code == Memcached::RES_NOTFOUND || $code == Memcached::RES_NOTSTORED) {
                     $this->handler->set($nkey, $value, $ttl);
                     $result = $value;
                 } else {

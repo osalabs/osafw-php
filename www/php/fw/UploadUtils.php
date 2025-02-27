@@ -71,7 +71,7 @@ class UploadUtils {
         return '.' . self::jpeg2jpg(strtolower($pp['extension']));
     }
 
-    public static function jpeg2jpg(string $str) {
+    public static function jpeg2jpg(string $str): string {
         if ($str == 'jpeg') {
             $str = 'jpg';
         }
@@ -223,9 +223,7 @@ class UploadUtils {
         if ($size > '') {
             $size = '_' . $size;
         }
-        $path = self::getUploadDir($id, $module_basedir) . '/' . $id . $size . $ext;
-
-        return $path;
+        return self::getUploadDir($id, $module_basedir) . '/' . $id . $size . $ext;
     }
 
     /**
@@ -241,9 +239,7 @@ class UploadUtils {
         if ($size > '') {
             $size = '_' . $size;
         }
-        $url = $module_baserul . self::id2dir($id) . '/' . $id . $size . $ext;
-
-        return $url;
+        return $module_baserul . self::id2dir($id) . '/' . $id . $size . $ext;
     }
 
     /**

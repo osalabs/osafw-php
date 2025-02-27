@@ -86,7 +86,9 @@ abstract class FwController {
     /**
      * return cached singleton instance (create if necessary) of this controller
      * @return static
+     * @throws AuthException
      * @throws NoControllerException
+     * @throws NoModelException
      */
     public static function i(): static {
         return fw::controller(get_called_class());
@@ -203,7 +205,7 @@ abstract class FwController {
             if (!strlen(req("is_list_edit"))) {
                 $this->is_list_edit = $this->is_dynamic_index_edit;
             } else {
-                $this->is_list_edit = reqb("is_list_edit") && $this->is_dynamic_index_edit;
+                $this->is_list_edit = reqb("is_list_edit");
             }
 
             if ($this->is_list_edit) {
@@ -279,6 +281,7 @@ abstract class FwController {
      *   - if request param 'dofilter' passed - session filters cleaned
      * @param string $session_key
      * @return array and also set $this->list_filter
+     * @throws NoModelException
      */
     public function initFilter(string $session_key = ''): array {
         $f = reqh('f');
@@ -565,7 +568,7 @@ abstract class FwController {
 
     public function getListIds(string $list_view = ''): array {
         $list_view_name = !empty($list_view) ? $list_view : $this->list_view;
-        $sql            = "SELECT {$this->model->field_id} FROM {$list_view_name} WHERE {$this->list_where} ORDER BY {$this->list_orderby}";
+        $sql            = "SELECT {$this->model->field_id} FROM $list_view_name WHERE $this->list_where ORDER BY $this->list_orderby";
         return $this->db->colp($sql, $this->list_where_params);
     }
 
@@ -585,7 +588,6 @@ abstract class FwController {
      * $this->list_rows list of rows
      * $this->list_pager pager from FormUtils::getPager
      * @return void
-     * @throws DBException
      */
     public function getListRows(): void {
         $is_export = false;

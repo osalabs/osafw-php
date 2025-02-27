@@ -18,8 +18,8 @@ class TestController extends FwController {
     }
 
     public function MissingClassAction(): void {
-        #$model = Notes::i();
-        $a = new ABCDE();
+        $model = fw::model("Test");
+        #$a = new ABCDE();
         rw("done");
     }
 

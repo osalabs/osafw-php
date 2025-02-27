@@ -21,9 +21,9 @@ class Users extends FwModel {
     public const int ACL_USER       = 1; //min access level for users
     public const int ACL_VISITOR    = 0; //non-logged visitor
 
-    public static $PERM_COOKIE_NAME = 'perm';
-    public static $PERM_COOKIE_DAYS = 356;
-    public static $order_by = 'fname, lname';
+    public static string $PERM_COOKIE_NAME = 'perm';
+    public static int $PERM_COOKIE_DAYS = 356;
+    public static string $order_by = 'fname, lname';
 
     public function __construct() {
         parent::__construct();
