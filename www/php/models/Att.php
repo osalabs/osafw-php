@@ -320,30 +320,32 @@ class Att extends FwModel {
     public function listLinked(string $entity_icode, int $item_id, int $is_image = -1, string $category_icode = ""): array {
         $fwentities_id = FwEntities::i()->idByIcodeOrAdd($entity_icode);
 
-        $where                    = "";
-        $params                   = array();
-        $params["@fwentities_id"] = $fwentities_id;
-        $params["@item_id"]       = $item_id;
+        $where                   = "";
+        $params                  = array();
+        $params["fwentities_id"] = $fwentities_id;
+        $params["item_id"]       = $item_id;
 
         if ($is_image > -1) {
-            $where               .= " and a.is_image=@is_image";
-            $params["@is_image"] = $is_image;
+            $where              .= " and a.is_image=@is_image";
+            $params["is_image"] = $is_image;
         }
         if ($category_icode > '') {
             $att_category = AttCategories::i()->oneByIcode($category_icode);
             if (count($att_category) > 0) {
-                $where                        .= " and a.att_categories_id=@att_categories_id";
-                $params["@att_categories_id"] = $att_category["id"];
+                $where                       .= " and a.att_categories_id=@att_categories_id";
+                $params["att_categories_id"] = $att_category["id"];
             }
         }
 
-        return $this->db->arrp("select a.* " .
-            " from " . $this->db->qid(AttLinks::i()->table_name) . " al, " . $this->db->qid($this->table_name) . " a " .
-            " where al.fwentities_id=@fwentities_id " .
-            "   and al.item_id=@item_id " .
-            "   and a.id=al.att_id " .
-            $where .
-            " order by a.id", $params);
+        $links_table = AttLinks::i()->qTable();
+
+        return $this->db->arrp("select a.* 
+                from {$this->qTable()} a 
+                    INNER JOIN $links_table al ON (al.att_id=a.id)
+             where al.fwentities_id=@fwentities_id 
+               and al.item_id=@item_id 
+                $where 
+             order by a.id", $params);
     }
 
     /**
