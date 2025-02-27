@@ -233,6 +233,56 @@ class DevManageController extends FwController {
         rw("done");
     }
 
+    public function SelfTestAction(): void {
+        rw("start self-test");
+        // get all controller classes from /php/controllers folder including subfolders
+        // for each controller call IndexAction using fw->runController, check if it returns array (OK) or emtpty|null (warning)
+
+        $path        = $this->fw->config->SITE_ROOT . '/php/controllers';
+        $controllers = array();
+        $dir         = new RecursiveDirectoryIterator($path);
+        $it          = new RecursiveIteratorIterator($dir);
+        foreach ($it as $file) {
+            if (preg_match('/^(.+)\.php$/', $file->getFilename(), $m)) {
+                $controllers[] = $m[1];
+            }
+        }
+        sort($controllers);
+
+        $GLOBALS['IS_EXCEPTION_ON_REDIRECT'] = true;
+        $ok_ctr                              = 0;
+        $err_ctr                             = 0;
+
+        rw("calling IndexAction for controllers: ", count($controllers));
+        foreach ($controllers as $controller) {
+            logger("**** self-test controller: $controller");
+            try {
+                ob_start();
+                $result  = $this->fw->dispatcher->runController($controller, fw::ACTION_INDEX);
+                $content = ob_get_contents();
+                ob_end_clean();
+                if (is_array($result)) {
+                    rw("$controller: OK");
+                    $ok_ctr++;
+                } else {
+                    rw("$controller: EMPTY RESULT");
+                }
+                if ($content) {
+                    rw("$controller: CONTENT RETURNED: " . strlen($content) . " bytes");
+                }
+            } catch (Exception $e) {
+                rw("$controller: Exception: " . $e->getMessage());
+                $err_ctr++;
+                continue;
+            }
+        }
+        rw("----");
+        rw("self-test finished: $ok_ctr OK, $err_ctr ERRORS");
+        rw("total:" . count($controllers));
+
+        rw("end of self-test");
+    }
+
     private function _models() {
         $result = array();
         $dir    = $this->fw->config->SITE_ROOT . '/php/models';

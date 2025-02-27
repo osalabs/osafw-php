@@ -267,7 +267,7 @@ class fw {
             return $fw->controllers_cache[$cache_key];
         }
         try {
-            $object = new $controller_class($fw);
+            $object = new $controller_class();
         } catch (NoControllerException|NoClassException) { #class autoload can throw this
             #if no such controller class - try virtual controllers
             logger("TRACE", "Controller class not found, trying Virtual Controller: $controller_class");
@@ -1115,7 +1115,11 @@ class fw {
         logger("REDIRECT to [$url]");
         header("Location: $url");
         if (!$noexit) {
-            exit;
+            if ($GLOBALS['IS_EXCEPTION_ON_REDIRECT'] ?? false) {
+                throw new ExitException("Redirect to $url");
+            } else {
+                exit;
+            }
         }
         return null;
     }
