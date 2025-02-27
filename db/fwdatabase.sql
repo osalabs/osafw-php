@@ -81,30 +81,32 @@ CREATE TABLE att_categories
 DROP TABLE IF EXISTS att;
 CREATE TABLE att
 (
-    id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, /* files stored on disk under 0/0/0/id.dat */
+    id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    icode             VARCHAR(64) CHARACTER SET ascii NOT NULL DEFAULT '', -- public id, basically UUID, use if needed
     att_categories_id INT UNSIGNED,
 
-    fwentities_id     INT UNSIGNED, -- related to entity (optional)
+    fwentities_id     INT UNSIGNED,                                        -- related to entity (optional)
     item_id           INT UNSIGNED,
 
-    is_s3             TINYINT               DEFAULT 0, /* 1 if file is in S3 - see config: $S3Bucket/$S3Root/att/att_id */
-    is_inline         TINYINT               DEFAULT 0, /* if uploaded with wysiwyg */
-    is_image          TINYINT               DEFAULT 0, /* 1 if this is supported image */
+    storage           TINYINT UNSIGNED                         DEFAULT 0,  -- 0 - table, 10 - local file (0/0/0/att_id.dat), 20 - s3 (see config: $S3Bucket/$S3Root/att/att_id)
+    raw               LONGBLOB,                                            -- raw file data, if storage=0
 
-    fname             VARCHAR(255) NOT NULL DEFAULT '', /*original file name*/
-    fsize             BIGINT                DEFAULT 0, /*file size*/
-    ext               VARCHAR(16)  NOT NULL DEFAULT '', /*extension*/
-    iname             VARCHAR(255) NOT NULL DEFAULT '', /*attachment name*/
+    iname             VARCHAR(255)                    NOT NULL DEFAULT '', /*attachment name*/
+    fname             VARCHAR(255)                    NOT NULL DEFAULT '', /*original file name*/
+    fsize             BIGINT UNSIGNED                          DEFAULT 0, /*file size*/
+    ext               VARCHAR(16)                     NOT NULL DEFAULT '', /*extension*/
+    is_image          TINYINT                                  DEFAULT 0, /* 1 if this is supported image */
 
-    status            TINYINT      NOT NULL DEFAULT 0, /*0-ok, 1-under upload, 127-deleted*/
-    add_time          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    add_users_id      INT UNSIGNED          DEFAULT 0,
-    upd_time          DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
-    upd_users_id      INT UNSIGNED          DEFAULT 0,
+    status            TINYINT                         NOT NULL DEFAULT 0, /*0-ok, 1-under upload, 127-deleted*/
+    add_time          DATETIME                        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    add_users_id      INT UNSIGNED                             DEFAULT 0,
+    upd_time          DATETIME                        NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id      INT UNSIGNED                             DEFAULT 0,
 
     FOREIGN KEY (att_categories_id) REFERENCES att_categories (id),
     FOREIGN KEY (fwentities_id) REFERENCES fwentities (id),
 
+    -- INDEX UX_att_icode (icode), -- uncomment if user icode
     INDEX IX_att_categories (att_categories_id),
     INDEX IX_att_fwentities (fwentities_id, item_id)
 ) ENGINE = InnoDB;
@@ -133,55 +135,55 @@ DROP TABLE IF EXISTS users;
 CREATE TABLE users
 (
     id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    icode            VARCHAR(64) CHARACTER SET utf8 NOT NULL,              -- public id, basically UUID, use if needed
+    icode            VARCHAR(64) CHARACTER SET ascii NOT NULL DEFAULT '',   -- public id, basically UUID, use if needed
 
-    email            VARCHAR(255)                   NOT NULL DEFAULT '',
-    pwd              VARCHAR(255)                   NOT NULL DEFAULT '',   -- hashed password
-    access_level     TINYINT                        NOT NULL,              -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
-    is_readonly      TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user is readonly
+    email            VARCHAR(255)                    NOT NULL DEFAULT '',
+    pwd              VARCHAR(255)                    NOT NULL DEFAULT '',   -- hashed password
+    access_level     TINYINT                         NOT NULL,              -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
+    is_readonly      TINYINT                         NOT NULL DEFAULT 0,    -- 1 if user is readonly
 
-    fname            VARCHAR(32)                    NOT NULL DEFAULT '',
-    lname            VARCHAR(32)                    NOT NULL DEFAULT '',
-    iname            VARCHAR(128) AS (CONCAT(fname, ' ', lname)),          -- calculated column
+    fname            VARCHAR(32)                     NOT NULL DEFAULT '',
+    lname            VARCHAR(32)                     NOT NULL DEFAULT '',
+    iname            VARCHAR(128) AS (CONCAT(fname, ' ', lname)),           -- calculated column
 
-    title            VARCHAR(128)                   NOT NULL DEFAULT '',
+    title            VARCHAR(128)                    NOT NULL DEFAULT '',
 
-    address1         VARCHAR(128)                   NOT NULL DEFAULT '',
-    address2         VARCHAR(64)                    NOT NULL DEFAULT '',
-    city             VARCHAR(64)                    NOT NULL DEFAULT '',
-    state            VARCHAR(4)                     NOT NULL DEFAULT '',
-    zip              VARCHAR(16)                    NOT NULL DEFAULT '',
-    phone            VARCHAR(16)                    NOT NULL DEFAULT '',
+    address1         VARCHAR(128)                    NOT NULL DEFAULT '',
+    address2         VARCHAR(64)                     NOT NULL DEFAULT '',
+    city             VARCHAR(64)                     NOT NULL DEFAULT '',
+    state            VARCHAR(4)                      NOT NULL DEFAULT '',
+    zip              VARCHAR(16)                     NOT NULL DEFAULT '',
+    phone            VARCHAR(16)                     NOT NULL DEFAULT '',
 
-    lang             VARCHAR(16)                    NOT NULL DEFAULT 'en', -- user interface language
-    ui_theme         TINYINT                        NOT NULL DEFAULT 0,    -- 0--default theme
-    ui_mode          TINYINT                        NOT NULL DEFAULT 0,    -- 0--auto, 10-light, 20-dark
+    lang             VARCHAR(16)                     NOT NULL DEFAULT 'en', -- user interface language
+    ui_theme         TINYINT                         NOT NULL DEFAULT 0,    -- 0--default theme
+    ui_mode          TINYINT                         NOT NULL DEFAULT 0,    -- 0--auto, 10-light, 20-dark
 
     idesc            TEXT,
-    att_id           INT UNSIGNED,                                         -- avatar
+    att_id           INT UNSIGNED,                                          -- avatar
 
     login_time       DATETIME,
-    pwd_reset        VARCHAR(255)                   NULL,                  -- used for password reset token and initial confirmation token
-    pwd_reset_time   DATETIME                       NULL,
-    mfa_secret       VARCHAR(64),                                          -- mfa secret code, if empty - no mfa for the user configured
-    mfa_recovery     VARCHAR(1024),                                        -- mfa recovery hashed codes, space-separated
-    mfa_added        DATETIME,                                             -- last datetime when mfa setup or resynced
+    pwd_reset        VARCHAR(255)                    NULL,                  -- used for password reset token and initial confirmation token
+    pwd_reset_time   DATETIME                        NULL,
+    mfa_secret       VARCHAR(64),                                           -- mfa secret code, if empty - no mfa for the user configured
+    mfa_recovery     VARCHAR(1024),                                         -- mfa recovery hashed codes, space-separated
+    mfa_added        DATETIME,                                              -- last datetime when mfa setup or resynced
 
-    oauth_scopes     TEXT,                                                 -- space-separated list of scopes for oauth2: openid email profile
+    oauth_scopes     TEXT,                                                  -- space-separated list of scopes for oauth2: openid email profile
 
     -- for email change procedures
-    email_new        VARCHAR(255)                            DEFAULT '',   -- new email
-    email_token      VARCHAR(255)                            DEFAULT '',
+    email_new        VARCHAR(255)                             DEFAULT '',   -- new email
+    email_token      VARCHAR(255)                             DEFAULT '',
     email_token_time DATETIME,
 
-    email_bounced    TINYINT                        NOT NULL DEFAULT 0,    -- 1 if email bounced
-    is_marked_spam   TINYINT                        NOT NULL DEFAULT 0,    -- 1 if user marked as spam (disable emails)
+    email_bounced    TINYINT                         NOT NULL DEFAULT 0,    -- 1 if email bounced
+    is_marked_spam   TINYINT                         NOT NULL DEFAULT 0,    -- 1 if user marked as spam (disable emails)
 
-    status           TINYINT                        NOT NULL DEFAULT 0, /*0-active, 10-inactive, 20-new/unconfirmed email, 127-deleted*/
-    add_time         DATETIME                       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    add_users_id     INT UNSIGNED                            DEFAULT 0,
-    upd_time         DATETIME                       NULL ON UPDATE CURRENT_TIMESTAMP,
-    upd_users_id     INT UNSIGNED                            DEFAULT 0,
+    status           TINYINT                         NOT NULL DEFAULT 0, /*0-active, 10-inactive, 20-new/unconfirmed email, 127-deleted*/
+    add_time         DATETIME                        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    add_users_id     INT UNSIGNED                             DEFAULT 0,
+    upd_time         DATETIME                        NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id     INT UNSIGNED                             DEFAULT 0,
 
     FOREIGN KEY (att_id) REFERENCES att (id),
 
