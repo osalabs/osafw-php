@@ -261,19 +261,26 @@ class DevManageController extends FwController {
                 $result  = $this->fw->dispatcher->runController($controller, fw::ACTION_INDEX);
                 $content = ob_get_contents();
                 ob_end_clean();
+
+                $content_str = '';
+                if ($content) {
+                    $content_str = " (" . strlen($content) . " bytes of content)";
+                }
+
                 if (is_array($result)) {
-                    rw("$controller: OK");
+                    echo("$controller: <span style='color:green;'>OK</span>" . $content_str . "<br>");
                     $ok_ctr++;
                 } else {
-                    rw("$controller: EMPTY RESULT");
-                }
-                if ($content) {
-                    rw("$controller: CONTENT RETURNED: " . strlen($content) . " bytes");
+                    echo("$controller: <span style='color:orange;'>EMPTY PS</span>" . $content_str . "<br>");
                 }
             } catch (Exception $e) {
-                rw("$controller: Exception: " . $e->getMessage());
-                $err_ctr++;
-                continue;
+                if (str_starts_with($e->getMessage(), "Redirect to")) {
+                    echo("$controller: <span style='color:green;'>OK</span> " . $e->getMessage() . "<br>");
+                    $ok_ctr++;
+                } else {
+                    echo("$controller: <span style='color:red;font-weight:bold;'>Exception:</span> " . $e->getMessage() . " (" . $e->getFile() . ":" . $e->getLine() . ")<br>");
+                    $err_ctr++;
+                }
             }
         }
         rw("----");
