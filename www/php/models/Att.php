@@ -31,8 +31,6 @@ class Att extends FwModel {
     const int MAX_THUMB_W_L = 1200;
     const int MAX_THUMB_H_L = 1200;
 
-    public const string MIME_MAP = "doc|application/msword docx|application/msword xls|application/vnd.ms-excel xlsx|application/vnd.ms-excel ppt|application/vnd.ms-powerpoint pptx|application/vnd.ms-powerpoint csv|text/csv pdf|application/pdf html|text/html zip|application/x-zip-compressed jpg|image/jpeg jpeg|image/jpeg gif|image/gif png|image/png wmv|video/x-ms-wmv avi|video/x-msvideo mp4|video/mp4";
-
     public function __construct() {
         parent::__construct();
 
@@ -200,23 +198,6 @@ class Att extends FwModel {
         }
     }
 
-    /**
-     * return mime type for extension
-     * @param string $ext extension - doc, jpg, ... (dot is optional)
-     * @return string mime type or application/octetstream if not found
-     */
-    public function getMimeForExt(string $ext): string {
-        $map = Utils::qh(self::MIME_MAP);
-        $ext = preg_replace("/^\./", "", $ext); // remove dot if any
-
-        $result = "application/octetstream";
-        if (isset($map[$ext])) {
-            $result = $map[$ext];
-        }
-
-        return $result;
-    }
-
     public function delete(int $id, bool $is_perm = false): bool {
         // also delete from related tables:
         // users.att_id -> null?
@@ -324,11 +305,11 @@ class Att extends FwModel {
         }
 
         $filename = str_replace('"', "'", $item['iname']); #quote filename
-        header('Content-type: ' . UploadUtils::getMimeForExt($item['ext']));
+        header('Content-type: ' . UploadUtils::ext2mime($item['ext']));
         header("Content-Length: " . filesize($filepath));
         header('Content-Disposition: ' . $disposition . '; filename="' . $filename . '"');
 
-        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, " . UploadUtils::getMimeForExt($item['ext']));
+        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, " . UploadUtils::ext2mime($item['ext']));
         $fp = fopen($filepath, 'rb');
         fpassthru($fp);
     }

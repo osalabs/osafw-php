@@ -147,6 +147,15 @@ $FW_CONFIG = array(
         'REDIRECT_URI'  => '',
     ],
 
+    #AWS api related - S3, etc
+    'AWS'            => [
+        'ACCESS_KEY' => '',
+        'SECRET_KEY' => '',
+        'REGION'     => '', # us-east-1, us-west-2, ...
+        'BUCKET'     => '', # bucket name
+        'S3_ROOT'    => '', # optional, if set - all files will be stored under this prefix
+    ],
+
     ########### place site specific configuration variables here:
     'SITE_VERSION'   => '0.25.0222', #also used to re-load css/js to avoid browser caching
     'SITE_NAME'      => 'Site Name',

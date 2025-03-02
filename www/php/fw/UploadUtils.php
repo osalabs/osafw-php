@@ -17,15 +17,10 @@ class UploadUtils {
     );
     public static string $MIME_MAP = "doc|application/msword docx|application/msword xls|application/vnd.ms-excel xlsx|application/vnd.ms-excel ppt|application/vnd.ms-powerpoint pptx|application/vnd.ms-powerpoint pdf|application/pdf html|text/html zip|application/x-zip-compressed jpg|image/jpeg jpeg|image/jpeg gif|image/gif png|image/png wmv|video/x-ms-wmv avi|video/x-msvideo";
 
-    public static function getMimeForExt($ext = '') {
+    public static function ext2mime($ext = '') {
         $map = Utils::qh(self::$MIME_MAP);
         $ext = preg_replace("/^\./", "", $ext); #remove dot if any
-        if (array_key_exists($ext, $map)) {
-            $result = $map[$ext];
-        } else {
-            $result = "application/octetstream";
-        }
-        return $result;
+        return $map[$ext] ?? "application/octet-stream";
     }
 
     public static function getUploadBaseDir() {
