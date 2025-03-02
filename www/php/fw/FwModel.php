@@ -161,7 +161,7 @@ abstract class FwModel {
             $this->field_iname => $iname,
         );
         if ($this->field_status > '') {
-            $where[$this->field_status] = 0;
+            $where[$this->field_status] = self::STATUS_ACTIVE;
         }
         $row = $this->db->row($this->getTable(), $where);
         $this->normalizeNames($row);

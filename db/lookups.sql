@@ -3,7 +3,8 @@
 -- lookups in virtual controllers
 INSERT INTO fwcontrollers (igroup, icode, url, iname, model, access_level)
 VALUES ('System', 'AdminLogTypes', '/Admin/LogTypes', 'Log Types', 'FwLogTypes', 100),
-       ('System', 'AdminAttCategories', '/Admin/AttCategories', 'Upload Categories', 'AttCategories', 50)
+       ('System', 'AdminAttCategories', '/Admin/AttCategories', 'Upload Categories', 'AttCategories', 50),
+       ('System', 'AdminFwUpdates', '/Admin/FwUpdates', 'FW Updates', 'FwUpdates', 100)
 ;
 UPDATE fwcontrollers
 SET is_lookup=1;

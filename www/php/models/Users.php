@@ -395,6 +395,15 @@ class Users extends FwModel {
             //            'login_host' => $host,
         );
         $this->update($id, $vars);
+
+        #if Site Admin - check for pending db updates
+        if ($this->isAccessLevel(self::ACL_SITE_ADMIN)) {
+            FwUpdates::i()->loadUpdates();
+
+            @session_start();
+            $_SESSION['FW_UPDATES_CTR'] = FwUpdates::i()->getCountPending();
+            session_write_close();
+        }
     }
 
     //</editor-fold>

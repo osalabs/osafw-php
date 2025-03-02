@@ -20,6 +20,8 @@ class HomeController extends FwController {
     public function IndexAction(): ?array {
         #fw::redirect('/Login'); #uncomment to always show login instead of Home
 
+        FwUpdates::i()->checkApplyIfDev();
+
         /*cached version
         $ps = $this->fw->cache->get('home_page');
 
