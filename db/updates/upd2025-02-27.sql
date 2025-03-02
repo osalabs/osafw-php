@@ -5,7 +5,12 @@ ALTER TABLE att
     -- Add new columns
     ADD COLUMN icode VARCHAR(64) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER id,
     ADD COLUMN storage TINYINT UNSIGNED DEFAULT 0 AFTER item_id,
-    ADD COLUMN raw LONGBLOB AFTER storage,
+    -- raw file data, if storage=0, invisible so not used in regualr selects
+    ADD COLUMN raw               LONGBLOB INVISIBLE AFTER storage,
+    ADD COLUMN raw_s             LONGBLOB INVISIBLE AFTER raw,                                  -- small thumbnail
+    ADD COLUMN raw_m             LONGBLOB INVISIBLE AFTER raw_s,                                  -- medium thumbnail
+    ADD COLUMN raw_l             LONGBLOB INVISIBLE AFTER raw_m,                                  -- large thumbnail
+
 
     -- Modify existing columns
     MODIFY COLUMN fsize BIGINT UNSIGNED DEFAULT 0,

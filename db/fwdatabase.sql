@@ -110,7 +110,11 @@ CREATE TABLE att
     item_id           INT UNSIGNED,
 
     storage           TINYINT UNSIGNED                         DEFAULT 0,  -- 0 - table, 10 - local file (0/0/0/att_id.dat), 20 - s3 (see config: $S3Bucket/$S3Root/att/att_id)
-    raw               LONGBLOB,                                            -- raw file data, if storage=0
+    -- raw file data, if storage=0, invisible so not used in regualr selects
+    raw               LONGBLOB INVISIBLE,
+    raw_s             LONGBLOB INVISIBLE,                                  -- small thumbnail
+    raw_m             LONGBLOB INVISIBLE,                                  -- medium thumbnail
+    raw_l             LONGBLOB INVISIBLE,                                  -- large thumbnail
 
     iname             VARCHAR(255)                    NOT NULL DEFAULT '', /*attachment name*/
     fname             VARCHAR(255)                    NOT NULL DEFAULT '', /*original file name*/
