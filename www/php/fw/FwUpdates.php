@@ -108,11 +108,15 @@ class FwUpdates extends FwModel {
         if (!$this->fw->config->IS_DEV) {
             return; #only auto-apply in dev
         }
-        $this->loadUpdates();
+        try {
+            $this->loadUpdates();
 
-        #if any pending updates - redirect to automatically apply
-        if ($this->getCountPending()) {
-            fw::redirect('/Dev/Configure/(ApplyUpdates)');
+            #if any pending updates - redirect to automatically apply
+            if ($this->getCountPending()) {
+                fw::redirect('/Dev/Configure/(ApplyUpdates)');
+            }
+        }catch (Exception $e) {
+            logger("ERROR", $e->getMessage());
         }
     }
 }

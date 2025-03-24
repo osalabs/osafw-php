@@ -555,6 +555,21 @@ class ParsePage {
             $compareVal = $this->getVariableValue($attributes['vvalue'], $data);
         }
 
+        //use compareVal to detect type of comparison because compare val is in templates, while varVal can be any type from data
+        if (is_numeric($compareVal)) {
+            // if variable is numeric - do numeric comparison
+            $compareVal = (float)$compareVal;
+            if ($varVal !== null) {
+                $varVal = is_scalar($varVal) ? (float)$varVal : !empty($varVal); #if array - assume true value if not empty
+            }
+        } else {
+            // if variable is string - do string comparison
+            $compareVal = is_scalar($compareVal) ? (string)$compareVal : !empty($compareVal); #if array - assume true value if not empty
+            if ($varVal !== null) {
+                $varVal = is_scalar($varVal) ? (string)$varVal : !empty($varVal); #if array - assume true value if not empty
+            }
+        }
+
         #$this->logger("DEBUG", "Evaluating condition: {$op} {$varName}=[{$varVal}] <=> [{$compareVal}]");
         switch ($op) {
             case 'if':
@@ -570,32 +585,32 @@ class ParsePage {
                 }
                 break;
             case 'ifeq':
-                if ((string)$varVal !== (string)$compareVal) {
+                if ($varVal !== $compareVal) {
                     return false;
                 }
                 break;
             case 'ifne':
-                if ((string)$varVal === (string)$compareVal) {
+                if ($varVal === $compareVal) {
                     return false;
                 }
                 break;
             case 'ifgt':
-                if ((string)$varVal <= (string)$compareVal) {
+                if ($varVal <= $compareVal) {
                     return false;
                 }
                 break;
             case 'iflt':
-                if ((string)$varVal >= (string)$compareVal) {
+                if ($varVal >= $compareVal) {
                     return false;
                 }
                 break;
             case 'ifge':
-                if ((string)$varVal < (string)$compareVal) {
+                if ($varVal < $compareVal) {
                     return false;
                 }
                 break;
             case 'ifle':
-                if ((string)$varVal > (string)$compareVal) {
+                if ($varVal > $compareVal) {
                     return false;
                 }
                 break;
