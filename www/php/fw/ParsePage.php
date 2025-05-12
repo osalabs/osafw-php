@@ -59,6 +59,7 @@
 2025-01-11 - converted to ParsePage class and PHP 8.3+
 2025-01-16 - comments support <~#tag>
 2025-01-17 - added support for attributes: currency, url, noparse
+2025-03-30 - added support for languageCallback
 
 ##########################################################
 tags in templates should be in <~name [attributes]> format
@@ -182,6 +183,8 @@ class ParsePage {
     private string $languageDir = '/lang'; //Directory for language files, relative to templates root
     private bool $isLanguageUpdate = false; //true if auto-add missing language strings to lang file
 
+    private mixed $languageCallback = null; //Callback for language string processing
+
     // working variables
     private array $dataTop = []; //Data top-level reference (similar to PARSE_PAGE_DATA_TOP in original)
     private bool $langParse = true; //Whether to parse language strings enclosed in backticks
@@ -224,6 +227,9 @@ class ParsePage {
         }
         if (isset($options['isLangUpdate'])) {
             $this->setLangUpdate($options['isLangUpdate']);
+        }
+        if (isset($options['languageCallback'])) {
+            $this->setLanguageCallback($options['languageCallback']);
         }
 
         $this->initTagQuotes();
@@ -270,6 +276,11 @@ class ParsePage {
 
     public function setLangUpdate(bool $flag): self {
         $this->isLanguageUpdate = $flag;
+        return $this;
+    }
+
+    public function setLanguageCallback(callable $callback): self {
+        $this->languageCallback = $callback;
         return $this;
     }
 
@@ -1010,11 +1021,8 @@ class ParsePage {
         // now check if we have a value to replace
         if (!is_null($tagValue)) {
             // Apply additional modifiers (date, truncate, default, etc.)
-            $tagValue = $this->applyModifiers($tagValue, $attributes);
-            if (!isset($attributes['noescape'])) {
-                // By default, we escape normal variables if "noescape" is not set
-                $tagValue = $this->htmlescape($tagValue);
-            }
+            // And by default, we escape normal variables if "noescape" is not set
+            $tagValue = $this->applyModifiers($tagValue, $attributes, true);
         } else {
             // Null variable => then tag name could be a template name to include
             // but no need for file seek if it contains "[" (array syntax) or starts with "#" (comment)
@@ -1034,9 +1042,16 @@ class ParsePage {
 
     /**
      * Apply modifiers to a scalar or array value (date, truncate, etc.)
+     * @param $value
+     * @param $attributes
+     * @param bool $is_htmlescape if true and no "noescape" attribute present - additionally htmlescape the value
+     * @return array|bool|float|mixed|string|string[]|null
      */
-    private function applyModifiers($value, $attributes) {
+    private function applyModifiers($value, $attributes, bool $is_htmlescape = false): mixed {
         if (!$attributes) {
+            if ($is_htmlescape) {
+                $value = $this->htmlescape($value);
+            }
             return $value;
         }
 
@@ -1047,7 +1062,11 @@ class ParsePage {
             if (isset($attributes['json'])) {
                 // If "json=pretty" => pretty print
                 $options = (strtolower($attributes['json']) === 'pretty') ? JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK : JSON_NUMERIC_CHECK;
-                return json_encode($value, $options);
+                $result  = json_encode($value, $options);
+                if ($is_htmlescape && !isset($attributes['noescape'])) {
+                    $result = $this->htmlescape($result);
+                }
+                return $result;
             }
             // Non-scalar but no json => default to empty
             return '';
@@ -1101,11 +1120,6 @@ class ParsePage {
             $value = trim($value);
         }
 
-        // nl2br
-        if (isset($attributes['nl2br'])) {
-            $value = nl2br($value);
-        }
-
         // count
         if (isset($attributes['count'])) {
             // if $value is something countable, use count
@@ -1144,6 +1158,15 @@ class ParsePage {
             // Re-encode if this is a scalar?
             $options = (strtolower($attributes['json']) === 'pretty') ? JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK : JSON_NUMERIC_CHECK;
             $value   = json_encode($value, $options);
+        }
+
+        if ($is_htmlescape && !isset($attributes['noescape'])) {
+            $value = $this->htmlescape($value);
+        }
+
+        // nl2br - do after htmlescape to avoid double-escaping
+        if (isset($attributes['nl2br'])) {
+            $value = nl2br($value);
         }
 
         return $value;
@@ -1262,6 +1285,10 @@ class ParsePage {
      * @return string
      */
     private function translate(string $str): string {
+        if (!is_null($this->languageCallback)) {
+            return call_user_func($this->languageCallback, $str);
+        }
+
         $langFile = $this->templatesRoot . $this->languageDir . "/$this->language.txt";
 
         if (!isset(self::$langCacheGlobal[$langFile])) {
