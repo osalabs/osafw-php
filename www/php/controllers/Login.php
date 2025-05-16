@@ -65,7 +65,7 @@ class LoginController extends FwController {
             $user = Users::i()->oneByEmail($login);
             if (!$is_dev_login) {
                 if (!$user || $user['status'] != 0 || !$this->model->checkPwd($pwd, $user['pwd'])) {
-                    throw new ApplicationException(lng("User Authentication Error"));
+                    throw new ApplicationException("User Authentication Error");
                 }
             }
 
