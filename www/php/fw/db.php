@@ -164,7 +164,7 @@ function dbqi(string $value): int {
  * @param string|null $field_type 's'(string, default if empty), 'i'(int), 'x'(no quote)
  * @return string, integer or 'NULL' string (if $field_type is not defined and $value is null)
  */
-function dbq(string $value, string $field_type = null): string {
+function dbq(string $value, ?string $field_type = null): string {
     return DB::i()->quote($value, $field_type);
 }
 
@@ -181,7 +181,7 @@ function dbqid(string $value): string {
  * @return string|null
  * @throws DBException
  */
-function db_value(string $table, array $where, string $field_name = null, string $order_by = null): ?string {
+function db_value(string $table, array $where, ?string $field_name = null, ?string $order_by = null): ?string {
     return DB::i()->value($table, $where, $field_name, $order_by);
 }
 
@@ -192,7 +192,7 @@ function db_value(string $table, array $where, string $field_name = null, string
  * @return string|null
  * @throws DBException
  */
-function db_valuep(string $sql, array $params = null): ?string {
+function db_valuep(string $sql, ?array $params = null): ?string {
     return DB::i()->valuep($sql, $params);
 }
 
@@ -204,7 +204,7 @@ function db_valuep(string $sql, array $params = null): ?string {
  * @return array                   assoc array (has keys as field names and values as field values)
  * @throws DBException
  */
-function db_row(string $table, array $where, string $order_by = null): array {
+function db_row(string $table, array $where, ?string $order_by = null): array {
     return DB::i()->row($table, $where, $order_by);
 }
 
@@ -215,7 +215,7 @@ function db_row(string $table, array $where, string $order_by = null): array {
  * @return array
  * @throws DBException
  */
-function db_rowp(string $sql, array $params = null): array {
+function db_rowp(string $sql, ?array $params = null): array {
     return DB::i()->rowp($sql, $params);
 }
 
@@ -228,7 +228,7 @@ function db_rowp(string $sql, array $params = null): array {
  * @return array
  * @throws DBException
  */
-function db_col(string $table, array $where, string $field_name = null, string $order_by = null): array {
+function db_col(string $table, array $where, ?string $field_name = null, ?string $order_by = null): array {
     return DB::i()->col($table, $where, $field_name, $order_by);
 }
 
@@ -239,7 +239,7 @@ function db_col(string $table, array $where, string $field_name = null, string $
  * @return array
  * @throws DBException
  */
-function db_colp(string $sql, array $params = null): array {
+function db_colp(string $sql, ?array $params = null): array {
     return DB::i()->colp($sql, $params);
 }
 
@@ -253,7 +253,7 @@ function db_colp(string $sql, array $params = null): array {
  * @return array
  * @throws DBException
  */
-function db_array(string $table, array $where = null, string $order_by = null, int $limit = null, array|string $selected_fields = "*"): array {
+function db_array(string $table, ?array $where = null, ?string $order_by = null, ?int $limit = null, array|string $selected_fields = "*"): array {
     return DB::i()->arr($table, $where, $order_by, $limit, $selected_fields);
 }
 
@@ -264,7 +264,7 @@ function db_array(string $table, array $where = null, string $order_by = null, i
  * @return array
  * @throws DBException
  */
-function db_arrayp(string $sql, array $params = null): array {
+function db_arrayp(string $sql, ?array $params = null): array {
     return DB::i()->arrp($sql, $params);
 }
 
@@ -275,7 +275,7 @@ function db_arrayp(string $sql, array $params = null): array {
  * @return mysqli_result|bool object
  * @throws DBException
  */
-function db_query(string $sql, array $params = null): mysqli_result|bool {
+function db_query(string $sql, ?array $params = null): mysqli_result|bool {
     return DB::i()->query($sql, $params);
 }
 
@@ -286,7 +286,7 @@ function db_query(string $sql, array $params = null): mysqli_result|bool {
  * @return void
  * @throws DBException
  */
-function db_exec(string $sql, array $params = null): void {
+function db_exec(string $sql, ?array $params = null): void {
     DB::i()->exec($sql, $params);
 }
 
@@ -309,7 +309,7 @@ function db_identity(): int {
  * @return int number of deleted rows
  * @throws DBException
  */
-function db_delete(string $table, array $where, string $order_by = null, string $limit = null): int {
+function db_delete(string $table, array $where, ?string $order_by = null, ?string $limit = null): int {
     return DB::i()->delete($table, $where, $order_by, $limit);
 }
 
@@ -344,7 +344,7 @@ function db_update(string $table, array $fields, array $where): int {
  * @return int
  * @throws DBException
  */
-function db_updatep(string $sql, array $params = null): int {
+function db_updatep(string $sql, ?array $params = null): int {
     return DB::i()->updatep($sql, $params);
 }
 
@@ -358,7 +358,7 @@ function db_updatep(string $sql, array $params = null): int {
  * @return bool                 true if record exists or false if not
  * @throws DBException
  */
-function db_is_record_exists(string $table_name, string $uniq_value, string $column, string $not_id = null, string $not_id_column = 'id'): bool {
+function db_is_record_exists(string $table_name, string $uniq_value, string $column, ?string $not_id = null, string $not_id_column = 'id'): bool {
     return DB::i()->isRecordExists($table_name, $uniq_value, $column, $not_id, $not_id_column);
 }
 
@@ -563,6 +563,7 @@ class DB {
     #can also contain:
     # CONNECT_ATTEMPTS - how many times to try to connect (default CONNECT_ATTEMPTS)
     # CONNECT_TIMEOUT - how many seconds to wait for connection (default 0 - no timeout)
+    # LOCAL_INFILE - if true, enable client-side LOAD DATA LOCAL INFILE for this connection
     # WAIT_TIMEOUT - how many seconds to wait for query (default 0 - no timeout)
     # DEADLOCK_RETRY_ATTEMPTS - how many times to execute query+retry on deadlock (default DEADLOCK_RETRY_ATTEMPTS retries before exception, min=1 - no retries)
     # IS_LOG - if true - log all queries (default false)
@@ -627,10 +628,15 @@ class DB {
             try {
                 $last_exception = null;
 
-                if (isset($this->config['CONNECT_TIMEOUT'])) {
-                    #if need to set connect timeout - initialize in a different way
+                if (isset($this->config['CONNECT_TIMEOUT']) || !empty($this->config['LOCAL_INFILE'])) {
+                    #if need to set connect timeout or client-side LOAD DATA LOCAL INFILE - initialize in a different way
                     $this->dbh = mysqli_init();
-                    $this->dbh->options(MYSQLI_OPT_CONNECT_TIMEOUT, $this->config['CONNECT_TIMEOUT']);
+                    if (isset($this->config['CONNECT_TIMEOUT'])) {
+                        $this->dbh->options(MYSQLI_OPT_CONNECT_TIMEOUT, $this->config['CONNECT_TIMEOUT']);
+                    }
+                    if (!empty($this->config['LOCAL_INFILE'])) {
+                        $this->dbh->options(MYSQLI_OPT_LOCAL_INFILE, true);
+                    }
                     $this->dbh->real_connect($this->config['HOST'], $this->config['USER'], $this->config['PWD'], $this->config['DBNAME'], ($this->config['PORT'] > '' ? (int)$this->config['PORT'] : null));
                 } else {
                     #@ hides connection warning, which is unnecessary as exception thrown anyway
@@ -679,18 +685,9 @@ class DB {
      * @throws DBException
      */
     public function checkConnect(): void {
-        $is_reconnect = !$this->is_connected || is_null($this->dbh);
-
-        if (!$is_reconnect) {
-            try {
-                $is_reconnect = !@$this->dbh->ping(); #we don't need Warning: mysqli::ping(): MySQL server has gone away
-            } catch (mysqli_sql_exception) {
-                //if ping fails - MySQL server has gone away
-                $is_reconnect = true;
-            }
-        }
-
-        if ($is_reconnect) {
+        # Do not probe live handles here: this runs before every query.
+        # Stale handles are reconnected once when the actual query fails with ERROR_GONE_AWAY.
+        if (!$this->is_connected || is_null($this->dbh)) {
             $this->connect();
         }
     }
@@ -726,7 +723,7 @@ class DB {
      * @return mysqli_result|bool
      * @throws DBException
      */
-    public function query(string $sql, array $params = null): mysqli_result|bool {
+    public function query(string $sql, ?array $params = null): mysqli_result|bool {
         $result = null;
         $this->checkConnect();
 
@@ -734,7 +731,8 @@ class DB {
         DB::$SQL_QUERY_CTR++;
 
         $deadlock_attempts = $this->config['DEADLOCK_RETRY_ATTEMPTS'] ?? self::DEADLOCK_RETRY_ATTEMPTS; #max deadlock retry attempts
-        $last_ex           = null;
+        $last_ex            = null;
+        $is_reconnect_retry = true;
 
         while ($deadlock_attempts--) {
             try {
@@ -744,7 +742,14 @@ class DB {
             } catch (DBException $ex) {
                 $last_ex = $ex;
                 $err_msg = $ex->getMessage();
-                if (preg_match("/deadlock/i", $err_msg)) {
+                if ($is_reconnect_retry && $ex->getCode() === self::ERROR_GONE_AWAY) {
+                    $is_reconnect_retry = false;
+                    $this->logger('NOTICE', "Reconnect/retry on lost DB connection", $err_msg);
+                    $this->dbh          = null;
+                    $this->is_connected = false;
+                    $this->connect();
+                    $deadlock_attempts++;
+                } elseif (preg_match("/deadlock/i", $err_msg)) {
                     $this->logger('NOTICE', "Sleep/retry on deadlock", "attempts left:" . $deadlock_attempts . $err_msg);
                     sleep(rand(self::SLEEP_RETRY_MIN, self::SLEEP_RETRY_MAX)); #if got deadlock - sleep 1-3s before repeat
                 } else {
@@ -767,7 +772,7 @@ class DB {
      * @return null|bool|mysqli_result  object
      * @throws DBException
      */
-    public function queryInner(string $sql, array $params = null): null|bool|mysqli_result {
+    public function queryInner(string $sql, ?array $params = null): null|bool|mysqli_result {
         $result = null;
 
         try {
@@ -866,7 +871,7 @@ class DB {
      * @param array|null $params
      * @return void
      */
-    protected function loggerInner(string $sql, array $params = null): void {
+    protected function loggerInner(string $sql, ?array $params = null): void {
         $host = $this->config['HOST'];
         #for logger - just leave first name in domain
         $dbhost_info = substr($host, 0, strpos($host, '.')) . '(' . $this->config['USER'] . '):' . $this->config['DBNAME'] . ' ';
@@ -959,7 +964,7 @@ class DB {
      * @return int number of affected rows or last inserted id
      * @throws DBException
      */
-    public function exec(string $sql, array $params = null, bool $is_get_identity = false): int {
+    public function exec(string $sql, ?array $params = null, bool $is_get_identity = false): int {
         $this->query($sql, $params);
         $this->lastRows = $this->dbh->affected_rows;
         if ($is_get_identity) {
@@ -1010,7 +1015,7 @@ class DB {
      * @return array<string, mixed>
      * @throws DBException
      */
-    public function row(string $table, array $where, string $order_by = null): array {
+    public function row(string $table, array $where, ?string $order_by = null): array {
         $qp = $this->buildSelect($table, $where, $order_by, 1);
         return $this->rowp($qp->sql, $qp->params);
     }
@@ -1022,7 +1027,7 @@ class DB {
      * @return array<string, mixed>
      * @throws DBException
      */
-    public function rowp(string $sql, array $params = null): array {
+    public function rowp(string $sql, ?array $params = null): array {
         $res = $this->query($sql, $params);
         #we only need a first row from the result
         $row = $res->fetch_assoc();
@@ -1040,7 +1045,7 @@ class DB {
      * @return array<int, array<string, mixed>>
      * @throws DBException
      */
-    public function arr(string $table, array $where, string $order_by = null, string $limit = null, array|string $select_fields = '*'): array {
+    public function arr(string $table, ?array $where = null, ?string $order_by = null, ?string $limit = null, array|string $select_fields = '*'): array {
         if (is_array($select_fields)) {
             $select_fields = implode(',', array_map(fn($v) => $this->qid($v), $select_fields)); // quote all fields
         }
@@ -1055,7 +1060,7 @@ class DB {
      * @return array<int, array<string, mixed>>
      * @throws DBException
      */
-    public function arrp(string $sql, array $params = null): array {
+    public function arrp(string $sql, ?array $params = null): array {
         $res    = $this->query($sql, $params);
         $result = $res->fetch_all(MYSQLI_ASSOC);
         $res->free();
@@ -1071,7 +1076,7 @@ class DB {
      * @return string|null
      * @throws DBException
      */
-    public function value(string $table, array $where, string $field_name = null, string $order_by = null): string|null {
+    public function value(string $table, array $where, ?string $field_name = null, ?string $order_by = null): string|null {
         if (is_null($field_name)) {
             $field_name = '*';
         } elseif ($field_name === '1' || str_starts_with(strtolower($field_name), 'count(')) {
@@ -1092,7 +1097,7 @@ class DB {
      * @return string|null
      * @throws DBException
      */
-    public function valuep(string $sql, array $params = null): string|null {
+    public function valuep(string $sql, ?array $params = null): string|null {
         $res    = $this->query($sql, $params);
         $result = $res->fetch_row();
         $res->free();
@@ -1108,7 +1113,7 @@ class DB {
      * @return array
      * @throws DBException
      */
-    public function col(string $table, array $where, string $field_name = null, string $order_by = null): array {
+    public function col(string $table, array $where, ?string $field_name = null, ?string $order_by = null): array {
         if (is_null($field_name)) {
             $field_name = '*';
         } else {
@@ -1125,7 +1130,7 @@ class DB {
      * @return array
      * @throws DBException
      */
-    public function colp(string $sql, array $params = null): array {
+    public function colp(string $sql, ?array $params = null): array {
         $res    = $this->query($sql, $params);
         $result = $res->fetch_all();
         $res->free();
@@ -1158,7 +1163,7 @@ class DB {
      * @param string|null $limit
      * @return DBQueryAndParams
      */
-    public function buildDelete(string $table, array $where, string $order_by = null, string $limit = null): DBQueryAndParams {
+    public function buildDelete(string $table, array $where, ?string $order_by = null, ?string $limit = null): DBQueryAndParams {
         $result      = new DBQueryAndParams();
         $result->sql = 'DELETE FROM ' . $this->qid($table);
         if ($where) {
@@ -1184,7 +1189,7 @@ class DB {
      * @return int number of affected rows
      * @throws DBException
      */
-    public function delete(string $table, array $where, string $order_by = null, string $limit = null): int {
+    public function delete(string $table, array $where, ?string $order_by = null, ?string $limit = null): int {
         $qp = $this->buildDelete($table, $where, $order_by, $limit);
         return $this->exec($qp->sql, $qp->params);
     }
@@ -1278,6 +1283,8 @@ class DB {
             $qp_where       = $this->prepareParams($table, $where);
             $result->sql    .= ' WHERE ' . $qp_where->sql;
             $result->params = array_merge($qp_set->params, $qp_where->params);
+        } else {
+            $result->params = $qp_set->params;
         }
 
         return $result;
@@ -1303,7 +1310,7 @@ class DB {
      * @return int number of affected rows
      * @throws DBException
      */
-    public function updatep(string $sql, array $params = null): int {
+    public function updatep(string $sql, ?array $params = null): int {
         return $this->exec($sql, $params);
     }
 
@@ -1336,7 +1343,7 @@ class DB {
      * @return bool                 true if record exists or false if not
      * @throws DBException
      */
-    public function isRecordExists(string $table_name, mixed $uniq_value, string $column, string $not_id = null, string $not_id_column = 'id'): bool {
+    public function isRecordExists(string $table_name, mixed $uniq_value, string $column, ?string $not_id = null, string $not_id_column = 'id'): bool {
         $not_sql = '';
         $params  = array($uniq_value);
         if (!is_null($not_id)) {
@@ -1707,12 +1714,12 @@ class DB {
      * @param string $select_fields comma separated fields to select or '*'
      * @return DBQueryAndParams
      */
-    public function buildSelect(string $table, array $where, string $order_by = null, string $limit = null, string $select_fields = "*"): DBQueryAndParams {
+    public function buildSelect(string $table, ?array $where = null, ?string $order_by = null, ?string $limit = null, string $select_fields = "*"): DBQueryAndParams {
         $result = new DBQueryAndParams();
 
         $result->sql = "SELECT " . $select_fields . " FROM " . $this->qid($table);
 
-        if (count($where) > 0) {
+        if (!empty($where)) {
             $qp = $this->prepareParams($table, $where);
             if ($qp->sql > '') {
                 $result->sql    .= ' WHERE ' . $qp->sql;

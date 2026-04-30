@@ -45,7 +45,15 @@ class DevManageController extends FwController {
     }
 
     public function ResetCacheAction() {
-        $this->fw->flash("error", "Not applicable in PHP framework. Yet.");
+        if (function_exists('opcache_reset')) {
+            $res = opcache_reset()
+                ? "OPcache reset successfully"
+                : "OPcache reset failed or not enabled";
+            $this->fw->flash("success", $res);
+        } else {
+            $this->fw->flash("error", "OPcache not enabled");
+        }
+
         fw::redirect($this->base_url);
     }
 
@@ -291,15 +299,28 @@ class DevManageController extends FwController {
     }
 
     private function _models() {
-        $result = array();
-        $dir    = $this->fw->config->SITE_ROOT . '/php/models';
-        $files  = scandir($dir);
-        foreach ($files as $value) {
-            if (!preg_match('/^(.+)\.php$/', $value, $m)) {
+        $result = [];
+
+        $dirs = method_exists($this->fw, 'getAutoloadModelDirs')
+            ? $this->fw->getAutoloadModelDirs()
+            : [$this->fw->config->SITE_ROOT . '/php/models'];
+
+        foreach ($dirs as $dir) {
+            if (!is_dir($dir)) {
                 continue;
             }
-            $result[] = $m[1];
+
+            foreach (scandir($dir) as $value) {
+                if (!preg_match('/^(.+)\.php$/', $value, $m)) {
+                    continue;
+                }
+
+                $result[$m[1]] = true;
+            }
         }
+
+        $result = array_keys($result);
+        sort($result);
         return $result;
     }
 

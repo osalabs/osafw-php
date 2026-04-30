@@ -97,6 +97,7 @@ let state = {
 
     related_id: 0, // related model id
     return_url: '', // return url if controller called from other place expecting user's return
+    header_links: [], // extra header links configured by the controller
     field_id: 'id', // model's id field name
     list_headers: [], // list headers, array of {field_name:"", field_name_visible:"", is_sortable:bool, is_checked:bool, search_value:null|"", is_ro:bool, input_type:"input|select|date"}
     is_list_search_open: false, // true if list search is open by user
@@ -322,7 +323,19 @@ let actions = {
     //save to store each key from data if such key exists in store
     saveToStore(data) {
         Object.keys(data).forEach(key => {
-            if (this.$state[key] !== undefined) this.$state[key] = data[key];
+            if (this.$state[key] === undefined) return;
+
+            let value = data[key];
+            if (key === 'header_links' && typeof value === 'string' && value.length) {
+                try {
+                    value = JSON.parse(value);
+                } catch (e) {
+                    console.warn('Failed to parse header_links', e);
+                    value = [];
+                }
+            }
+
+            this.$state[key] = value;
         });
     },
 

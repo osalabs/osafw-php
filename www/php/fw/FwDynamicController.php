@@ -140,10 +140,7 @@ class FwDynamicController extends FwController {
 
     public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
-        $item = $this->model->one($id);
-        if (!$item) {
-            throw new ApplicationException("Not Found", 404);
-        }
+        $item = $this->modelOneOrFail($id);
 
         $ps = array(
             'id'               => $id,
@@ -195,7 +192,7 @@ class FwDynamicController extends FwController {
         if ($this->isGet()) {
             if ($id > 0) {
                 // edit screen
-                $item = $this->model->one($id);
+                $item = $this->modelOneOrFail($id);
             } else {
                 // add new screen
                 $item_new = [];
@@ -204,7 +201,7 @@ class FwDynamicController extends FwController {
                 $item     = $item_new;
             }
         } else {
-            $itemdb = $id ? $this->model->one($id) : array();
+            $itemdb = $id ? $this->modelOne($id) : array();
             $item   = array_merge($itemdb, $item);
         }
 
@@ -213,6 +210,7 @@ class FwDynamicController extends FwController {
             'i'           => $item,
             'return_url'  => $this->return_url,
             'related_id'  => $this->related_id,
+            'base_url'    => $this->base_url,
             'is_readonly' => $this->is_readonly,
             'tab'         => $this->form_tab,
             'is_showform' => true // flag for template that we are in show form
@@ -261,7 +259,7 @@ class FwDynamicController extends FwController {
 
         $this->Validate($id, $item);
         // load old record if necessary
-        // $item_old = $this->model0->one($id);
+        // $item_old = $this->modelOne($id);
 
         $itemdb = $this->getSaveFields($id, $item);
 
@@ -299,7 +297,7 @@ class FwDynamicController extends FwController {
      * @param string|null $tab optional tab code, if ommited - form_tab used
      * @return array
      */
-    protected function getConfigShowFormFieldsByTab(string $prefix, string $tab = null): array {
+    protected function getConfigShowFormFieldsByTab(string $prefix, ?string $tab = null): array {
         $tab = $tab ?? $this->form_tab;
         $key = $prefix . ($tab ? "_" . $tab : "");
         return $this->config[$key] ?? [];
@@ -463,7 +461,7 @@ class FwDynamicController extends FwController {
 
         $id = intval($form_id);
         $ps = array(
-            'i'          => $this->model->one($id),
+            'i'          => $this->modelOneOrFail($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
             'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates
@@ -547,17 +545,19 @@ class FwDynamicController extends FwController {
         $id         = reqi("id"); //specific id, if just need iname for it (used to preload existing id/label for edit form)
         $model_name = reqs("model");
         $ac_model   = null;
+        $ac_def     = null;
         if (empty($model_name)) {
             //if no model passed - use model_related
             $ac_model = $this->model_related;
         } else {
             //validation - only allow models from showform_fields type=autocomplete
-            $form_tabs = $this->config["form_tabs"] ?? [];
+            $form_tabs = $this->config["form_tabs"] ?? [['tab' => '']];
             foreach ($form_tabs as $form_tab) {
                 $fields = $this->getConfigShowFormFieldsByTab("showform_fields", $form_tab["tab"]);
                 foreach ($fields as $def) {
                     if (($def["type"] ?? '') == "autocomplete" && ($def["lookup_model"] ?? '') == $model_name) {
                         $ac_model = fw::model($model_name);
+                        $ac_def   = $def;
                         break;
                     }
                 }
@@ -568,7 +568,15 @@ class FwDynamicController extends FwController {
             throw new ApplicationException("No model defined");
         }
 
-        $items = $id > 0 ? [$ac_model->iname($id)] : $ac_model->listAutocomplete($q);
+        if ($id > 0) {
+            $value = $ac_model->iname($id);
+            if ($ac_def['autocomplete_with_id'] ?? false) {
+                $value = FormUtils::formatAutocomplete($value, (string)$id);
+            }
+            $items = [$value];
+        } else {
+            $items = $ac_model->listAutocompleteByDef($q, $ac_def);
+        }
 
         return ['_json' => $items];
     }
@@ -589,7 +597,7 @@ class FwDynamicController extends FwController {
         $load_id      = reqi("load_id");
         $is_reset     = reqi("is_reset");
         $density      = reqs("density");
-        $is_list_edit = reqb("is_list_edit");
+        $is_list_edit = isset($_REQUEST['is_list_edit']) ? reqb("is_list_edit") : $this->is_list_edit;
 
         $icode = UserViews::icodeByUrl($this->base_url, $is_list_edit);
 
@@ -728,6 +736,11 @@ class FwDynamicController extends FwController {
 
             } else {
                 #single values
+                if ($dtype == "plaintext_json") {
+                    $def["value"] = $this->prettifyJsonValue($field_value);
+                    continue;
+                }
+
                 #lookups
                 if (array_key_exists('lookup_table', $def)) {
                     $lookup_key   = $def["lookup_key"] ?? "id";
@@ -747,7 +760,7 @@ class FwDynamicController extends FwController {
                         $def["admin_url"] = "/Admin/" . $def["lookup_model"]; #default admin url from model name
                     }
                 } elseif (array_key_exists('lookup_tpl', $def)) {
-                    $def["value"] = FormUtils::selectTplName($def["lookup_tpl"], $item[$field], strtolower($this->fw->route->controller_path));
+                    $def["value"] = FormUtils::selectTplName($def["lookup_tpl"], $item[$field] ?? '', strtolower($this->fw->route->controller_path));
 
                 } elseif (array_key_exists('options', $def)) {
                     // select options
@@ -762,6 +775,9 @@ class FwDynamicController extends FwController {
                     if ($def["conv"] == "time_from_seconds") {
                         $def["value"] = DateUtils::int2timestr(intval($def["value"]));
                     }
+                }
+                if ($dtype == "plaintext_url") {
+                    $def["safe_url"] = Utils::safeUrl((string)$field_value);
                 }
             }
         }
@@ -906,6 +922,11 @@ class FwDynamicController extends FwController {
 
             } else {
                 // single values
+                $is_json_pretty = ($def['is_json_pretty'] ?? false) && $dtype == "textarea";
+                if ($is_json_pretty) {
+                    $field_value = $this->prettifyJsonValue($field_value);
+                }
+
                 // lookups
                 if (array_key_exists('lookup_table', $def)) {
                     $lookup_key   = $def["lookup_key"] ?? "id";
@@ -929,7 +950,11 @@ class FwDynamicController extends FwController {
                             $def["lookup_row"] = $lookup_row;
 
                             $lookup_field = $def["lookup_field"] ?? $lookup_model->field_iname;
-                            $def["value"] = $lookup_row[$lookup_field] ?? '';
+                            $value        = $lookup_row[$lookup_field] ?? '';
+                            if ($def['autocomplete_with_id'] ?? false) {
+                                $value = FormUtils::formatAutocomplete($value, (string)$def["lookup_id"]);
+                            }
+                            $def["value"] = $value;
                         } else {
                             //when form refreshed - get value from the form
                             if ($dtype == "autocomplete") {
@@ -971,7 +996,6 @@ class FwDynamicController extends FwController {
                     $def["value"]          = $field_value;
                 } else {
                     $def["value"] = $field_value;
-                    $def["value"] = $field_value;
                 }
 
                 // convertors
@@ -1002,10 +1026,15 @@ class FwDynamicController extends FwController {
             $def  = $showform_fields[$field];
             $type = $def["type"];
             if ($type == "autocomplete") {
-                $lookup_model   = $this->getModelWithRelated($def["lookup_model"]);
-                $field_value    = $item[$field . '_iname'] ?? ''; // autocomplete value is in "${field}_iname"
-                $is_added       = false;
-                $fields[$field] = $lookup_model->findOrAddByIname($field_value, $is_added);
+                $lookup_model = $this->getModelWithRelated($def["lookup_model"]);
+                $field_value  = $item[$field . '_iname'] ?? ''; // autocomplete value is in "${field}_iname"
+                $is_added     = false;
+                [$ac_label, $ac_id] = FormUtils::parseAutocomplete($field_value);
+                if ((int)$ac_id > 0) {
+                    $fields[$field] = (int)$ac_id;
+                } else {
+                    $fields[$field] = $lookup_model->findOrAddByIname($ac_label, $is_added) ?: null;
+                }
             } elseif ($type == "date_combo") {
                 $fields[$field] = FormUtils::dateForCombo($item, $field);
             } elseif ($def['type'] == 'date_popup') {
@@ -1019,6 +1048,9 @@ class FwDynamicController extends FwController {
                 } else {
                     $fields[$field] = floatval($value); // number - convert to number (if field empty or non-number - it will become 0)
                 }
+            } elseif ($type == "textarea" && ($def['is_json_pretty'] ?? false)) {
+                $is_nullable    = array_key_exists($field, $fnullable);
+                $fields[$field] = $this->encodeJsonCompact($value, $is_nullable);
             }
         }
     }
@@ -1177,6 +1209,45 @@ class FwDynamicController extends FwController {
         }
 
         return $id;
+    }
+
+    protected function prettifyJsonValue($value): string {
+        if ($value === '' || $value === null) {
+            return '';
+        }
+
+        if (is_array($value) || is_object($value)) {
+            $json = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            return $json === false ? '' : $json;
+        }
+
+        $json = is_string($value) ? trim($value) : $value;
+        if ($json === '' || $json === null) {
+            return '';
+        }
+
+        $decoded = json_decode((string)$json, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return (string)$value;
+        }
+
+        $encoded = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return $encoded === false ? (string)$value : $encoded;
+    }
+
+    protected function encodeJsonCompact($value, bool $is_nullable = false): ?string {
+        $json = is_string($value) ? trim($value) : $value;
+        if ($json === '' || $json === null) {
+            return $is_nullable ? null : '';
+        }
+
+        $decoded = json_decode((string)$json, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return (string)$value;
+        }
+
+        $encoded = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return $encoded === false ? (string)$value : $encoded;
     }
 
     /**

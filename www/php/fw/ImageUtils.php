@@ -51,6 +51,8 @@ class ImageUtils {
             $old_w = imagesx($img);
             $old_h = imagesy($img);
             #    logger(".old: . $old_w,$old_h");
+            $new_w = $old_w;
+            $new_h = $old_h;
 
             $ratio   = $old_w / $old_h;
             $w_scale = 1;

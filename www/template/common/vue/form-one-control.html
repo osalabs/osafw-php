@@ -6,10 +6,15 @@
     <p v-else-if="def.type=='plaintext'" class="form-control-plaintext" style="white-space: pre-line">
         {{def.lookup_model ? lookupValue : value}}
     </p>
+    <pre v-else-if="def.type=='plaintext_json'" class="form-control-plaintext font-monospace mb-0">{{value}}</pre>
     <p v-else-if="def.type=='plaintext_link'" class="form-control-plaintext">
         <a :href="(def.admin_url ? def.admin_url : '/Admin/'+def.lookup_model)+'/'+value">{{lookupValue}}
             <template v-if="!lookupValue">{{value}}</template>
         </a>
+    </p>
+    <p v-else-if="def.type=='plaintext_url'" class="form-control-plaintext text-break">
+        <a v-if="safeUrl(value)" :href="safeUrl(value)" target="_blank" rel="noopener noreferrer">{{value}}</a>
+        <template v-else>{{value}}</template>
     </p>
     <p v-else-if="def.type=='plaintext_autocomplete'" class="form-control-plaintext" style="white-space: pre-line">
         {{item[def.field+'_iname']??'-'}}
@@ -396,6 +401,21 @@
                     minute: '2-digit',
                     second: '2-digit'
                 });
+            },
+            safeUrl(str) {
+                let url = String(str ?? '').trim().replace(/[\x00-\x1F\x7F]+/g, '');
+                if (!url || url.startsWith('//')) return '';
+                if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) url = 'https://' + url;
+
+                let parsed;
+                try {
+                    parsed = new URL(url);
+                } catch (e) {
+                    return '';
+                }
+
+                const allowed = ['http:', 'https:', 'mailto:', 'tel:'];
+                return allowed.includes(parsed.protocol) ? url : '';
             },
             async autocompleteOptions(query, select$) {
                 let id = 0;

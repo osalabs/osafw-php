@@ -150,8 +150,8 @@ class DateUtils {
         return $dt?->format('c');
     }
 
-    // from date string to YYYY-MM-DD
-    public static function Str2SQL($s): ?string {
+    // from date string to YYYY-MM-DD or YYYY-MM-DD HH:MM:SS
+    public static function Str2SQL($s, bool $is_hms = false): ?string {
         if (is_null($s)) {
             return null; #keep passed null as is, so it will go to db as NULL
         }
@@ -160,7 +160,7 @@ class DateUtils {
         }
 
         $dt = self::f2date($s);
-        return $dt?->format('Y-m-d');
+        return $dt?->format($is_hms ? 'Y-m-d H:i:s' : 'Y-m-d');
         //
         //        list($day, $month, $year) = self::ParseStrToDate($s);
         //        if (strlen($day) < 2) {
@@ -341,4 +341,85 @@ class DateUtils {
         return $result;
     }
 
+    /**
+     * Return time difference in minutes between two datetimes, always positive.
+     */
+    public static function differenceMinutes($from, $to): int {
+        if (!($from instanceof DateTime)) {
+            $from = new DateTime($from);
+        }
+        if (!($to instanceof DateTime)) {
+            $to = new DateTime($to);
+        }
+
+        $interval = $from->diff($to, true);
+        return $interval->y * 365 * 24 * 60 + $interval->m * 30 * 24 * 60 + $interval->d * 24 * 60 + $interval->h * 60 + $interval->i;
+    }
+
+    /**
+     * Guess the nearest IANA time-zone name for coordinates.
+     */
+    public static function timezoneFromCoords(float $lat, float $lon, ?string $country_iso2 = null): string {
+        $lat = max(-90, min(90, $lat));
+        $lon = fmod($lon + 540, 360) - 180;
+
+        static $cache = [];
+        $key = null;
+
+        if ($country_iso2) {
+            $country_iso2 = strtoupper(trim($country_iso2));
+            if (preg_match('/^[A-Z]{2}$/', $country_iso2)) {
+                $key = $country_iso2;
+            }
+        }
+
+        $key            = $key ?? '*';
+        $hasCountryKey  = $key !== '*';
+        if (!isset($cache[$key])) {
+            $ids = $hasCountryKey
+                ? DateTimeZone::listIdentifiers(DateTimeZone::PER_COUNTRY, $key)
+                : DateTimeZone::listIdentifiers();
+            if ($ids === false) {
+                $ids = DateTimeZone::listIdentifiers();
+            }
+
+            $cache[$key] = array_map(
+                static function (string $id): array {
+                    $loc = (new DateTimeZone($id))->getLocation();
+                    return ['id' => $id, 'lat' => $loc['latitude'], 'lon' => $loc['longitude']];
+                },
+                $ids
+            );
+        }
+
+        $bestId = 'UTC';
+        $bestKm = INF;
+        foreach ($cache[$key] as $zone) {
+            $km = self::haversineKM($lat, $lon, $zone['lat'], $zone['lon']);
+            if ($km < $bestKm) {
+                $bestKm = $km;
+                $bestId = $zone['id'];
+            }
+        }
+
+        return $bestId;
+    }
+
+    public static function haversineKM(float $lat1, float $lon1, float $lat2, float $lon2): float {
+        static $R = 6371.0088;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a    = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
+        return 2 * $R * asin(min(1, sqrt($a)));
+    }
+
+    /**
+     * Return UTC offset minutes for an IANA time-zone at a timestamp.
+     */
+    public static function utcOffsetMinutesForTZ(string $tzId, ?int $timestamp = null): int {
+        $dt = new DateTime('@' . ($timestamp ?? time()));
+        $dt->setTimezone(new DateTimeZone($tzId));
+
+        return (int)round($dt->getOffset() / self::MINUTE_SECONDS);
+    }
 }

@@ -94,7 +94,7 @@ class FwVueController extends FwDynamicController {
      * @throws NoModelException
      */
     protected function setScopeInitial(array &$ps): void {
-        $ps["XSS"]          = $_SESSION["XSS"];
+        $ps["XSS"]          = $_SESSION["XSS"] ?? '';
         $ps["access_level"] = $this->fw->userAccessLevel();
         $ps["me_id"]        = $this->fw->userId();
         //some specific from global fw.GLOBAL;
@@ -268,10 +268,7 @@ class FwVueController extends FwDynamicController {
         $mode = reqs("mode"); // view or edit
 
         $ps   = [];
-        $item = $this->model->one($id);
-        if (empty($item)) {
-            throw new NotFoundException();
-        }
+        $item = $this->modelOneOrFail($id);
 
         // additionally, if we have autocomplete fields - preload their values
         $multi_rows  = [];
@@ -373,7 +370,7 @@ class FwVueController extends FwDynamicController {
 
         $this->Validate($id, $item);
         // load old record if necessary
-        // $item_old = $this->model->one($id);
+        // $item_old = $this->modelOne($id);
 
         $itemdb = FormUtils::filter($item, $this->save_fields);
         FormUtils::filterCheckboxes($itemdb, $item, $this->save_fields_checkboxes, $this->isPatch());

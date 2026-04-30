@@ -14,7 +14,7 @@ class DemosItems extends FwModel {
         $this->junction_field_main_id = "demos_id";
     }
 
-    public function prepareSubtable(array &$list_rows, int $related_id, array $def = null): void {
+    public function prepareSubtable(array &$list_rows, int $related_id, ?array $def = null): void {
         parent::prepareSubtable($list_rows, $related_id, $def);
 
         // add select options

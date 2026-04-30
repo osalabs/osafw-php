@@ -27,7 +27,7 @@ class AttController extends FwController {
         if (!$item) {
             throw new ApplicationException("404 File Not Found");
         }
-        if ($item['is_s3']) {
+        if (intval($item['storage'] ?? 0) === Att::STORAGE_S3) {
             $this->model->redirectS3($id, $size);
         } else {
             $this->model->transmitFile($id, $size);
@@ -46,7 +46,7 @@ class AttController extends FwController {
         if (!$item) {
             throw new ApplicationException("404 File Not Found");
         }
-        if ($item['is_s3']) {
+        if (intval($item['storage'] ?? 0) === Att::STORAGE_S3) {
             $this->model->redirectS3($id, $size);
             return;
         }

@@ -309,10 +309,11 @@ abstract class FwModel {
     /**
      * return standard list of id,iname for all non-deleted OR wtih specified statuses order by by getOrderBy
      * @param array|null $statuses
+     * @param array|null $def not used here, for compatibility with dynamic controllers
      * @return array<int, array<string, mixed>>
      * @throws DBException
      */
-    public function ilist(array $statuses = null): array {
+    public function ilist(?array $statuses = null, ?array $def = null): array {
         $where = '1=1';
         if (strlen($this->field_status)) {
             if ($statuses && count($statuses) > 0) {
@@ -334,7 +335,7 @@ abstract class FwModel {
      * @return int
      * @throws DBException|DateMalformedStringException
      */
-    public function getCount(array $statuses = null, ?int $since_days = null): int {
+    public function getCount(?array $statuses = null, ?int $since_days = null): int {
         $where = [];
         if (strlen($this->field_status)) {
             if ($statuses) {
@@ -624,7 +625,7 @@ abstract class FwModel {
      * @return array
      * @throws DBException
      */
-    public function listSelectOptions(array $def = null): array {
+    public function listSelectOptions(?array $def = null): array {
         $where = '';
         if (strlen($this->field_status)) {
             $where = " WHERE " . $this->db->qid($this->field_status) . "<>" . dbqi(self::STATUS_DELETED);
@@ -666,6 +667,12 @@ abstract class FwModel {
         return $this->db->colp($sql);
     }
 
+    public function listAutocompleteByDef(string $q, ?array $def = null): array {
+        $limit = intval($def['autocomplete_limit'] ?? 5);
+
+        return $this->listAutocomplete($q, $limit);
+    }
+
     //</editor-fold>
 
 
@@ -679,7 +686,7 @@ abstract class FwModel {
      * @throws ApplicationException
      * @throws DBException
      */
-    public function listByMainId(int $main_id, array $def = null): array {
+    public function listByMainId(int $main_id, ?array $def = null): array {
         if (empty($this->junction_field_main_id)) {
             throw new ApplicationException("Not implemented");
         }
@@ -694,7 +701,7 @@ abstract class FwModel {
      * @throws ApplicationException
      * @throws DBException
      */
-    public function listByLinkedId(int $linked_id, array $def = null): array {
+    public function listByLinkedId(int $linked_id, ?array $def = null): array {
         if (empty($this->junction_field_linked_id)) {
             throw new ApplicationException("Not implemented");
         }
@@ -710,11 +717,11 @@ abstract class FwModel {
     public function sortByCheckedPrio(array $lookup_rows): array {
         if (!empty($this->field_prio)) {
             usort($lookup_rows, function ($a, $b) {
-                return $b['_link'][$this->field_prio] - $a['_link'][$this->field_prio];
+                return ($b['_link'][$this->field_prio] ?? 0) - ($a['_link'][$this->field_prio] ?? 0);
             });
         } else {
             usort($lookup_rows, function ($a, $b) {
-                return $b['is_checked'] - $a['is_checked'];
+                return ($b['is_checked'] ?? 0) - ($a['is_checked'] ?? 0);
             });
         }
         return $lookup_rows;
@@ -728,15 +735,18 @@ abstract class FwModel {
      * @return array
      * @throws ApplicationException|DBException
      */
-    public function listLinkedByMainId(int $main_id, array $def = null): array {
+    public function listLinkedByMainId(int $main_id, ?array $def = null): array {
         $linked_rows = $this->listByMainId($main_id, $def);
 
-        $lookup_rows = $this->junction_model_linked->ilist();
+        $lookup_rows = $this->junction_model_linked->ilist(null, $def);
+        foreach ($lookup_rows as $k => $row) {
+            $lookup_rows[$k]['is_checked'] = false;
+            $lookup_rows[$k]['_link']      = [];
+        }
+
         if ($linked_rows && count($linked_rows) > 0) {
             foreach ($lookup_rows as $k => $row) {
                 // check if linked_rows contain main id
-                $lookup_rows[$k]['is_checked'] = false;
-                $lookup_rows[$k]['_link']      = [];
                 foreach ($linked_rows as $lrow) {
                     // compare LINKED ids
                     if ($row[$this->junction_model_linked->field_id] == $lrow[$this->junction_field_linked_id]) {
@@ -747,8 +757,8 @@ abstract class FwModel {
                 }
             }
 
-            $lookup_rows = $this->filterAndSortChecked($lookup_rows, $def);
         }
+        $lookup_rows = $this->filterAndSortChecked($lookup_rows, $def);
         return $lookup_rows;
     }
 
@@ -761,15 +771,18 @@ abstract class FwModel {
      * @throws ApplicationException
      * @throws DBException
      */
-    public function listMainByLinkedId(int $linked_id, array $def = null): array {
+    public function listMainByLinkedId(int $linked_id, ?array $def = null): array {
         $linked_rows = $this->listByLinkedId($linked_id, $def);
 
-        $lookup_rows = $this->junction_model_main->ilist();
+        $lookup_rows = $this->junction_model_main->ilist(null, $def);
+        foreach ($lookup_rows as $k => $row) {
+            $lookup_rows[$k]['is_checked'] = false;
+            $lookup_rows[$k]['_link']      = [];
+        }
+
         if ($linked_rows && count($linked_rows) > 0) {
             foreach ($lookup_rows as $k => $row) {
                 // check if linked_rows contain main id
-                $lookup_rows[$k]['is_checked'] = false;
-                $lookup_rows[$k]['_link']      = [];
                 foreach ($linked_rows as $lrow) {
                     // compare MAIN ids
                     if ($row[$this->junction_model_main->field_id] == $lrow[$this->junction_field_main_id]) {
@@ -780,8 +793,8 @@ abstract class FwModel {
                 }
             }
 
-            $lookup_rows = $this->filterAndSortChecked($lookup_rows, $def);
         }
+        $lookup_rows = $this->filterAndSortChecked($lookup_rows, $def);
         return $lookup_rows;
     }
 
@@ -792,7 +805,7 @@ abstract class FwModel {
      * @param array|null $def def - in dynamic controller - field definition (also contains "i" and "ps", "lookup_params", ...) or you could use it to pass additional params
      * @return array
      */
-    public function setMultiListChecked(array $rows, array $ids, array $def = null): array {
+    public function setMultiListChecked(array $rows, array $ids, ?array $def = null): array {
         $result          = $rows;
         $is_checked_only = $def['lookup_checked_only'] ?? false;
 
@@ -810,12 +823,12 @@ abstract class FwModel {
         return $result;
     }
 
-    protected function filterAndSortChecked(array $rows, array $def = null): array {
+    protected function filterAndSortChecked(array $rows, ?array $def = null): array {
         $is_checked_only = $def['lookup_checked_only'] ?? false;
         if ($is_checked_only) {
             $result = [];
             foreach ($rows as $row) {
-                if ($row['is_checked']) {
+                if (!empty($row['is_checked'])) {
                     $result[] = $row;
                 }
             }
@@ -832,11 +845,11 @@ abstract class FwModel {
      * @return array           array of hashtables for templates
      * @throws DBException
      */
-    public function listWithChecked(array|string $hsel_ids, array $def = null): array {
+    public function listWithChecked(array|string $hsel_ids, ?array $def = null): array {
         if (!is_array($hsel_ids)) {
             $hsel_ids = explode(",", $hsel_ids);
         }
-        $rows = $this->setMultiListChecked($this->ilist(), $hsel_ids, $def);
+        $rows = $this->setMultiListChecked($this->ilist(null, $def), $hsel_ids, $def);
         return $rows;
     }
 
@@ -1048,7 +1061,7 @@ abstract class FwModel {
 
     //<editor-fold desc="dynamic subtable component">
     // override in your specific models when necessary
-    public function prepareSubtable(array &$list_rows, int $related_id, array $def = null): void {
+    public function prepareSubtable(array &$list_rows, int $related_id, ?array $def = null): void {
         $model_name = $def != null ? (string)$def["model"] : get_class($this);
         foreach ($list_rows as $k => &$row) {
             //if row_id starts with "new-" - set flag is_new
@@ -1061,7 +1074,7 @@ abstract class FwModel {
         unset($row);
     }
 
-    public function prepareSubtableAddNew(array &$list_rows, int $related_id, array $def = null): void {
+    public function prepareSubtableAddNew(array &$list_rows, int $related_id, ?array $def = null): void {
         //generate unique id based on time (milliseconds) for sequential adding
         $t           = microtime(true);
         $id          = "new-" . intval($t * 1000);

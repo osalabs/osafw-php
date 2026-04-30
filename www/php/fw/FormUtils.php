@@ -6,6 +6,18 @@ Part of PHP osa framework  www.osalabs.com/osafw/php
 
 class FormUtils {
     public const int MAX_PAGE_ITEMS = 25; //default max number of items on list screen
+    public const string AUTOCOMPLETE_SEPARATOR = ' ::: ';
+
+    /**
+     * Convert mixed values to integers, drop empty values and duplicates, and return a packed array.
+     * Useful for sanitizing IDs from request arrays.
+     */
+    public static function intUniqueArray(array $values): array {
+        $values = array_map('intval', $values);
+        $values = array_filter($values);
+
+        return array_values(array_unique($values));
+    }
 
     #simple email check
     public static function isEmail($email): bool {
@@ -184,7 +196,7 @@ class FormUtils {
      *
      * "id" key is optional, if not present - iname will be used for values too
      */
-    public static function selectOptions(array $rows, string $selected_id = NULL): string {
+    public static function selectOptions(array $rows, ?string $selected_id = null): string {
         $result = '';
         if (is_null($selected_id)) {
             $selected_id = '';
@@ -505,5 +517,35 @@ class FormUtils {
             }
         }
         return implode(", ", $aorderby);
+    }
+
+    /**
+     * Format autocomplete value from label and id.
+     */
+    public static function formatAutocomplete(string $label, string $id = ''): string {
+        $label = trim($label);
+        $id    = trim($id);
+
+        if ($label === '' && ($id === '' || $id === '0')) {
+            return '';
+        }
+
+        return $label . ($id !== '' ? self::AUTOCOMPLETE_SEPARATOR . $id : '');
+    }
+
+    /**
+     * Parse autocomplete value into [label, id].
+     */
+    public static function parseAutocomplete(?string $value): array {
+        $value = trim((string)$value);
+        if ($value === '') {
+            return ['', ''];
+        }
+
+        $parts = Utils::split2(trim(self::AUTOCOMPLETE_SEPARATOR), $value);
+        return [
+            trim($parts[0]),
+            trim($parts[1]),
+        ];
     }
 }

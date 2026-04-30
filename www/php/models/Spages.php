@@ -215,7 +215,7 @@ class Spages extends FwModel {
     }
 
     #return correct url - TODO
-    public function getUrl(int $id, string $icode, string $url = null): string {
+    public function getUrl(int $id, string $icode, ?string $url = null): string {
         if ($url > '') {
             if (str_starts_with($url, "/")) {
                 $url = $this->fw->config->ROOT_URL . $url;

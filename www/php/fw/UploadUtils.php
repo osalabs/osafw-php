@@ -137,9 +137,9 @@ class UploadUtils {
         self::cleanupUpload($item_id, $module_basedir);
 
         $ext = self::uploadExt($file['name']);
-        if ($opt['ext']) {
-            $ext = $opt['ext'];
-        } #if required to save images in particular format - do this
+        if ($opt['ext'] ?? false) {
+            $ext = $opt['ext']; #if required to save images in particular format - do this
+        }
 
         $file_path_orig = self::getUploadPath($item_id, $module_basedir, $ext);
 
@@ -171,7 +171,7 @@ class UploadUtils {
      * @param int|null $level optional, default in $DEFAULT_ID2DIR_LEVEL, dir deep level
      * @return string        path without trailing /
      */
-    public static function id2dir(int $id, int $level = NULL): string {
+    public static function id2dir(int $id, ?int $level = NULL): string {
         if (is_null($level)) {
             $level = self::$DEFAULT_ID2DIR_LEVEL;
         }

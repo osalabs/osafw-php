@@ -101,7 +101,7 @@ class fw {
     public static function run(array $ROUTES = []): void {
         $uri = strtok($_SERVER["REQUEST_URI"] ?? '', '?');
 
-        logger('*** REQUEST START [' . $uri . ']');
+        logger('*** REQUEST START [' . ($_SERVER['REQUEST_METHOD'] ?? 'GET') . ' ' . $uri . ']');
 
         self::$start_time = microtime(true);
         $fw               = fw::i();
@@ -114,7 +114,8 @@ class fw {
         FwHooks::initRequest($fw, $uri);
 
         #if request content type is "application/json" - parse JSON and put to $_REQUEST
-        if (str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
+        $content_type = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+        if (str_contains($content_type, 'application/json')) {
             $fw->postedJson = Utils::parsePostedJson();
         }
 
@@ -138,7 +139,7 @@ class fw {
             $_SESSION['_flash'] = array();
         }
 
-        $fw->dispatcher  = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES);
+        $fw->dispatcher  = new Dispatcher($ROUTES, $fw->config->ROOT_URL, $fw->config->ROUTE_PREFIXES, $fw->config->ROUTE_ID_REGEX ?? '');
         $fw->route       = $fw->dispatcher->getRoute();
         $fw->request_url = $fw->dispatcher->request_url;
 
@@ -289,6 +290,25 @@ class fw {
         return $object;
     }
 
+    /**
+     * Clear cached controllers, models, and optionally request-scoped cache values between tests.
+     */
+    public function resetRuntimeCaches(bool $clearRequestCache = true): void {
+        $this->controllers_cache = [];
+        $this->models_cache      = [];
+
+        if ($clearRequestCache && isset($this->cache) && method_exists($this->cache, 'clearRequest')) {
+            $this->cache->clearRequest();
+        }
+    }
+
+    /**
+     * Allow tests to inject a model singleton instance without reflection.
+     */
+    public function setModelInstanceForTest(string $modelClass, FwModel $instance): void {
+        $this->models_cache[strtolower($modelClass)] = $instance;
+    }
+
     public function __construct() {
         global $CONFIG;
         spl_autoload_register(array($this, 'autoload'));
@@ -334,6 +354,17 @@ class fw {
         } else {
             // For models
             $dirs[] = $bdir . '../models/';
+            foreach (($this->config->AUTOLOAD_MODELS ?? []) as $subfolder) {
+                $subfolder = trim((string)$subfolder);
+                if ($subfolder === '' || !str_starts_with($subfolder, '/')) {
+                    continue;
+                }
+
+                $subfolder = trim($subfolder, '/');
+                if ($subfolder !== '') {
+                    $dirs[] = $bdir . '../models/' . $subfolder . '/';
+                }
+            }
 
             // If not a framework’s own model - remove the suffix
             if ($class_name !== 'FwModel') {
@@ -527,7 +558,9 @@ class fw {
 
     #throw AuthException if request XSS is not passed or not equal to session's value
     public function checkXSS(bool $is_die = true): bool {
-        if ($_SESSION["XSS"] != reqs("XSS")) {
+        $session_xss = $_SESSION["XSS"] ?? '';
+        $request_xss = reqs("XSS");
+        if ($session_xss === '' || $session_xss !== $request_xss) {
             #logger("WARN", "XSS CHECK FAIL"); #too excessive logging
             if ($is_die) {
                 throw new AuthException("XSS Error. Reload the page or try to re-login");
@@ -561,7 +594,7 @@ class fw {
                     || $route->action == self::ACTION_DELETE
                     || $route->action == self::ACTION_SAVE_MULTI
                 )
-                && $session_xss > "" && $session_xss != $request_xss
+                && ($session_xss === '' || $session_xss !== $request_xss)
             ) {
                 throw new AuthException("XSS Error");
             }
@@ -1091,7 +1124,7 @@ class fw {
         return $this->sendEmail($to_email, $msg_subj, $msg_body, $options);
     }
 
-    public function logActivity(string $log_types_icode, string $entity_icode, int $item_id = 0, string $iname = "", array $changed_fields = null): void {
+    public function logActivity(string $log_types_icode, string $entity_icode, int $item_id = 0, string $iname = "", ?array $changed_fields = null): void {
         if (!$this->is_log_events) {
             return;
         }
@@ -1230,6 +1263,34 @@ function reqb(string $name, bool $default = false): bool {
     }
 }
 
+/**
+ * Safely export values to JSON for logs/debugging with limited depth.
+ */
+function dumper($data, int $depth = 16): string {
+    try {
+        if ($data instanceof Throwable) {
+            $data = [
+                'type'    => get_class($data),
+                'message' => $data->getMessage(),
+                'code'    => $data->getCode(),
+                'file'    => $data->getFile(),
+                'line'    => $data->getLine(),
+                'trace'   => $data->getTrace(),
+            ];
+        }
+
+        $json = json_encode($data, JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT, $depth);
+    } catch (Throwable) {
+        $json = '"[unserializable data]"';
+    }
+
+    if ($json === false) {
+        $json = '"[json encoding error]"';
+    }
+
+    return $json;
+}
+
 function reqjson(string $name): array {
     $value = _req($name, []);
     if (is_array($value)) {
@@ -1277,9 +1338,7 @@ function logger(mixed ...$params): void {
     // 3) Skip logging if current config doesn't permit it
     $currentLogLevel   = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']] ?? fw::$LOG_LEVELS['INFO'];
     $requestedLogLevel = fw::$LOG_LEVELS[$logType];
-    if ($requestedLogLevel > $currentLogLevel) {
-        return;
-    }
+    $isLogLevelSkipped = $requestedLogLevel > $currentLogLevel;
 
     // 4) Build the combined log message from remaining arguments
     //    The first of $params is considered the "main message" if scalar, else var_export
@@ -1287,7 +1346,7 @@ function logger(mixed ...$params): void {
     if (!empty($params)) {
         // Start with the first item
         $main    = $params[0];
-        $message = is_scalar($main) ? (string)$main : @var_export($main, true);
+        $message = is_scalar($main) ? (string)$main : dumper($main);
 
         // Append everything else
         for ($i = 1, $count = count($params); $i < $count; $i++) {
@@ -1295,19 +1354,25 @@ function logger(mixed ...$params): void {
             if (is_scalar($item)) {
                 $message .= ' ' . $item;
             } else {
-                $message .= "\n" . @var_export($item, true);
+                $message .= "\n" . dumper($item);
             }
         }
     }
 
-    $isLogEnabled = !empty($CONFIG['LOG_DESTINATION']);
+    $logDestination = (string)($CONFIG['LOG_DESTINATION'] ?? '');
+    if (!empty($CONFIG['LOG_DESTINATION_OFFLINE']) && PHP_SAPI === 'cli') {
+        $logDestination = (string)$CONFIG['LOG_DESTINATION_OFFLINE'];
+    }
+
+    $isLogEnabled = $logDestination !== '';
+    $isSentryEnabled = !empty($CONFIG['LOG_SENTRY_DSN']) && !$isLogLevelSkipped;
 
     // 5) If logging to file is on, gather file/line info via debug_backtrace.
     //    (We skip it if we’re not writing anywhere, to save overhead.)
     $fileName = '';
     $funcName = '';
     $line     = '';
-    if ($isLogEnabled) {
+    if ($isLogEnabled || $isSentryEnabled) {
         [$fileName, $funcName, $line] = getCallerInfo();
     }
 
@@ -1319,7 +1384,7 @@ function logger(mixed ...$params): void {
     }
 
     // 7) If LOG_DESTINATION is set, write to error_log
-    if ($isLogEnabled) {
+    if ($isLogEnabled && !$isLogLevelSkipped) {
         $now    = (new DateTime())->format('Y-m-d H:i:s.v');
         $pid    = getmypid();
         $prefix = "$now $pid $logType $fileName::$funcName($line) ";
@@ -1327,11 +1392,11 @@ function logger(mixed ...$params): void {
         if (!str_ends_with($message, "\n")) {
             $message .= "\n";
         }
-        error_log($prefix . $message, $CONFIG['LOG_MESSAGE_TYPE'] ?? 0, $CONFIG['LOG_DESTINATION']);
+        error_log($prefix . $message, $CONFIG['LOG_MESSAGE_TYPE'] ?? 0, $logDestination);
     }
 
     // 8) If Sentry is configured, push logs there
-    if (!empty($CONFIG['LOG_SENTRY_DSN'])) {
+    if ($isSentryEnabled) {
         try {
             //add extra params for Sentry
             $params[] = [

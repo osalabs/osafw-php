@@ -20,6 +20,11 @@
                 ><i class="bi bi-plus-lg"></i> `Add New`</a>
                 <slot name="group"></slot>
             </div>
+            <a v-for="link in headerLinks"
+               :key="link.url + '|' + link.label"
+               class="btn btn-default ms-1"
+               :href="link.url"
+            ><i v-if="link.icon" :class="[link.icon, 'me-1']"></i>{{link.label}}</a>
             <slot></slot>
         </div>
         <slot name="afterButtons"></slot>
@@ -37,6 +42,13 @@
             ...mapStores(useFwStore), //accessible via this.fwStore
             uioptions() {
                 return this.fwStore.uioptions.list.header ?? false;
+            },
+            headerLinks() {
+                if (!Array.isArray(this.fwStore.header_links)) {
+                    return [];
+                }
+
+                return this.fwStore.header_links.filter(link => link && link.url && link.label);
             }
         },
         methods: {

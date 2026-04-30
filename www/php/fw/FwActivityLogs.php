@@ -18,6 +18,7 @@ class FwActivityLogs extends FwModel {
     public const string TAB_ALL      = "all";
     public const string TAB_COMMENTS = "comments";
     public const string TAB_HISTORY  = "history";
+    public const int    PAYLOAD_MAX_BYTES = 1000000;
 
     public function __construct() {
         parent::__construct();
@@ -37,7 +38,7 @@ class FwActivityLogs extends FwModel {
      * @throws ApplicationException
      * @throws NoModelException
      */
-    public function addSimple(string $log_types_icode, string $entity_icode, int $item_id = 0, string $idesc = "", array $payload = null): int {
+    public function addSimple(string $log_types_icode, string $entity_icode, int $item_id = 0, string $idesc = "", ?array $payload = null): int {
         $lt = FwLogTypes::i()->oneByIcode($log_types_icode);
         if (empty($lt)) {
             throw new ApplicationException("Log type not found for icode=[" . $log_types_icode . "]");
@@ -53,7 +54,11 @@ class FwActivityLogs extends FwModel {
             $fields["item_id"] = $item_id;
         }
         if ($payload) {
-            $fields["payload"] = json_encode($payload);
+            $payload_encoded = json_encode($payload);
+            if ($payload_encoded !== false && strlen($payload_encoded) > self::PAYLOAD_MAX_BYTES) {
+                $payload_encoded = substr($payload_encoded, 0, self::PAYLOAD_MAX_BYTES - 14) . "... [truncated]";
+            }
+            $fields["payload"] = $payload_encoded === false ? '' : $payload_encoded;
         }
         return $this->add($fields);
     }
@@ -66,7 +71,7 @@ class FwActivityLogs extends FwModel {
      * @return array
      * @throws NoModelException|DBException
      */
-    public function listByEntity(string $entity_icode, int $id, array $log_types_icodes = null): array {
+    public function listByEntity(string $entity_icode, int $id, ?array $log_types_icodes = null): array {
         $fwentities_id = FwEntities::i()->idByIcodeOrAdd($entity_icode);
         $where         = [
             "fwentities_id" => $fwentities_id,
@@ -189,7 +194,7 @@ class FwActivityLogs extends FwModel {
         return $result;
     }
 
-    public function getCountByLogIType(int $log_itype, array $statuses = null, int $since_days = null): int {
+    public function getCountByLogIType(int $log_itype, ?array $statuses = null, ?int $since_days = null): int {
         $logtypes = FwLogTypes::i()->qTable();
         $sql      = "SELECT count(*) 
                     from {$this->qTable()} al 

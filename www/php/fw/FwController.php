@@ -157,7 +157,7 @@ abstract class FwController {
         $this->form_new_defaults = $this->config["form_new_defaults"] ?? [];
 
         #save_fields_checkboxes could be defined as qw string - check and convert
-        if (is_array($this->config["save_fields_checkboxes"])) {
+        if (is_array($this->config["save_fields_checkboxes"] ?? '')) {
             $this->save_fields_checkboxes = Utils::qhRevert($this->config["save_fields_checkboxes"]); #not optimal, but simplest for now
         } else {
             $this->save_fields_checkboxes = $this->config["save_fields_checkboxes"] ?? '';
@@ -661,7 +661,7 @@ abstract class FwController {
      * @return bool true if all required field names non-empty
      *              also set global fw.FormErrors[REQUIRED]=true in case of validation error if no form_errors defined
      */
-    public function validateRequired(mixed $id, array $item, array|string $afields, array &$form_errors = null): bool {
+    public function validateRequired(mixed $id, array $item, array|string $afields, ?array &$form_errors = null): bool {
         $result = true;
 
         $afields = Utils::qw($afields);
@@ -774,6 +774,30 @@ abstract class FwController {
     }
 
     /**
+     * Return one item from controller's model. For simpler overriding in child controllers.
+     * @param int $id
+     * @return array
+     */
+    public function modelOne(int $id): array {
+        return $this->model->one($id);
+    }
+
+    /**
+     * Return one item from controller's model or throw a standard not-found exception.
+     * @param int $id
+     * @return array
+     * @throws NotFoundException
+     */
+    public function modelOneOrFail(int $id): array {
+        $item = $this->modelOne($id);
+        if (empty($item)) {
+            throw new NotFoundException();
+        }
+
+        return $item;
+    }
+
+    /**
      * return URL for location after successful Save action
      * if return_url set (and no add new form requested) - go to return_url
      * id:
@@ -859,7 +883,7 @@ abstract class FwController {
      * @param array|null $more_json added to json response
      * @return array|null ps array of json response or null (will be redirected to new location or ShowForm)
      */
-    public function afterSave(bool $success, string $id = '', bool $is_new = false, string $action = FW::ACTION_SHOW_FORM, string $location = '', array $more_json = null): ?array {
+    public function afterSave(bool $success, string $id = '', bool $is_new = false, string $action = FW::ACTION_SHOW_FORM, string $location = '', ?array $more_json = null): ?array {
         if (!$location) {
             $location = $this->afterSaveLocation($id);
         }
@@ -903,7 +927,7 @@ abstract class FwController {
         return null;
     }
 
-    public function afterSaveJson(bool $success, array $more_json = null): array {
+    public function afterSaveJson(bool $success, ?array $more_json = null): array {
         return $this->afterSave($success, "", false, "no_action", "", $more_json);
     }
 
@@ -943,7 +967,7 @@ abstract class FwController {
         }
     }
 
-    public function setPS(array &$ps = null): array {
+    public function setPS(?array &$ps = null): array {
         if (empty($ps)) {
             $ps = array();
         }

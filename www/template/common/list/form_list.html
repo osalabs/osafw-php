@@ -1,6 +1,7 @@
 <form class="fw-card" action="<~../url>" method="post">
   <input type="hidden" name="XSS" value="<~SESSION[XSS]>">
   <input type="hidden" name="_method" value="PUT">
+  <~form_list_hidden_fields>
   <~/common/form/relid>
 
   <div class="table-list-wrapper">

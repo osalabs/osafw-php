@@ -39,7 +39,7 @@ class AdminReportsController extends FwAdminController {
         $f = $this->initFilter("AdminReports." . $repcode);
 
         #get format directly form request as we don't need to remember format
-        $f["format"] = reqh("f")["format"];
+        $f["format"] = reqh("f")["format"] ?? 'html';
         if (!$f["format"]) {
             $f["format"] = "html";
         }
@@ -49,6 +49,8 @@ class AdminReportsController extends FwAdminController {
         $ps["f"] = $report->getReportFilters();
         if ($ps["is_run"]) {
             $ps["rep"] = $report->getReportData();
+        } else {
+            $ps["rep"] = array();
         }
 
         #show or output report according format

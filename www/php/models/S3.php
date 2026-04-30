@@ -35,6 +35,7 @@ you could optionally add /S3Root/* after YOURBUCKETNAME to limit access only to 
  */
 
 use Aws\Result;
+use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
 
 class S3 extends FwModel {
@@ -43,39 +44,87 @@ class S3 extends FwModel {
     public string $region = '';
     public string $bucket = '';
     public string $root = '';
+    protected array $credentials = [];
 
     public S3Client $client;
 
-    public function __construct() {
-        parent::__construct();
+    public function __construct($param_fw = null) {
+        $bucket_config = is_array($param_fw) ? $param_fw : null;
+
+        parent::__construct($bucket_config === null ? $param_fw : null);
 
         $this->table_name = '';
+        $this->initConfig($bucket_config ?? $this->fw->config->AWS);
 
         $this->initClient(); // automatically init client on start
     }
 
-    public function initClient(): void {
-        $this->bucket = $this->fw->config->AWS['BUCKET'];
-        $this->root   = $this->fw->config->AWS['S3_ROOT'];
+    protected function initConfig(array $bucket_config): void {
+        $this->region = $bucket_config['REGION'] ?? $this->fw->config->AWS['REGION'] ?? '';
+        $this->bucket = $bucket_config['BUCKET'] ?? $this->fw->config->AWS['BUCKET'] ?? '';
+        $root         = $bucket_config['S3_ROOT'] ?? $this->fw->config->AWS['S3_ROOT'] ?? '';
+        $root         = rtrim($root, '/');
+        $this->root   = $root === '' ? '' : $root . '/';
 
-        //throw exception if region/bucket/akey/skey is not defined
-        if (empty($this->fw->config->AWS['ACCESS_KEY'])
-            || empty($this->fw->config->AWS['SECRET_KEY'])
-            || empty($this->region)
-            || empty($this->bucket)
-            || empty($this->root)
-        ) {
+        $this->credentials = $bucket_config['CREDENTIALS'] ?? [];
+        if (empty($this->credentials['key']) && !empty($bucket_config['ACCESS_KEY']) && !empty($bucket_config['SECRET_KEY'])) {
+            $this->credentials = [
+                'key'    => $bucket_config['ACCESS_KEY'],
+                'secret' => $bucket_config['SECRET_KEY']
+            ];
+        }
+    }
+
+    public static function withBucket(array $bucket_config): S3 {
+        return new self($bucket_config);
+    }
+
+    public function initClient(): void {
+        if (empty($this->region) || empty($this->bucket)) {
             throw new Exception('S3 region/bucket/root is not configured');
         }
 
-        $this->client = new S3Client([
-            'region'      => $this->region,
-            'version'     => 'latest',
-            'credentials' => [
-                'key'    => $this->fw->config->AWS['ACCESS_KEY'],
-                'secret' => $this->fw->config->AWS['SECRET_KEY']
-            ],
-        ]);
+        $client_options = [
+            'region'  => $this->region,
+            'version' => 'latest',
+        ];
+
+        if (!empty($this->credentials['key'])) {
+            $client_options['credentials'] = $this->credentials;
+        }
+
+        $this->client = new S3Client($client_options);
+    }
+
+    /**
+     * return S3 URL for the key
+     * @param string $key
+     * @return string
+     */
+    public function getURL(string $key): string {
+        return 'https://s3.' . $this->region . '.amazonaws.com/' . $this->bucket . '/' . $this->root . $key;
+    }
+
+    /**
+     * check if object actually exists in the bucket
+     */
+    public function isKeyExists(string $key): bool {
+        try {
+            $this->client->headObject([
+                'Bucket' => $this->bucket,
+                'Key'    => $this->root . $key,
+            ]);
+            return true;
+        } catch (S3Exception $e) {
+            if ($e->getStatusCode() == 404) {
+                return false;
+            }
+            logger('NOTICE', 'S3 exists error', $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            logger('NOTICE', 'S3 exists error', $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -122,7 +171,7 @@ class S3 extends FwModel {
         $request = $request->withHeader('Cache-Control', 'private, max-age=' . $max_age . ', immutable');
 
         $url = (string)$request->getUri();
-        $url .= '?max-age=' . $max_age;
+        $url .= (str_contains($url, '?') ? '&' : '?') . 'max-age=' . $max_age; // help CDN/browser cache heuristics
         return $url;
     }
 
@@ -138,24 +187,47 @@ class S3 extends FwModel {
         logger("deleteObject: [$key] (is_add_root=$is_add_root, is_folder_check=$is_folder_check)");
 
         if ($is_folder_check && str_ends_with($key, '/')) {
-            // it's subfolder - delete all content first
-            $list = $this->client->listObjectsV2([
-                'Bucket'    => $this->bucket,
-                'Prefix'    => ($is_add_root ? $this->root : '') . $key,
-                'Delimiter' => '/',
+            $prefix            = ($is_add_root ? $this->root : '') . $key;
+            $continuationToken = null;
+
+            do {
+                $params = [
+                    'Bucket'  => $this->bucket,
+                    'Prefix'  => $prefix,
+                    'MaxKeys' => 1000,
+                ];
+                if ($continuationToken) {
+                    $params['ContinuationToken'] = $continuationToken;
+                }
+
+                $list    = $this->client->listObjectsV2($params);
+                $objects = [];
+                foreach ($list['Contents'] ?? [] as $entry) {
+                    if ($entry['Key'] === $prefix) {
+                        continue;
+                    }
+                    $objects[] = ['Key' => $entry['Key']];
+                }
+
+                if ($objects) {
+                    $this->client->deleteObjects([
+                        'Bucket' => $this->bucket,
+                        'Delete' => [
+                            'Objects' => $objects,
+                            'Quiet'   => true,
+                        ],
+                    ]);
+                }
+
+                $continuationToken = (!empty($list['IsTruncated']) && !empty($list['NextContinuationToken']))
+                    ? $list['NextContinuationToken']
+                    : null;
+            } while ($continuationToken);
+
+            return $this->client->deleteObject([
+                'Bucket' => $this->bucket,
+                'Key'    => $prefix,
             ]);
-
-            //delete objects in folder first. Note: object can be a folder itself with a zero size if
-            // it was created separately with no body and key name ending with "/",
-            // so set "is_folder_check" to False here to delete an object and avoid an infinite loop
-            foreach ($list['Contents'] as $entry) {
-                $this->deleteObject($entry['Key'], false, false);
-            }
-
-            //delete subfolders if any
-            foreach ($list['CommonPrefixes'] as $subfolder) {
-                $this->deleteObject($subfolder['Prefix'], false);
-            }
         }
         return $this->client->deleteObject([
             'Bucket' => $this->bucket,
@@ -169,36 +241,45 @@ class S3 extends FwModel {
      * @param string $filepath file path on the local disk to upload
      * @param string $disposition if defined (ex: inline) - Content-Disposition with file.FileName added
      * @param string $filename optional filename to include in disposition header
-     * @param string|null $storage_class S3 Storage Class, default is STANDARD or use 5 times cheaper GLACIER_IR
+     * @param array|string|null $options additional options to pass to putObject, or legacy storage class string
      * @return bool
      *
      * alternative way for upload - use Aws\S3\Transfer https://docs.aws.amazon.com/sdk-for-php/v3/developer-guide/s3-transfer.html
      */
-    public function uploadLocalFile(string $key, string $filepath, string $disposition = '', string $filename = '', string $storage_class = null): bool {
+    public function uploadLocalFile(string $key, string $filepath, string $disposition = '', string $filename = '', array|string|null $options = []): bool {
         logger("uploading to S3: key=[$key], filepath=[$filepath]");
+        if (!is_array($options)) {
+            $options = ['StorageClass' => $options ?? 'STANDARD'];
+        }
 
         $request                = [
             'Bucket'       => $this->bucket,
             'Key'          => $this->root . $key,
             'SourceFile'   => $filepath,
-            'StorageClass' => $storage_class ?? 'STANDARD'
+            'StorageClass' => $options['StorageClass'] ?? 'STANDARD'
         ];
         $request['ContentType'] = UploadUtils::ext2mime(pathinfo($filepath, PATHINFO_EXTENSION));
 
-        if ($disposition != '') {
-            if ($filename == '') {
+        if ($options) {
+            $request = array_merge($request, $options);
+        }
+
+        if ($disposition !== '') {
+            if ($filename === '') {
                 $filename = basename($filepath);
             }
-            $filename                      = str_replace('"', "'", $filename); // replace quotes
+            $filename                      = str_replace('"', "'", $filename);
             $request['ContentDisposition'] = "$disposition; filename=\"$filename\"";
         }
 
-        $result = $this->client->putObject($request);
-        if ($result['@metadata']['statusCode'] != 200) {
-            logger('WARN', "HttpStatusCode=", $result['@metadata']['statusCode']);
+        $result     = $this->client->putObject($request);
+        $meta       = $result['@metadata'] ?? [];
+        $statusCode = $meta['statusCode'] ?? null;
+        if ($statusCode !== 200) {
+            logger('WARN', 'HttpStatusCode', $statusCode, $meta);
         }
 
-        return ($result['@metadata']['statusCode'] == 200);
+        return $statusCode === 200;
     }
 
     /**
@@ -207,11 +288,12 @@ class S3 extends FwModel {
      * @param array $file single file from http upload $_FILES[xxx]
      * @param string $disposition if defined (ex: inline) - Content-Disposition with file.FileName added
      * @param string $filename optional filename to include in disposition header
+     * @param array $options additional options to pass to putObject
      * @return Result
      * alternative way for disposition - override response header in GET
      */
-    public function uploadPostedFile(string $key, array $file, string $disposition = '', string $filename = ''): Result {
-        logger("uploading to S3: key=[$key], file=[$file]");
+    public function uploadPostedFile(string $key, array $file, string $disposition = '', string $filename = '', array $options = []): Result {
+        logger("uploading to S3: key=[$key], file name=[{$file['name']}] size=[{$file['size']}] error=[{$file['error']}] ");
 
         $request                = [
             'Bucket'     => $this->bucket,
@@ -220,15 +302,70 @@ class S3 extends FwModel {
         ];
         $request['ContentType'] = UploadUtils::ext2mime($file['type']);
 
-        if ($disposition != '') {
-            if ($filename == '') {
+        if ($options) {
+            $request = array_merge($request, $options);
+        }
+
+        if ($disposition !== '') {
+            if ($filename === '') {
                 $filename = basename($file['name']);
             }
-            $filename                      = str_replace('"', "'", $filename); // replace quotes
+            $filename                      = str_replace('"', "'", $filename);
             $request['ContentDisposition'] = "$disposition; filename=\"$filename\"";
         }
 
         return $this->client->putObject($request);
+    }
+
+    public function uploadContent(string $key, string $fileContent, string $contentType = 'application/octet-stream', string $disposition = '', string $filename = '', array $more_request = []): Result {
+        $request = [
+            'Bucket'      => $this->bucket,
+            'Key'         => $this->root . $key,
+            'Body'        => $fileContent,
+            'ContentType' => $contentType,
+        ];
+        $request = array_merge($request, $more_request);
+
+        if ($disposition !== '') {
+            if ($filename === '') {
+                $filename = basename($key);
+            }
+            $filename                      = str_replace('"', "'", $filename);
+            $request['ContentDisposition'] = "$disposition; filename=\"$filename\"";
+        }
+
+        return $this->client->putObject($request);
+    }
+
+    public function uploadFromURL(string $key, string $url, string $disposition = '', string $filename = '', array $more_request = []): Result {
+        logger("uploading to S3: key=[$key], url=[$url]");
+
+        $stream = fopen($url, 'rb');
+        if ($stream === false) {
+            throw new Exception("Failed to read file from URL: " . $url);
+        }
+
+        $meta        = stream_get_meta_data($stream);
+        $fileContent = stream_get_contents($stream);
+        fclose($stream);
+        if ($fileContent === false) {
+            throw new Exception("Failed to read file from URL: " . $url);
+        }
+
+        $contentType      = 'application/octet-stream';
+        $response_headers = is_array($meta['wrapper_data'] ?? null) ? $meta['wrapper_data'] : [];
+        foreach (array_reverse($response_headers) as $hdr) {
+            if (stripos($hdr, 'Content-Type:') === 0) {
+                $contentType = trim(substr($hdr, 13));
+                break;
+            }
+        }
+
+        if ($filename === '') {
+            $filename = basename($url);
+        }
+
+        return $this->uploadContent($key, $fileContent, $contentType, $disposition, $filename, $more_request);
     }
 
     /**
@@ -245,9 +382,11 @@ class S3 extends FwModel {
             'Key'    => $this->root . $key,
         ];
 
-        $result = $this->client->getObject($request);
-        if ($result['@metadata']['statusCode'] != 200) {
-            logger('WARN', "HttpStatusCode=", $result['@metadata']['statusCode']);
+        $result     = $this->client->getObject($request);
+        $meta       = $result['@metadata'] ?? [];
+        $statusCode = $meta['statusCode'] ?? null;
+        if ($statusCode !== 200) {
+            logger('WARN', 'HttpStatusCode', $statusCode, $meta);
             return '';
         }
 

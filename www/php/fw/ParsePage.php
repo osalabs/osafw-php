@@ -60,6 +60,7 @@
 2025-01-16 - comments support <~#tag>
 2025-01-17 - added support for attributes: currency, url, noparse
 2025-03-30 - added support for languageCallback
+2025-07-19 - repeat supports associative arrays, added repeat.key
 
 ##########################################################
 tags in templates should be in <~name [attributes]> format
@@ -103,6 +104,9 @@ repeat - use $data[tag] (array of hashes) for repeat content, the following vars
     repeat.total (total number of items)
     repeat.index  (0-based)
     repeat.iteration (1-based)
+    repeat.even (0-odd, 1-even)
+    repeat.odd  (0-even, 1-odd)
+    repeat.key  (key of current item if array is associative)
     example:  <~/common/comma unless="repeat.last"> - will add comma template for all but last item
 
 sub - this attribute tell parser to use sub-hashtable for parse subtemplate ($data hash should contain reference to hash), examples:
@@ -228,6 +232,9 @@ class ParsePage {
         if (isset($options['isLangUpdate'])) {
             $this->setLangUpdate($options['isLangUpdate']);
         }
+        if (isset($options['isLangParse'])) {
+            $this->setLangParse($options['isLangParse']);
+        }
         if (isset($options['languageCallback'])) {
             $this->setLanguageCallback($options['languageCallback']);
         }
@@ -276,6 +283,11 @@ class ParsePage {
 
     public function setLangUpdate(bool $flag): self {
         $this->isLanguageUpdate = $flag;
+        return $this;
+    }
+
+    public function setLangParse(bool $flag): self {
+        $this->langParse = $flag;
         return $this;
     }
 
@@ -348,7 +360,7 @@ class ParsePage {
      * @return string    Parsed template content
      * @throws Exception
      */
-    private function parseTemplate(string $templateName, array $data, string $inlineContent = '', array $parentData = null, array $parentAttrs = null): string {
+    private function parseTemplate(string $templateName, array $data, string $inlineContent = '', ?array $parentData = null, ?array $parentAttrs = null): string {
         #$this->logger("DEBUG", "Parsing template: [$templateName]" . ($inlineContent !== '' ? ' inline' : ''));
         // Resolve the full template path
         $templateName = $this->getFullTemplatePath($templateName);
@@ -666,7 +678,7 @@ class ParsePage {
      * @param array|null $parentData
      * @return mixed The variable value or null if not found
      */
-    private function getVariableValue(string $tagName, array $data = null, array $parentData = null): mixed {
+    private function getVariableValue(string $tagName, ?array $data = null, ?array $parentData = null): mixed {
         if ($tagName === '' || is_null($data)) {
             return null;
         }
@@ -734,7 +746,8 @@ class ParsePage {
         $loopedOutput = '';
         $items        = $tagValue;
         $total        = count($items);
-        foreach ($items as $index => $item) {
+        $index        = 0;
+        foreach ($items as $key => $item) {
             // Add repeat.* variables
             $item['repeat.first']     = ($index === 0) ? 1 : 0;
             $item['repeat.last']      = ($index === $total - 1) ? 1 : 0;
@@ -743,10 +756,12 @@ class ParsePage {
             $item['repeat.total']     = $total;
             $item['repeat.even']      = ($index % 2) ? 1 : 0;
             $item['repeat.odd']       = ($index % 2) ? 0 : 1;
+            $item['repeat.key']       = $key;
 
             // Parse template for one item
             $tagTplPath   = $this->getTagTemplatePath($tagName, $templateName, $isInline);
             $loopedOutput .= $this->parseTemplate($tagTplPath, $item, $inlineTemplate, $data, $attributes);
+            $index++;
         }
 
         return $this->replaceTagRaw($content, $tagFull, $tagName, $loopedOutput, $isInline);
@@ -912,7 +927,7 @@ class ParsePage {
      * Show the selected label from .sel file or array (like a read-only version of select/radio).
      */
     private function processSelvalueTag(string $content, string $tagFull, string $tagName, array $attributes, array $data): string {
-        $selectedValue = $this->getVariableValue($attributes['selvalue'], $data);
+        $selectedValue = $this->getVariableValue($attributes['selvalue'], $data) ?? '';
         $options       = $this->loadOptions($tagName, $data);
 
         $label = $options[$selectedValue] ?? '';
@@ -1057,18 +1072,33 @@ class ParsePage {
 
         #$this->logger("DEBUG", "Applying modifiers to value: ", $value, $attributes);
 
-        // If it's not scalar but "json" is requested, we handle that
-        if (!is_scalar($value)) {
-            if (isset($attributes['json'])) {
-                // If "json=pretty" => pretty print
-                $options = (strtolower($attributes['json']) === 'pretty') ? JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK : JSON_NUMERIC_CHECK;
-                $result  = json_encode($value, $options);
+        if (isset($attributes['json'])) {
+            $json_options = JSON_NUMERIC_CHECK | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+            if (strtolower((string)$attributes['json']) === 'pretty') {
+                $json_options |= JSON_PRETTY_PRINT;
+            }
+
+            if (!is_scalar($value)) {
+                $result = json_encode($value, $json_options);
                 if ($is_htmlescape && !isset($attributes['noescape'])) {
                     $result = $this->htmlescape($result);
                 }
                 return $result;
             }
-            // Non-scalar but no json => default to empty
+
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $value = json_encode($decoded, $json_options);
+                } else {
+                    $value = json_encode($value, $json_options);
+                }
+            } else {
+                $value = json_encode($value, $json_options);
+            }
+        }
+
+        if (!is_scalar($value)) {
             return '';
         }
 
@@ -1151,13 +1181,6 @@ class ParsePage {
             if (!preg_match('!^\w+://!', $value)) {
                 $value = 'https://' . $value;
             }
-        }
-
-        // json (last pass, if the user wants to re-encode)
-        if (isset($attributes['json'])) {
-            // Re-encode if this is a scalar?
-            $options = (strtolower($attributes['json']) === 'pretty') ? JSON_PRETTY_PRINT | JSON_NUMERIC_CHECK : JSON_NUMERIC_CHECK;
-            $value   = json_encode($value, $options);
         }
 
         if ($is_htmlescape && !isset($attributes['noescape'])) {

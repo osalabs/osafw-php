@@ -25,9 +25,61 @@ class Locks extends FwModel {
         #$this->db = SiteUtils::connectDBHostQuick($this->fw); #this model works with Quick DB
     }
 
+    protected function lockTimeField(): string {
+        $schema = $this->schema();
+        $fields = array_column($schema, 'name');
+        if (in_array('upd_time', $fields, true)) {
+            return 'upd_time';
+        }
+        if (in_array('updated', $fields, true)) {
+            return 'updated';
+        }
+        return 'add_time';
+    }
+
+    protected function lockTimeSql(): string {
+        $schema = $this->schema();
+        $fields = array_column($schema, 'name');
+        $qadd = $this->db->qid('add_time');
+        $hasUpdTime = in_array('upd_time', $fields, true);
+        $hasUpdated = in_array('updated', $fields, true);
+
+        if ($hasUpdTime && $hasUpdated) {
+            return 'IFNULL(' . $this->db->qid('upd_time') . ', IFNULL(' . $this->db->qid('updated') . ', ' . $qadd . '))';
+        }
+        if ($hasUpdTime) {
+            return 'IFNULL(' . $this->db->qid('upd_time') . ', ' . $qadd . ')';
+        }
+        if ($hasUpdated) {
+            return 'IFNULL(' . $this->db->qid('updated') . ', ' . $qadd . ')';
+        }
+        return $qadd;
+    }
+
     #cleanup - auto-expire locks
     public function cleanup(): void {
-        $this->db->exec("delete from $this->table_name where DATE_ADD(updated, INTERVAL expires SECOND)<NOW()");
+        $this->db->exec("delete from " . $this->qTable() . " where DATE_ADD(" . $this->lockTimeSql() . ", INTERVAL " . $this->db->qid('expires') . " SECOND)<NOW()");
+    }
+
+    // check if lock exists
+    public function exists(string $icode, int $item_id = 0, ?string $environment = null): bool {
+        if (empty($environment)) {
+            $environment = SiteUtils::getEnvironment();
+        }
+
+        $row = $this->db->row($this->table_name, [
+            'icode'       => $icode,
+            'environment' => $environment,
+            'item_id'     => $item_id
+        ]);
+        if ($row) {
+            $expires         = $row['expires'] ?? 3600;
+            $upd_time        = $row['upd_time'] ?? $row['updated'] ?? $row['add_time'];
+            $expiration_time = strtotime($upd_time) + $expires;
+            return $expiration_time > time();
+        }
+
+        return false;
     }
 
     /**
@@ -38,7 +90,7 @@ class Locks extends FwModel {
      * @param string|null $environment optional, particular environment, if not set - SiteUtils::getEnvironment() used
      * @return boolean          true if lock obtained
      */
-    public function lock(string $icode, int $item_id = 0, int $expires = 3600, string $environment = null): bool {
+    public function lock(string $icode, int $item_id = 0, int $expires = 3600, ?string $environment = null): bool {
         $result = false;
 
         if (empty($environment)) {
@@ -74,7 +126,7 @@ class Locks extends FwModel {
      * @param string|null $environment
      * @return bool false if failed to unlock (like db error)
      */
-    public function unlock(string $icode, int $item_id = 0, string $environment = null): bool {
+    public function unlock(string $icode, int $item_id = 0, ?string $environment = null): bool {
         $result = true;
 
         if (empty($environment)) {
@@ -103,7 +155,7 @@ class Locks extends FwModel {
      * @param string|null $environment
      * @return bool
      */
-    public function extend(string $icode, int $item_id = 0, string $environment = null): bool {
+    public function extend(string $icode, int $item_id = 0, ?string $environment = null): bool {
         $result = true;
 
         if (empty($environment)) {
@@ -111,8 +163,12 @@ class Locks extends FwModel {
         }
 
         try {
+            $time_field = $this->lockTimeField();
+            if ($time_field === 'add_time') {
+                return false;
+            }
             $rows_updated_ctr = $this->db->update($this->table_name, [
-                'updated' => DB::NOW()
+                $time_field => DB::NOW()
             ], [
                 'icode'       => $icode,
                 'environment' => $environment,

@@ -62,10 +62,7 @@ class FwAdminController extends FwController {
 
     public function ShowAction($form_id): ?array {
         $id   = intval($form_id);
-        $item = $this->model->one($id);
-        if (!$item) {
-            throw new ApplicationException("Not Found", 404);
-        }
+        $item = $this->modelOneOrFail($id);
 
         $ps = array(
             'id'               => $id,
@@ -94,7 +91,7 @@ class FwAdminController extends FwController {
         if ($this->isGet()) {
             if ($id > 0) {
                 // edit screen
-                $item = $this->model->one($id);
+                $item = $this->modelOneOrFail($id);
             } else {
                 // add new screen
                 $item_new = [];
@@ -103,7 +100,7 @@ class FwAdminController extends FwController {
                 $item     = $item_new;
             }
         } else {
-            $itemdb = $this->model->one($id);
+            $itemdb = $this->modelOne($id);
             $item   = array_merge($itemdb, $item);
         }
 
@@ -166,7 +163,7 @@ class FwAdminController extends FwController {
 
         $id = intval($form_id);
         $ps = array(
-            'i'          => $this->model->one($id),
+            'i'          => $this->modelOneOrFail($id),
             'return_url' => $this->return_url,
             'related_id' => $this->related_id,
             'base_url'   => $this->base_url, #override default template url, remove if you created custom /showdelete templates

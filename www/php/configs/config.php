@@ -68,13 +68,14 @@ $FW_CONFIG = array(
         'IS_LOG'     => true, #enable logging via fw
     ),
 
-    'LOG_DESTINATION'  => $site_root_offline . '/logs/osafw.log',
-    'LOG_MESSAGE_TYPE' => 3, #3 - default to LOG_DESTINATION
-    'LOG_LEVEL'        => 'DEBUG', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
-    'LOG_LIMIT'        => 4096, #size limit for log messages
-    'LOG_SENTRY_DSN'   => '', #if set - log to Sentry
-    'IS_DEV'           => false, #NEVER set to true on live environments
-    'IS_TEST'          => false, #if true - test mode, emails sent to current user or test_email
+    'LOG_DESTINATION'         => $site_root_offline . '/logs/osafw.log',
+    'LOG_DESTINATION_OFFLINE' => '', #optional separate log destination for CLI/offline scripts
+    'LOG_MESSAGE_TYPE'        => 3, #3 - default to LOG_DESTINATION
+    'LOG_LEVEL'               => 'DEBUG', #ALL|TRACE|DEBUG|INFO|WARN|ERROR|FATAL|OFF. Use WARN|ERROR|FATAL|OFF for production, ALL|TRACE|DEBUG for dev
+    'LOG_LIMIT'               => 4096, #size limit for log messages
+    'LOG_SENTRY_DSN'          => '', #if set - log to Sentry
+    'IS_DEV'                  => false, #NEVER set to true on live environments
+    'IS_TEST'                 => false, #if true - test mode, emails sent to current user or test_email
 
     'IS_SIGNUP'            => false,  #set to true to enable Sign Up module
     'UNLOGGED_DEFAULT_URL' => '/',
@@ -104,6 +105,8 @@ $FW_CONFIG = array(
         '/Dev',
         '/v1', #API version 1
     ),
+    'ROUTE_ID_REGEX'        => '', #optional override for REST ID matching; default keeps numeric IDs and 32+ char UUID-like strings
+    'AUTOLOAD_MODELS'       => array(), #optional /models subfolders to autoload, e.g. array('/Extra')
     #prefixes without XSS check (without slash)
     'NO_XSS_PREFIXES'       => array(
         'v1' => true, # no need to check for API
@@ -122,7 +125,8 @@ $FW_CONFIG = array(
         '/AdminAtt/Select' => 1,
     ),
 
-    'IS_API'      => null, #null - disable, true - only allow API controllers, false - only allow NON-API controllers (to enable same code deployment for API and NON-API)
+    'IS_API'                 => null, #null - disable, true - only allow API controllers, false - only allow NON-API controllers (to enable same code deployment for API and NON-API)
+    'PERM_COOKIE_ENV_SUFFIX' => '', #optional suffix for remember-me cookie names across shared domains
 
     #multilanguage support settings
     'LANG_DEF'    => 'en',        #default language - en, ru, ua, ...

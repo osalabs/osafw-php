@@ -24,6 +24,10 @@ class LoginController extends FwController {
     }
 
     public function IndexAction(): ?array {
+        if ($this->fw->isLogged()) {
+            fw::redirect($this->fw->config->LOGGED_DEFAULT_URL);
+        }
+
         $item = reqh('item');
         if (!$item) {
             #defaults
@@ -46,8 +50,9 @@ class LoginController extends FwController {
             if (($item["chpwd"] ?? '') == "1") {
                 $pwd = $item['pwd'];
             }
-            $pwd   = substr(trim($pwd), 0, 64);
-            $gourl = reqs('gourl');
+            $pwd      = substr(trim($pwd), 0, 64);
+            $gourl    = reqs('gourl');
+            $remember = $item['remember'] ?? '';
 
             #for dev only - login as first admin
             $is_dev_login = false;
@@ -55,6 +60,11 @@ class LoginController extends FwController {
                 $dev          = $this->db->rowp("select email, pwd from users where status=0 and access_level=100 order by id limit 1");
                 $login        = $dev['email'];
                 $is_dev_login = true;
+            }
+            #for normal logins - have a delay up to 2s to slow down any brute force attempts
+            if (!$is_dev_login) {
+                $delay = intval((mt_rand() / mt_getrandmax() * 2 + 0.5) * 1000);
+                usleep($delay * 1000);
             }
 
             if (!strlen($login) || !strlen($pwd)) {
@@ -65,11 +75,12 @@ class LoginController extends FwController {
             $user = Users::i()->oneByEmail($login);
             if (!$is_dev_login) {
                 if (!$user || $user['status'] != 0 || !$this->model->checkPwd($pwd, $user['pwd'])) {
+                    $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGIN_FAIL, FwEntities::ICODE_USERS, 0, $login);
                     throw new ApplicationException("User Authentication Error");
                 }
             }
 
-            $this->model->doLogin($user['id']);
+            $this->model->doLogin($user['id'], !empty($remember));
 
             if ($gourl && !preg_match("/^http/i", $gourl)) { #if url set and not external url (hack!) given
                 fw::redirect($gourl);

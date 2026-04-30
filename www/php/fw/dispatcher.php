@@ -80,11 +80,13 @@ class Dispatcher {
     public string $ROOT_URL;
     public array $ROUTE_PREFIXES; #array('/Admin', '/My', ...)
     public string $request_url; #last url processed by uriToRoute
+    public string $ROUTE_ID_REGEX;
 
-    public function __construct(array $ROUTES = array(), string $ROOT_URL = '', array $ROUTE_PREFIXES = array()) {
+    public function __construct(array $ROUTES = array(), string $ROOT_URL = '', array $ROUTE_PREFIXES = array(), string $ROUTE_ID_REGEX = '') {
         $this->ROUTES         = $ROUTES;
         $this->ROOT_URL       = $ROOT_URL;
         $this->ROUTE_PREFIXES = $ROUTE_PREFIXES;
+        $this->ROUTE_ID_REGEX = $ROUTE_ID_REGEX ?: '\d+|[\w_]{32,}';
     }
 
     /**
@@ -147,7 +149,7 @@ class Dispatcher {
             $ps = $controller->$method_name(...$aparams);
 
             // check/override _basedir from controller for non-json requests
-            if (!fw::i()->isJsonExpected() && !isset($ps['_basedir_controller']) && !empty($controller->template_basedir)) {
+            if (is_array($ps) && !fw::i()->isJsonExpected() && !isset($ps['_basedir_controller']) && !empty($controller->template_basedir)) {
                 logger("TRACE", "Controller [$controller_name] template_basedir override to [$controller->template_basedir]");
                 $ps['_basedir_controller'] = $controller->template_basedir;
             }
@@ -259,7 +261,7 @@ class Dispatcher {
         if (!$result) {
             #just respond with 405 and exit immediately
             header("HTTP/1.0 405 Method Not Allowed", true, 405);
-            header("Allow: GET, POST, PUT, DELETE, OPTIONS"); #instruct client what methods are allowed
+            header("Allow: GET, POST, PUT, PATCH, DELETE, OPTIONS"); #instruct client what methods are allowed
             exit;
             #throw new Exception('Unsupported REST params combination'); #405 Method Not Allowed
         }
@@ -345,7 +347,7 @@ class Dispatcher {
         if (!$is_route_found) {
             #if no special ROUTES found - try to detect default RESTful URLs
             $RX_CONTROLLER = '[^/]+';
-            $RX_ID         = '\d+|[\w_]{32,}'; // Match numeric IDs or UUID-like IDs (at least 32 chars, no dashes). I.e. custom action names should be less than 32 chars
+            $RX_ID         = $this->ROUTE_ID_REGEX; // Match numeric IDs or UUID-like IDs by default. I.e. custom action names should be less than 32 chars
 
             #get RESTful URI
             $is_match = preg_match("!^/($RX_CONTROLLER)(?:/(new|\.\w+)|/($RX_ID)(?:\.(\w+))?(?:/(edit|delete))?)?/?$!i", $uri, $m);

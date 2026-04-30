@@ -109,6 +109,49 @@ class Att extends FwModel {
         return $result;
     }
 
+    public function uploadString(array $item, string $filename, string $content): array {
+        $result = [];
+        if (!strlen($content)) {
+            return $result;
+        }
+
+        $itemdb           = $item;
+        $itemdb['status'] = self::STATUS_UNDER_UPDATE;
+        $id               = $this->add($itemdb);
+
+        $ext      = UploadUtils::uploadExt($filename);
+        $filepath = $this->getUploadPath($id, $ext, self::SIZE_ORIGINAL);
+        file_put_contents($filepath, $content);
+
+        logger("uploaded to [" . $filepath . "]");
+
+        $fields = [
+            'fname'   => $filename,
+            'fsize'   => strlen($content),
+            'ext'     => $ext,
+            'storage' => self::STORAGE_FILE,
+            'status'  => self::STATUS_ACTIVE,
+        ];
+
+        if (UploadUtils::isImgExt($ext)) {
+            $fields["is_image"] = 1;
+
+            ImageUtils::resize($filepath, self::MAX_THUMB_W_S, self::MAX_THUMB_H_S, $this->getUploadImgPath($id, self::SIZE_SMALL, $ext));
+            ImageUtils::resize($filepath, self::MAX_THUMB_W_M, self::MAX_THUMB_H_M, $this->getUploadImgPath($id, self::SIZE_MEDIUM, $ext));
+            ImageUtils::resize($filepath, self::MAX_THUMB_W_L, self::MAX_THUMB_H_L, $this->getUploadImgPath($id, self::SIZE_LARGE, $ext));
+        }
+
+        $this->update($id, $fields);
+
+        $result             = $fields;
+        $result["id"]       = $id;
+        $result["filepath"] = $filepath;
+
+        $this->moveToStorage($id);
+
+        return $result;
+    }
+
     /**
      * Update tmp uploads to be linked to specific entity id
      * @param string $entity_icode
@@ -159,7 +202,7 @@ class Att extends FwModel {
         }
 
         if ($item['storage'] == self::STORAGE_S3) {
-            $result = S3::i()->getSignedUrl($this->getS3KeyByID($id), $size);
+            $result = S3::i()->getSignedUrl($this->getS3KeyByID($id, $size));
         } else {
             #if /Att need to be on offline folder
             $result = $this->fw->GLOBAL['ROOT_URL'] . '/Att/' . $id;
@@ -181,7 +224,7 @@ class Att extends FwModel {
         if (is_array($id_or_item)) {
             $item = $id_or_item;
             if ($item['storage'] == self::STORAGE_S3) {
-                return S3::i()->getSignedUrl($this->getS3KeyByID($item['id']), $size);
+                return S3::i()->getSignedUrl($this->getS3KeyByID($item['id'], $size));
             } elseif ($item['storage'] == self::STORAGE_TABLE) {
                 return $this->getUrl($item['id'], $size); // don't have direct url for table storage
             } else {
@@ -213,12 +256,7 @@ class Att extends FwModel {
                 S3::i()->deleteObject($this->table_name . "/" . $item["id"]);
 
             } elseif ($item["storage"] == self::STORAGE_TABLE) {
-                $this->update($id, [
-                    'raw'   => null,
-                    'raw_s' => null,
-                    'raw_m' => null,
-                    'raw_l' => null,
-                ]);
+                // no need to clear raw fields as the whole record is deleted below
 
             } else {
                 // local storage
@@ -262,6 +300,11 @@ class Att extends FwModel {
         }
     }
 
+    public function oneRaw(int $id, string $size = ""): ?string {
+        $suffix = $size == self::SIZE_ORIGINAL ? "" : "_" . $size;
+        return $this->db->value($this->table_name, ["id" => $id], "raw" . $suffix);
+    }
+
     /**
      * transmit file by id/size to user's browser, optional disposition - attachment(default)/inline
      * also check access rights - throws ApplicationException if file not accessible by cur user
@@ -286,8 +329,16 @@ class Att extends FwModel {
 
         $size = UploadUtils::checkSize($size);
 
-        $filepath = $this->getUploadPath($id, $item['ext'], $size);
-        $filetime = filemtime($filepath);
+        $is_file_storage = ($item['storage'] == self::STORAGE_FILE);
+        if ($is_file_storage) {
+            $filepath = $this->getUploadPath($id, $item['ext'], $size);
+            $filetime = filemtime($filepath);
+            $filesize = filesize($filepath);
+        } else {
+            $content  = (string)$this->oneRaw($id, $size);
+            $filesize = strlen($content);
+            $filetime = strtotime($item['add_time'] ?? '') ?: time();
+        }
 
         $cache_time = 2592000; #30 days
         header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', time() + $cache_time));
@@ -306,12 +357,17 @@ class Att extends FwModel {
 
         $filename = str_replace('"', "'", $item['iname']); #quote filename
         header('Content-type: ' . UploadUtils::ext2mime($item['ext']));
-        header("Content-Length: " . filesize($filepath));
+        header("Content-Length: " . $filesize);
         header('Content-Disposition: ' . $disposition . '; filename="' . $filename . '"');
 
-        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, " . UploadUtils::ext2mime($item['ext']));
-        $fp = fopen($filepath, 'rb');
-        fpassthru($fp);
+        if ($is_file_storage) {
+            logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, " . UploadUtils::ext2mime($item['ext']));
+            $fp = fopen($filepath, 'rb');
+            fpassthru($fp);
+        } else {
+            logger('TRACE', "transmit file [table storage] $id, $size, $disposition, " . UploadUtils::ext2mime($item['ext']));
+            echo $content;
+        }
     }
 
     /**
@@ -457,19 +513,19 @@ class Att extends FwModel {
 
     /**
      * return one att record by entity and item_id
-     * @param int $entity_icode
+     * @param string $entity_icode
      * @param int $item_id
      * @return array
      * @throws DBException
      * @throws NoModelException
      */
-    public function oneByEntity(int $entity_icode, int $item_id): array {
+    public function oneByEntity(string $entity_icode, int $item_id): array {
         $fwentities_id = FwEntities::i()->idByIcodeOrAdd($entity_icode);
 
         return $this->db->row($this->table_name, array(
             'fwentities_id' => $fwentities_id,
             'item_id'       => $item_id,
-        ));
+        ), 'id desc');
     }
 
     // *********************** S3 support - only works with S3 model and Amazon SDK installed ***********************
@@ -531,7 +587,8 @@ class Att extends FwModel {
         foreach (self::ALL_SIZES as $size) {
             $path = $this->getUploadPath($id, $item["ext"], $size);
             if (file_exists($path)) {
-                $fields["raw_" . $size] = file_get_contents($path);
+                $suffix                  = $size == self::SIZE_ORIGINAL ? "" : "_" . $size;
+                $fields["raw" . $suffix] = file_get_contents($path);
             }
         }
 

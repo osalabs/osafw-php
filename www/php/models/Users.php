@@ -97,14 +97,14 @@ class Users extends FwModel {
     }
 
     #return standard list of id,iname where status=0 order by iname
-    public function ilist(array $statuses = null): array {
+    public function ilist(?array $statuses = null, ?array $def = null): array {
         if (is_null($statuses)) {
             $statuses = [FwModel::STATUS_ACTIVE];
         }
-        return parent::ilist($statuses);
+        return parent::ilist($statuses, $def);
     }
 
-    public function ilistByACL(int $min_acl = null): array {
+    public function ilistByACL(?int $min_acl = null): array {
         $where = '';
         if (!is_null($min_acl)) {
             $where = ' and access_level>=' . dbqi($min_acl);
@@ -115,7 +115,7 @@ class Users extends FwModel {
         return $this->db->arrp($sql, ['status' => FwModel::STATUS_ACTIVE]);
     }
 
-    public function listSelectOptions(array $def = null): array {
+    public function listSelectOptions(?array $def = null): array {
         $where = '';
         //        if (($def['lookup_params'] ?? '') == 'account') {
         //            $where .= " AND accounts_id=" . intval($def['i']['id'] ?? 0);
@@ -217,7 +217,7 @@ class Users extends FwModel {
         $chars = [];
         for ($i = 0; $i <= strlen($pwd) - 1; $i++) {
             $chars[$pwd[$i]] = intval($chars[$pwd[$i]]) + 1;
-            $result          += (int)(5.0 / (double)$chars[$pwd[$i]]);
+            $result          += (int)(5.0 / (float)$chars[$pwd[$i]]);
         }
 
         // bonus points for mixing it up
@@ -321,7 +321,7 @@ class Users extends FwModel {
 
     //<editor-fold defaultstate="collapsed" desc="Login/Session">
 
-    public function doLogin(int $id): void {
+    public function doLogin(int $id, bool $is_remember = false): void {
         $is_just_registered = intval($_SESSION['is_just_registered'] ?? 0);
 
         @session_destroy();
@@ -338,8 +338,11 @@ class Users extends FwModel {
         $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGIN, FwEntities::ICODE_USERS, $id);
 
         //set permanent login if requested
-        //if ($_REQUEST['is_remember']) createPermCookie($id);
-        $this->createPermCookie($id); #in this project no need is_remember
+        if ($is_remember) {
+            $this->createPermCookie($id);
+        } else {
+            $this->removePermCookie();
+        }
 
         $this->updateAfterLogin($id);
     }
@@ -409,8 +412,31 @@ class Users extends FwModel {
     //</editor-fold>
 
 
+    private function permCookieName(): string {
+        if (empty($this->fw->config->PERM_COOKIE_ENV_SUFFIX)) {
+            return self::$PERM_COOKIE_NAME;
+        }
+
+        $environment = $this->fw->config->environment ?? $this->fw->config->ENVIRONMENT ?? '';
+        if (!$environment || $environment === 'production') {
+            return self::$PERM_COOKIE_NAME;
+        }
+
+        $suffix = preg_replace('/[^a-z0-9_-]/i', '', (string)$environment);
+        if (!$suffix) {
+            return self::$PERM_COOKIE_NAME;
+        }
+
+        return self::$PERM_COOKIE_NAME . '_' . $suffix;
+    }
+
+    private function permCookieDomain(string $root_domain0): string {
+        return (preg_match('/\./', $root_domain0)) ? '.' . $root_domain0 : '';
+    }
+
     public function createPermCookie(int $id): string {
         $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
+        $cookie_name  = $this->permCookieName();
 
         $cookie_id = substr(Utils::getRandStr(16) . time(), 0, 32);
 
@@ -420,8 +446,8 @@ class Users extends FwModel {
         );
         $this->db->insert('users_cookies', $vars, array('replace' => 1));
 
-        setcookie(self::$PERM_COOKIE_NAME, $cookie_id, time() + 60 * 60 * 24 * self::$PERM_COOKIE_DAYS, "/", (preg_match('/\./', $root_domain0)) ? '.' . $root_domain0 : '');
-        #rwe("[$root_domain0] ".self::$PERM_COOKIE_NAME.", $cookie_id, ".(time()+60*60*24*self::$PERM_COOKIE_DAYS));
+        setcookie($cookie_name, $cookie_id, time() + 60 * 60 * 24 * self::$PERM_COOKIE_DAYS, "/", $this->permCookieDomain($root_domain0));
+        #rwe("[$root_domain0] ".$cookie_name.", $cookie_id, ".(time()+60*60*24*self::$PERM_COOKIE_DAYS));
 
         return $cookie_id;
     }
@@ -429,10 +455,11 @@ class Users extends FwModel {
     # check for permanent login cookie and if it's present - doLogin
     public function checkPermanentLogin(): bool {
         $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
+        $cookie_name  = $this->permCookieName();
 
         $result = false;
 
-        $cookie_id = @$_COOKIE[self::$PERM_COOKIE_NAME];
+        $cookie_id = @$_COOKIE[$cookie_name];
         #rw("cookies:");
         #print_r($_COOKIE);
         #exit;
@@ -450,19 +477,21 @@ class Users extends FwModel {
             if ($u_id > 0) {
                 $result = true;
                 #logger("PERMANENT LOGIN");
-                $this->doLogin($u_id);
+                $this->doLogin($u_id, true);
             } else {
                 #cookie is not found in DB - clean it (so it will not put load on DB during next pages)
-                setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/", (preg_match('/\./', $root_domain0)) ? '.' . $root_domain0 : '');
+                setcookie($cookie_name, FALSE, -1, "/", $this->permCookieDomain($root_domain0));
             }
         }
         return $result;
     }
 
     public function removePermCookie() {
-        $cookie_id = $_COOKIE[self::$PERM_COOKIE_NAME] ?? '';
+        $root_domain0 = $this->fw->config->ROOT_DOMAIN0;
+        $cookie_name  = $this->permCookieName();
+        $cookie_id    = $_COOKIE[$cookie_name] ?? '';
 
-        setcookie(self::$PERM_COOKIE_NAME, FALSE, -1, "/");
+        setcookie($cookie_name, FALSE, -1, "/", $this->permCookieDomain($root_domain0));
 
         #cleanup in DB (user's cookie and ALL old cookies)
         $this->db->query("DELETE FROM users_cookies
@@ -587,7 +616,7 @@ class Users extends FwModel {
      *     edit => true if user has edit permission
      *     del => true if user has delete permission
      */
-    public function getRBAC(?int $users_id = null, string $resource_icode = null): array {
+    public function getRBAC(?int $users_id = null, ?string $resource_icode = null): array {
         if (!$this->isRoles()) {
             return $this->allPermissions(); //if no Roles support - always allow
         }
@@ -675,7 +704,7 @@ class Users extends FwModel {
      * @return bool
      * @throws ApplicationException|DBException|NoModelException
      */
-    public function isAccessByRolesResourceAction(int $users_id, string $resource_icode, string $resource_action, string $resource_action_more = "", array $access_actions_to_permissions = null): bool {
+    public function isAccessByRolesResourceAction(int $users_id, string $resource_icode, string $resource_action, string $resource_action_more = "", ?array $access_actions_to_permissions = null): bool {
         if ($this->isRoles()) {
             // determine permission by resource action
             $permission_icode = Permissions::i()->mapActionToPermission($resource_action, $resource_action_more);

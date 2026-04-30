@@ -184,15 +184,28 @@ class Utils {
      * @return string
      */
     public static function html2text(string $str): string {
-        $str = preg_replace("/\n+/", " ", $str);
-        $str = preg_replace("/<br\s*\/?>/", "\n", $str);
-        $str = preg_replace("/(?:<[^>]*>)+/", " ", $str);
-        return $str;
+        $str = preg_replace('/<br\s*\/?>/i', "\n", $str);
+        $str = preg_replace('#</(p|div|h[1-6]|li)\s*>#i', "\n", $str);
+        $str = preg_replace('#<[^>]+>#', ' ', $str);
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $str = str_replace("\xc2\xa0", ' ', $str);
+        $str = preg_replace('/[ \t]+/', ' ', $str);
+        $str = preg_replace("/\r?\n[\r\n]+/", "\n\n", $str);
+        return trim($str);
     }
 
-    public static function dehtml(string $str): string {
-        $aaa = preg_replace("/<[^>]*>/", "", $str);
-        return preg_replace("/%%[^%]*%%/", "", $aaa); //remove special tags too
+    public static function dehtml(mixed $str): string {
+        $str = strval($str);
+        $str = str_replace(["\r\n", "\r"], "\n", $str);
+        $str = preg_replace('/<br\s*\/?>/i', "\n", $str);
+        $str = preg_replace('#</(p|div|h[1-6]|li)\s*>#i', "\n", $str);
+        $str = preg_replace('#<[^>]+>#', ' ', $str);
+        $str = preg_replace("/%%[^%]*%%/", "", $str); //remove special tags too
+        $str = html_entity_decode($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $str = str_replace("\xc2\xa0", ' ', $str);
+        $str = preg_replace('/[ \t]+/', ' ', $str);
+        $str = preg_replace("/\n{3,}/", "\n\n", $str);
+        return trim($str);
     }
 
     /**
@@ -204,7 +217,7 @@ class Utils {
      *   "other value" - use this value
      * @return array
      */
-    public static function commastr2hash(string $sel_ids, string $value = null): array {
+    public static function commastr2hash(string $sel_ids, ?string $value = null): array {
         $result = array();
         $ids    = explode(",", $sel_ids);
         foreach ($ids as $i => $v) {
@@ -495,6 +508,19 @@ class Utils {
     }
 
     /**
+     * Return nanoID (2.1 trillion unique IDs with the default length/alphabet).
+     */
+    public static function nanoID(): string {
+        $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz-';
+        $size     = 21;
+        $id       = '';
+        for ($i = 0; $i < $size; $i++) {
+            $id .= $alphabet[random_int(0, 63)];
+        }
+        return $id;
+    }
+
+    /**
      * return random ID (2.18 x 10^14 = 218.3 trillion unique IDs for 8 chars, useful up to 15 million generations because of birthday paradox)
      * @param int $length
      * @return string
@@ -779,25 +805,23 @@ class Utils {
     }
 
     /**
-     * load content from url
-     * @param string $url url to get info from
-     * @param string|array|null $params optional, if set - post will be used, instead of get. Can be string or array
-     * @param array|null $headers optional, add headers
-     * @param string $to_file optional, save response to file (for file downloads)
-     * @param array $curlinfo optional, return misc curl info by ref
-     * @param bool $report_errors
-     * @return false|string content received. FALSE if error
+     * Create and configure a cURL handle with shared defaults used by single and batch requests.
      */
-    public static function loadUrl(string $url, string|array $params = null, array $headers = null, string $to_file = '', array &$curlinfo = array(), bool $report_errors = true): false|string {
-        logger("CURL load from: [$url]", $params, $headers, $to_file);
+    private static function createCurlHandle(string $url, string|array|null $params = null, ?array $headers = null, string $to_file = '', ?int $timeout_seconds = null): array|false {
         $cu = curl_init();
+        if ($cu === false) {
+            return false;
+        }
 
         curl_setopt($cu, CURLOPT_URL, $url);
-        curl_setopt($cu, CURLOPT_TIMEOUT, 60);
+        $default_timeout = $to_file > '' ? 3600 : 60;
+        $timeout_to_set  = is_null($timeout_seconds) ? $default_timeout : max(1, $timeout_seconds);
+        curl_setopt($cu, CURLOPT_TIMEOUT, $timeout_to_set);
+        curl_setopt($cu, CURLOPT_CONNECTTIMEOUT, min(10, $timeout_to_set));
         curl_setopt($cu, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($cu, CURLOPT_FAILONERROR, true); #cause fail on >=400 errors
-        curl_setopt($cu, CURLOPT_FOLLOWLOCATION, true); #follow redirects
-        curl_setopt($cu, CURLOPT_MAXREDIRS, 8); #max redirects
+        curl_setopt($cu, CURLOPT_FAILONERROR, false);
+        curl_setopt($cu, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($cu, CURLOPT_MAXREDIRS, 8);
         if (is_array($headers)) {
             curl_setopt($cu, CURLOPT_HTTPHEADER, $headers);
         }
@@ -806,13 +830,70 @@ class Utils {
             curl_setopt($cu, CURLOPT_POST, 1);
             curl_setopt($cu, CURLOPT_POSTFIELDS, $params);
         }
+
+        $tmp_file   = '';
+        $fh_to_file = null;
         if ($to_file > '') {
-            #downloading to tmp file first
             $tmp_file   = $to_file . '.download';
             $fh_to_file = fopen($tmp_file, 'wb');
+            if ($fh_to_file === false) {
+                curl_close($cu);
+                return false;
+            }
             curl_setopt($cu, CURLOPT_FILE, $fh_to_file);
-            curl_setopt($cu, CURLOPT_TIMEOUT, 3600); #1h timeout
         }
+
+        return [
+            'handle'      => $cu,
+            'file_handle' => $fh_to_file,
+            'tmp_file'    => $tmp_file,
+        ];
+    }
+
+    /**
+     * Build a stable array key for curl handles across PHP versions.
+     */
+    private static function curlHandleKey($handle): string {
+        if (is_object($handle)) {
+            return 'o:' . spl_object_id($handle);
+        }
+
+        return 'r:' . intval($handle);
+    }
+
+    /**
+     * load content from url
+     * @param string $url url to get info from
+     * @param string|array|null $params optional, if set - post will be used, instead of get. Can be string or array
+     * @param array|null $headers optional, add headers
+     * @param string $to_file optional, save response to file (for file downloads)
+     * @param array $curlinfo optional, return misc curl info by ref
+     * @param bool $report_errors
+     * @param int|null $timeout_seconds optional timeout in seconds. If null - default used.
+     * @return false|string content received. FALSE if error
+     */
+    public static function loadUrl(string $url, string|array|null $params = null, ?array $headers = null, string $to_file = '', array &$curlinfo = array(), bool $report_errors = true, ?int $timeout_seconds = null): false|string {
+        if (!is_null($params)) {
+            logger("NOTICE", "CURL POST [$url]");
+        } else {
+            logger("NOTICE", "CURL GET [$url]", $params);
+        }
+
+        $handle_data = self::createCurlHandle($url, $params, $headers, $to_file, $timeout_seconds);
+        if ($handle_data === false) {
+            $curlinfo = [
+                'error' => 'Failed to initialize curl handle',
+            ];
+            if ($report_errors) {
+                logger('ERROR', 'CURL error: Failed to initialize curl handle');
+            }
+            return false;
+        }
+
+        $cu         = $handle_data['handle'];
+        $fh_to_file = $handle_data['file_handle'];
+        $tmp_file   = $handle_data['tmp_file'];
+
         #curl_setopt($cu, CURLOPT_VERBOSE,true);
         ##curl_setopt($cu, CURLINFO_HEADER_OUT, 1);
 
@@ -820,10 +901,12 @@ class Utils {
         logger('TRACE', 'RESULT:', $result);
         $curlinfo = curl_getinfo($cu);
         #logger('TRACE', 'CURL INFO:', $curlinfo);
-        if (curl_error($cu)) {
-            $curlinfo['error'] = curl_error($cu);
+        $curl_error = trim((string)curl_error($cu));
+        $http_code  = intval($curlinfo['http_code'] ?? 0);
+        if ($curl_error !== '' || $http_code >= 400) {
+            $curlinfo['error'] = $curl_error !== '' ? $curl_error : 'HTTP error ' . $http_code;
             if ($report_errors) {
-                logger('ERROR', 'CURL error: ' . curl_error($cu));
+                logger('ERROR', 'CURL error: ' . $curlinfo['error']);
             }
             $result = false;
         }
@@ -831,17 +914,197 @@ class Utils {
         #logger("CURL RESULT:", $result);
 
         if ($to_file > '') {
-            fclose($fh_to_file);
+            if (is_resource($fh_to_file)) {
+                fclose($fh_to_file);
+            }
             #if file download successfull - rename to destination
             #if failed - just remove tmp file
-            if ($result !== false) {
-                rename($tmp_file, $to_file);
-            } else {
-                unlink($tmp_file);
+            if ($tmp_file > '' && file_exists($tmp_file)) {
+                if ($result !== false) {
+                    rename($tmp_file, $to_file);
+                    $result = '';
+                } else {
+                    unlink($tmp_file);
+                }
             }
         }
 
         return $result;
+    }
+
+    /**
+     * Load multiple URLs in parallel with bounded in-process curl_multi concurrency.
+     */
+    public static function loadUrlBatch(array $requests, int $parallelMax = 4, bool $report_errors = true): false|array {
+        if (empty($requests)) {
+            return [];
+        }
+
+        $parallelMax = max(1, $parallelMax);
+        $results     = array_fill(0, count($requests), ['result' => false, 'curlinfo' => []]);
+
+        $multiHandle = curl_multi_init();
+        if ($multiHandle === false) {
+            return false;
+        }
+
+        $activeHandles = [];
+        $pendingIndex  = 0;
+
+        $queueRequest = static function (int $request_index) use (&$requests, &$results, &$activeHandles, $multiHandle, $report_errors): void {
+            $request = is_array($requests[$request_index] ?? null) ? $requests[$request_index] : [];
+            $url     = trim((string)($request['url'] ?? ''));
+
+            if ($url === '') {
+                $results[$request_index] = [
+                    'result'   => false,
+                    'curlinfo' => ['error' => 'CURL batch request URL is required.'],
+                ];
+                if ($report_errors) {
+                    logger('ERROR', 'CURL error: CURL batch request URL is required.');
+                }
+                return;
+            }
+
+            $params = $request['params'] ?? null;
+            if (!is_null($params) && !is_string($params) && !is_array($params)) {
+                $results[$request_index] = [
+                    'result'   => false,
+                    'curlinfo' => ['error' => 'CURL batch request params must be string|array|null.'],
+                ];
+                if ($report_errors) {
+                    logger('ERROR', 'CURL error: CURL batch request params must be string|array|null.');
+                }
+                return;
+            }
+
+            $headers = is_array($request['headers'] ?? null) ? $request['headers'] : null;
+            $timeout = null;
+            if (array_key_exists('timeout_seconds', $request) && $request['timeout_seconds'] !== null) {
+                $timeout = max(1, intval($request['timeout_seconds']));
+            }
+
+            $handle_data = self::createCurlHandle($url, $params, $headers, '', $timeout);
+            if ($handle_data === false) {
+                $results[$request_index] = [
+                    'result'   => false,
+                    'curlinfo' => ['error' => 'Failed to initialize curl handle'],
+                ];
+                if ($report_errors) {
+                    logger('ERROR', 'CURL error: Failed to initialize curl handle');
+                }
+                return;
+            }
+
+            $handle     = $handle_data['handle'];
+            $add_result = curl_multi_add_handle($multiHandle, $handle);
+            if ($add_result !== CURLM_OK) {
+                $error                   = function_exists('curl_multi_strerror') ? curl_multi_strerror($add_result) : 'Failed to queue CURL batch request.';
+                $results[$request_index] = [
+                    'result'   => false,
+                    'curlinfo' => ['error' => $error],
+                ];
+                if ($report_errors) {
+                    logger('ERROR', 'CURL error: ' . $error);
+                }
+                curl_close($handle);
+                return;
+            }
+
+            $activeHandles[self::curlHandleKey($handle)] = [
+                'handle'       => $handle,
+                'result_index' => $request_index,
+            ];
+        };
+
+        try {
+            while (!empty($activeHandles) || $pendingIndex < count($requests)) {
+                while (count($activeHandles) < $parallelMax && $pendingIndex < count($requests)) {
+                    $queueRequest($pendingIndex);
+                    $pendingIndex++;
+                }
+
+                if (empty($activeHandles)) {
+                    continue;
+                }
+
+                do {
+                    $status = curl_multi_exec($multiHandle, $running);
+                } while ($status === CURLM_CALL_MULTI_PERFORM);
+
+                if ($status !== CURLM_OK) {
+                    $error = function_exists('curl_multi_strerror') ? curl_multi_strerror($status) : 'cURL multi execution failed.';
+                    foreach ($activeHandles as $meta) {
+                        $results[$meta['result_index']] = [
+                            'result'   => false,
+                            'curlinfo' => ['error' => $error],
+                        ];
+                        if ($report_errors) {
+                            logger('ERROR', 'CURL error: ' . $error);
+                        }
+                        $handle = $meta['handle'];
+                        curl_multi_remove_handle($multiHandle, $handle);
+                        curl_close($handle);
+                    }
+                    $activeHandles = [];
+                    break;
+                }
+
+                while ($info = curl_multi_info_read($multiHandle)) {
+                    $doneHandle = $info['handle'];
+                    $handleId   = self::curlHandleKey($doneHandle);
+                    $meta       = $activeHandles[$handleId] ?? null;
+
+                    if ($meta) {
+                        $result    = curl_multi_getcontent($doneHandle);
+                        $curlinfo  = curl_getinfo($doneHandle);
+                        $curlError = trim((string)curl_error($doneHandle));
+                        $infoCode  = intval($info['result'] ?? CURLE_OK);
+                        $httpCode  = intval($curlinfo['http_code'] ?? 0);
+                        if ($curlError === '' && $infoCode !== CURLE_OK) {
+                            $curlError = function_exists('curl_strerror') ? curl_strerror($infoCode) : 'cURL request failed.';
+                        }
+                        if ($curlError === '' && $httpCode >= 400) {
+                            $curlError = 'HTTP error ' . $httpCode;
+                        }
+
+                        if ($curlError !== '') {
+                            $curlinfo['error'] = $curlError;
+                            if ($report_errors) {
+                                logger('ERROR', 'CURL error: ' . $curlError);
+                            }
+                            $result = false;
+                        }
+
+                        $results[$meta['result_index']] = [
+                            'result'   => $result === false ? false : strval($result),
+                            'curlinfo' => is_array($curlinfo) ? $curlinfo : [],
+                        ];
+
+                        unset($activeHandles[$handleId]);
+                    }
+
+                    curl_multi_remove_handle($multiHandle, $doneHandle);
+                    curl_close($doneHandle);
+                }
+
+                if (!empty($activeHandles) && intval($running ?? 0) > 0) {
+                    $select = curl_multi_select($multiHandle, 1.0);
+                    if ($select === -1) {
+                        usleep(10000);
+                    }
+                }
+            }
+        } finally {
+            foreach ($activeHandles as $meta) {
+                $handle = $meta['handle'];
+                curl_multi_remove_handle($multiHandle, $handle);
+                curl_close($handle);
+            }
+            curl_multi_close($multiHandle);
+        }
+
+        return $results;
     }
 
     /**
@@ -852,7 +1115,7 @@ class Utils {
      * @param array|null $headers optional, additional headers
      * @return bool|string content received. FALSE if error
      */
-    public static function sendFileToUrl(string $url, string $from_file, array $params = null, array $headers = null): bool|string {
+    public static function sendFileToUrl(string $url, string $from_file, ?array $params = null, ?array $headers = null): bool|string {
         logger('TRACE', "CURL post file [$from_file] to: [$url]", $params, $headers);
         $cu = curl_init();
 
@@ -901,9 +1164,11 @@ class Utils {
      * @param array $json
      * @param array $headers
      * @param string $to_file optional, save response to file (for file downloads)
+     * @param array $curlinfo
+     * @param int|null $timeout_seconds optional timeout in seconds. If null - default used.
      * @return false|array json data received. FALSE if error
      */
-    public static function postJson(string $url, array $json, array $headers = [], string $to_file = ''): false|array {
+    public static function postJson(string $url, array $json, array $headers = [], string $to_file = '', array &$curlinfo = array(), ?int $timeout_seconds = null): false|array {
         $jsonstr = json_encode($json);
 
         $headers = array_merge(array(
@@ -912,7 +1177,7 @@ class Utils {
             'Content-Length: ' . strlen($jsonstr),
         ), $headers);
 
-        $result = self::loadUrl($url, $jsonstr, $headers, $to_file);
+        $result = self::loadUrl($url, $jsonstr, $headers, $to_file, $curlinfo, true, $timeout_seconds);
         if ($result !== false) {
             if ($to_file > '') {
                 #if it was file transfer, just construct successful response
@@ -934,7 +1199,7 @@ class Utils {
      * @param array|null $headers optional, additional headers
      * @return false|array json data received. FALSE if error
      */
-    public static function getJson(string $url, string $to_file = '', array $headers = null): false|array {
+    public static function getJson(string $url, string $to_file = '', ?array $headers = null, array &$curlinfo = array(), ?int $timeout_seconds = null): false|array {
         $headers2 = array(
             'Accept: application/json',
         );
@@ -942,7 +1207,7 @@ class Utils {
             $headers2 = array_merge($headers2, $headers);
         }
 
-        $result = self::loadUrl($url, null, $headers2, $to_file);
+        $result = self::loadUrl($url, null, $headers2, $to_file, $curlinfo, true, $timeout_seconds);
         if ($result !== false) {
             if ($to_file > '') {
                 #if it was file transfer, just construct successful response
@@ -1030,6 +1295,32 @@ class Utils {
             $str = "https://" . $str;
         }
         return $str;
+    }
+
+    /**
+     * Normalize a user-provided URL for safe href output.
+     * Empty result means the value should be rendered as plain text.
+     */
+    public static function safeUrl(string $str): string {
+        $url = trim(preg_replace('/[\x00-\x1F\x7F]+/', '', $str) ?? '');
+        if ($url === '' || str_starts_with($url, '//')) {
+            return '';
+        }
+
+        if (!preg_match('/^[a-z][a-z0-9+.-]*:/i', $url)) {
+            $url = self::str2url($url);
+        }
+
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if (!in_array($scheme, ['http', 'https', 'mailto', 'tel'], true)) {
+            return '';
+        }
+
+        if (($scheme === 'http' || $scheme === 'https') && !parse_url($url, PHP_URL_HOST)) {
+            return '';
+        }
+
+        return $url;
     }
 
     /**

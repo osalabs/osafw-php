@@ -186,9 +186,8 @@ data.
 
 ## Command Notes
 
-- The repository may be checked out under Windows with ownership that triggers Git's dubious-ownership protection. Use
-  `git -c safe.directory=C:/DOCS_PROJ/github/osafw-php <command>` for local inspection, or ask before changing global Git
-  config.
+- The repository may be checked out under Windows with ownership that triggers Git's dubious-ownership protection. Run
+  Git from the repository root and prefer a local command override for inspection, or ask before changing global Git config.
 - Do not revert unrelated dirty files. This repo may contain local config, generated vendor metadata, or developer changes
   unrelated to the current task.
 - Prefer `rg` / `rg --files` for searches. Use focused file reads before broad sweeps.
