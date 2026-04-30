@@ -570,6 +570,8 @@ class DB {
     public int|string $lastRows; #affected_rows from last exec operations
     public bool $is_connected = false; #set to true if connect() were successful
 
+    private array $table_schema_cache = [];
+
     public static function NOW(): DBSpecialValue {
         return new DBSpecialValue('NOW()');
     }
@@ -1064,7 +1066,7 @@ class DB {
      * return one value (first column or named column) from $sql or table/where/orderby
      * @param string $table table name to read from
      * @param array $where array of (field => value) where conditions
-     * @param string|null $field_name field name to return. If omitted - first column fetched. Special case - "count(*),sum(field),avg,max,min", will return count/sum/...
+     * @param string|null $field_name field name to return. If omitted - first column fetched. Special cases - "1,count(*),sum(field),avg,max,min", will return count/sum/...
      * @param string|null $order_by order string to be added to ORDER BY
      * @return string|null
      * @throws DBException
@@ -1072,7 +1074,7 @@ class DB {
     public function value(string $table, array $where, string $field_name = null, string $order_by = null): string|null {
         if (is_null($field_name)) {
             $field_name = '*';
-        } elseif (str_starts_with(strtolower($field_name), 'count(')) {
+        } elseif ($field_name === '1' || str_starts_with(strtolower($field_name), 'count(')) {
             //$field_name = $field_name; // for count - do not quote (there could be different variants like count(*), count(field), count(1))
         } elseif (preg_match('/^(\w+)\((\w+)\)$/', $field_name, $m)) {
             $field_name = $m[1] . '(' . $this->qid($m[2]) . ')'; // sum, avg, max, min
@@ -1830,6 +1832,11 @@ class DB {
     }
 
     public function tableSchema($table_name): array {
+        #check local cache first
+        if (array_key_exists($table_name, $this->table_schema_cache)) {
+            return $this->table_schema_cache[$table_name];
+        }
+
         $rows = $this->arrp("SELECT
              c.column_name as `name`,
              c.data_type as `type`,
@@ -1845,6 +1852,7 @@ class DB {
             from information_schema.COLUMNS c
             where c.TABLE_SCHEMA=@TABLE_SCHEMA
               and c.TABLE_NAME=@TABLE_NAME
+            order by c.ORDINAL_POSITION
             ", [
             '@TABLE_SCHEMA' => $this->config['DBNAME'],
             '@TABLE_NAME'   => $table_name
@@ -1855,13 +1863,16 @@ class DB {
         }
         unset($row);
 
+        #save to cache
+        $this->table_schema_cache[$table_name] = $rows;
         return $rows;
     }
 
     public function mapTypeSQL2Fw($type): string {
         return match (strtolower($type)) {
             "tinyint", "smallint", "int", "bigint", "bit" => "int",
-            "real", "numeric", "decimal", "money", "smallmoney", "float" => "float",
+            "real", "float" => "float",
+            "decimal", "numeric", "money", "smallmoney" => "decimal",
             "datetime", "datetime2", "date", "smalldatetime" => "datetime",
             default => "varchar",
         };

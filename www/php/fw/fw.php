@@ -8,7 +8,7 @@ require_once dirname(__FILE__) . "/../configs/config.php";
 require_once dirname(__FILE__) . "/FwExceptions.php";
 require_once dirname(__FILE__) . "/../FwHooks.php";
 require_once dirname(__FILE__) . "/dispatcher.php";
-require_once dirname(__FILE__) . "/parsepage.php";
+require_once dirname(__FILE__) . "/ParsePage.php";
 require_once dirname(__FILE__) . "/db.php";
 require_once dirname(__FILE__) . '/../vendor/autoload.php';
 #also directly preload common classes used in every request:
@@ -45,7 +45,7 @@ class fw {
     public const string ACTION_MORE_EDIT   = "edit";
     public const string ACTION_MORE_DELETE = "delete";
 
-    #http status codes
+    #common http response codes
     const int HTTP_OK                 = 200;
     const int HTTP_CREATED            = 201;
     const int HTTP_NO_CONTENT         = 204;
@@ -58,21 +58,25 @@ class fw {
     const int HTTP_TOO_MANY_REQUESTS  = 429;
     const int HTTP_SERVER_ERROR       = 500;
 
+
     public static ?self $instance = null;
     public static float $start_time;
 
     public Dispatcher $dispatcher;
     public DB $db;
     public FwCache $cache;
+    private ParsePage $pp_instance; #for parsePage()
 
     public string $request_url; #current request url (relative to application url)
     public stdClass $route; #current request route data, stdClass
 
+    public array $postedJson = []; #original JSON from POST request body for "application/json" requests
     public array $GLOBAL = []; #"global" vars, initialized with $CONFIG - used in template engine, also stores "_flash"
 
     public array $FormErrors = []; # for storing form id's with error messages, put to ps['error']['details'] for parser
     public object $config; #copy of the config as object, usage: $this->fw->config->ROOT_URL; $this->fw->config->DB['DBNAME'];
-    public array $models_cache = []; #cached model instances
+    private array $models_cache = []; #cached model instances
+    private array $controllers_cache = []; #cached controller instances
 
     public string $page_layout;
     public bool $is_session = true; #if use session, can be set to false in initRequest to abort session use
@@ -104,26 +108,29 @@ class fw {
 
         #session_start(); #start session on each request - moved to FwHooks::initRequest as it's not always needed
 
+        $fw->cache = new FwCache($fw);
+
+        # and now run dispatcher
+        FwHooks::initRequest($fw, $uri);
+
+        #if request content type is "application/json" - parse JSON and put to $_REQUEST
+        if (str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
+            $fw->postedJson = Utils::parsePostedJson();
+        }
+
         if ($fw->is_session) {
             #setup user's language to use by template engine
             if (isset($_SESSION['lang'])) {
                 $fw->config->LANG = $_SESSION['lang'];
             }
             // override default ui_theme/ui_mode with user's settings
-            if (!empty($_SESSION["ui_theme"])) {
+            if (isset($_SESSION["ui_theme"])) {
                 $fw->GLOBAL["ui_theme"] = $_SESSION["ui_theme"];
             }
-            if (!empty($_SESSION["ui_mode"])) {
+            if (isset($_SESSION["ui_mode"])) {
                 $fw->GLOBAL["ui_mode"] = $_SESSION["ui_mode"];
             }
-        }
 
-        $fw->cache = new FwCache($fw);
-
-        # and now run dispatcher
-        FwHooks::initRequest($fw, $uri);
-
-        if ($fw->is_session) {
             #save flash to current var and update session
             if (isset($_SESSION['_flash'])) {
                 $fw->GLOBAL['_flash'] = $_SESSION['_flash'];
@@ -229,12 +236,56 @@ class fw {
             return $fw->models_cache[$cache_key];
         }
         #logger("MODEL CACHE MISS:" . $model_class);
-        try {
-            $object = new $model_class($fw);
-        } catch (NoClassException) {
+        if (!class_exists($model_class)) {
             throw new NoModelException("Model class not found: $model_class");
         }
+
+        $object                       = new $model_class($fw);
         $fw->models_cache[$cache_key] = $object;
+        return $object;
+    }
+
+    /**
+     * return controller object
+     * usage: $controller = UsersController::i();
+     * @param string $controller_class
+     * @return FwController
+     * @throws AuthException
+     * @throws NoControllerException
+     * @throws NoModelException
+     */
+    public static function controller(string $controller_class): FwController {
+        #logger("NOTICE", "fw controller: $controller_class");
+        //validate it ends on "Controller"
+        if (!str_ends_with($controller_class, 'Controller')) {
+            throw new NoControllerException("Controller class name should end on 'Controller': $controller_class");
+        }
+
+        $fw        = fw::i();
+        $cache_key = strtolower($controller_class);
+        if (array_key_exists($cache_key, $fw->controllers_cache)) {
+            return $fw->controllers_cache[$cache_key];
+        }
+        try {
+            $object = new $controller_class();
+        } catch (NoControllerException|NoClassException) { #class autoload can throw this
+            #if no such controller class - try virtual controllers
+            logger("TRACE", "Controller class not found, trying Virtual Controller: $controller_class");
+            $controller_icode = preg_replace('/Controller$/', '', $controller_class); // strip suffix
+            $fwcon            = FwControllers::i()->oneByIcode($controller_icode);
+            if ($fwcon) {
+                // check defined access level
+                if ($fw->userAccessLevel() < $fwcon['access_level']) {
+                    throw new AuthException("Access Denied (4)");
+                }
+
+                $object = new FwVirtualController($fwcon);
+            } else {
+                throw new NoControllerException("Controller class not found: $controller_class");
+            }
+        }
+        #logger("NOTICE", "fw controller found/created: $controller_class");
+        $fw->controllers_cache[$cache_key] = $object;
         return $object;
     }
 
@@ -257,72 +308,83 @@ class fw {
     }
 
     //autoload controller/model classes
-    public function autoload($class_name): void {
-        $dirs          = array();
-        $bdir          = dirname(__FILE__) . '/';
-        $is_controller = false;
-        if (str_ends_with($class_name, 'Controller')) {
-            $is_controller = true;
-            $dirs[]        = $bdir . '../controllers/';
-            #add prefixes from config, so controller classes can be in a prefix subfolders
+    public function autoload(string $class_name): void {
+        // bdir points to "/www/php/fw" directory
+        $bdir = __DIR__ . '/';
+
+        // Decide if class is a controller
+        $is_controller = str_ends_with($class_name, 'Controller');
+
+        // Prepare directories list
+        $dirs = [];
+        if ($is_controller) {
+            // For application controllers
+            $dirs[] = $bdir . '../controllers/';
+
+            // Additional subfolders for route prefixes
             foreach ($this->config->ROUTE_PREFIXES as $prefix) {
                 $dirs[] = $bdir . '../controllers' . $prefix . '/';
             }
 
-            if ($class_name !== 'FwController' && $class_name !== 'FwAdminController' && $class_name !== 'FwDynamicController' && $class_name !== 'FwApiController') {
-                $class_name = preg_replace("/Controller$/", "", $class_name);
+            // If not a framework’s own special controller (FwController, FwAdminController, etc.)
+            // then remove the suffix from the file we look for
+            if (!str_starts_with($class_name, 'Fw')) {
+                $class_name = preg_replace('/Controller$/', '', $class_name);
             }
         } else {
+            // For models
             $dirs[] = $bdir . '../models/';
+
+            // If not a framework’s own model - remove the suffix
             if ($class_name !== 'FwModel') {
-                $class_name = preg_replace("/Model$/", "", $class_name);
+                $class_name = preg_replace('/Model$/', '', $class_name);
             }
         }
-        $dirs[] = $bdir; #also look at /www/php/fw
-        $dirs[] = $bdir . '../'; #also look at /www/php
 
-        #if under linux (not Win or Mac) - need to do a case-insensitive search in each dir
-        $is_linux = !preg_match('/win/i', PHP_OS); #WIN - windows, Darwin - mac
-        if ($is_linux) {
-            $qclass_name = preg_quote($class_name, '/');
-        }
+        // Also check fw core directory itself, then "/www/php"
+        $dirs[] = $bdir;         // "/www/php/fw"
+        $dirs[] = $bdir . '../'; // "/www/php"
 
+        // Check if OS is Linux for case sensitivity checks
+        // (store this in a property if you want to avoid checking on every autoload)
+        $is_linux = !preg_match('/win|darwin/i', PHP_OS);
+
+        // Now try to locate the actual file
         $file_found = '';
         #logger($class_name, $dirs);
         foreach ($dirs as $dir) {
-            #first, try class name directly (under win/mac it will find right away as filesystem is case-insensitive)
             $file = $dir . $class_name . '.php';
+
+            // Direct check (fast path)
             if (file_exists($file)) {
                 $file_found = $file;
                 break;
             }
 
-            #if not found - for linux - do a case-insensitive search and return first found
+            // Fallback for Linux: do a case-insensitive search if direct check failed
             if ($is_linux) {
-                $files      = glob($dir . '*.php', GLOB_NOSORT);
-                $file_found = current(preg_grep("/$qclass_name\.php$/i", $files));
-                if ($file_found) {
-                    break;
+                $pattern       = preg_quote($class_name, '/');
+                $all_php_files = glob($dir . '*.php', GLOB_NOSORT);
+                if (!empty($all_php_files)) {
+                    $matches = preg_grep("/$pattern\.php$/i", $all_php_files);
+                    if (!empty($matches)) {
+                        $file_found = reset($matches);
+                        break;
+                    }
                 }
             }
-
-            #if not exists - try normalized
-            #$file = $dir . ucfirst(strtolower($class_name)) . '.php'; #normalize name, i.e. users => Users
-            #if (file_exists($file)) {
-            #    $file_found = $file;
-            #    break;
-            #}
         }
 
+        // Include if found, otherwise possibly throw exception if controller missing
         if ($file_found) {
             include_once $file_found;
         } else {
             if ($is_controller) {
+                // For controllers, we usually want to fail hard
                 throw new NoControllerException("Controller class not found: $class_name");
-            } else {
-                //no exception so class_exists() can work without a crash
-                // throw new NoClassException("Class not found: $class_name");
             }
+            // For other classes, we do nothing, so class_exists() can return false
+            // (or you could throw your own NoClassException here if desired)
         }
     }
 
@@ -331,9 +393,9 @@ class fw {
             $this->auth($this->route);
             $this->renderRoute($this->route);
         } catch (AuthException $ex) {
-            $this->handlePageError(401, $ex->getMessage(), $ex);
+            $this->handlePageError(self::HTTP_UNAUTHORIZED, $ex->getMessage(), $ex);
         } catch (NoControllerException $ex) {
-            #requested controller not found - use Home->NotFoundAction
+            #requested controller not found - use Home->NotFoundAction which will check Spages and if still not found - show 404
             logger("No controller found [" . $this->route->controller . "], using default HomeController->NotFoundAction()");
             $this->route->prefix     = '';
             $this->route->controller = 'Home';
@@ -354,7 +416,7 @@ class fw {
         } catch (NoClassMethodException) {
             #if can't call method - so class/method doesn't exists - show using route_default_action
             logger('NOTICE', "No method found for route, checking route_default_action");
-            logger('NOTICE', "Route: ", $this->route);
+            #logger('NOTICE', "Route: ", $this->route);
 
             $default_action = $this->dispatcher->getRouteDefaultAction($this->route->controller);
             if ($default_action == self::ACTION_INDEX) {
@@ -365,7 +427,7 @@ class fw {
                 $this->route->params[0] = $this->route->id;
                 $this->route->action    = self::ACTION_SHOW;
             } elseif ($default_action == self::ACTION_ERROR) {
-                $this->handlePageError(self::HTTP_NOT_FOUND);
+                $this->handlePageError(self::HTTP_NOT_FOUND, 'Not found');
                 return;
             } else {
                 #if no default action set - this is special case action - this mean action should be got form REST's 'id'
@@ -493,6 +555,7 @@ class fw {
             if (($request_xss
                     || $route->method == "POST"
                     || $route->method == "PUT"
+                    || $route->method == "PATCH"
                     || $route->method == "DELETE"
                     || $route->action == self::ACTION_SAVE
                     || $route->action == self::ACTION_DELETE
@@ -519,11 +582,6 @@ class fw {
         }
 
         if (is_null($rule_level)) {
-            #rule not found in config - try Controller.access_level
-            $rule_level = $this->dispatcher->getRouteAccessLevel($route->controller);
-        }
-
-        if (is_null($rule_level)) {
             #if no access level set in config and in controller - no restrictions
             $rule_level = Users::ACL_VISITOR;
         }
@@ -538,13 +596,15 @@ class fw {
      * @throws Exception
      */
     public function handlePageError(int $error_code, string $error_message = '', ?Exception $ex = null): void {
-        #Sentry support
-        global $_raven;
-        if (isset($_raven)) {
-            $_raven->captureException($ex, array("message" => $error_message));
-        }
-
         if ($ex) {
+            if ($ex instanceof UserException || $ex instanceof AuthException) {
+                #UserException and ValidationException here
+                #no need to always log user errors as those are known caused by user bad input, uncomment if necessary to debug
+                #logger('WARN', "UserException : $code", $message);
+            } else {
+                logger("FATAL", "Exception: " . $ex->getMessage(), $ex);
+            }
+
             $ps = FwHooks::handleException($ex);
             if ($ps) {
                 // only process exceptions there and only return here if we actually returned something
@@ -553,28 +613,26 @@ class fw {
                     $err_code = intval($error["code"] ?? 0);
                     if ($err_code >= 100 && $err_code <= 599) {
                         #if error http code exists
-                        header("HTTP/1.0 " . $err_code . " " . $error["message"], true, $err_code);
+                        $message = strtok($error["message"], "\n"); # extract just a first line for header
+                        header("HTTP/1.0 " . $err_code . " " . $message, true, $err_code);
                     }
                     $this->parser('/error', $ps);
                 }
                 return;
             }
+
+        } else {
+            logger('ERROR', "handlePageError : $error_code $error_message");
+        }
+        if ($error_code >= self::HTTP_SERVER_ERROR) {
+            logger($ex->getTraceAsString());
         }
 
+        #check custom error route
         $route              = null;
         $custom_error_route = $this->dispatcher->ROUTES[$error_code] ?? '';
         if ($custom_error_route > '') {
             $route = @$this->dispatcher->str2route($custom_error_route);
-        }
-
-        if ($ex) {
-            logger("FATAL", "Dispatcher - handlePageError exception: " . $ex->getMessage(), $ex);
-        } else {
-            logger('ERROR', "Dispatcher - handlePageError : $error_code $error_message");
-        }
-
-        if ($error_code >= self::HTTP_SERVER_ERROR) {
-            logger($ex->getTraceAsString());
         }
 
         $is_error_processed = false;
@@ -597,12 +655,23 @@ class fw {
 
             $err_msg = $error_message ?: ($err_code_desc ?: "PAGE NOT YET IMPLEMENTED [$uri]");
 
+            #legacy framework format
+            //        $ps = [
+            //            '_json'    => true,
+            //            'success'  => false,
+            //            'err_code' => $code,
+            //            'err_msg'  => $message
+            //        ];
+
             $ps = array(
                 '_json' => true, #also allow return urls by json
                 'error' => [
                     'code'    => $error_code,
                     'message' => $err_msg,
                     'time'    => time(),
+                    //optional:
+                    //'category' => 'EXCEPTION',
+                    //'details'  => []
                 ],
             );
 
@@ -638,20 +707,16 @@ class fw {
     # output format based on requested format: json, pjax or (default) full page html
     # JSON: for automatic json response support - set ps("_json") = true
     # to return only specific content for json - set ps("_json")=array(...)
-    # to override page template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
+    # to override:
+    #   base directory - set ps("_basedir")="/another_controller/another_action" (relative to SITE_TEMPLATES dir)
+    #   only controller base directory - set ps("_basedir_controller")="/another_controller" (relative to SITE_TEMPLATES dir)
+    #   layout template - set ps("_layout")="/another_page_layout.html" (relative to SITE_TEMPLATES dir)
     #
-    # (not for json) to perform route_redirect - set ps("_route_redirect") = ["method" => , "controller" => , "args" => ]
-    # TODO: (not for json) to perform redirect - set ps("_redirect")="url"
-    public function parser(): void {
-        $args       = func_get_args();
-        $basedir    = '';
-        $controller = $this->route->controller;
-        if ($this->route->prefix) {
-            $basedir    .= '/' . $this->route->prefix;
-            $controller = preg_replace('/^' . preg_quote($this->route->prefix, '/') . '/i', '', $controller);
-        }
-        $basedir      .= '/' . $controller . '/' . $this->route->action;
-        $basedir      = strtolower($basedir);
+    #   (not for json) to perform route_redirect - set ps("_route_redirect") = ["method" => , "controller" => , "args" => ]
+    #   TODO: (not for json) to perform redirect - set ps("_redirect")="url"
+    public function parser(): ?string {
+        $args         = func_get_args();
+        $basedir      = '';
         $layout       = $this->page_layout;
         $ps           = array();
         $out_filename = '';
@@ -702,22 +767,21 @@ class fw {
                     'message' => $msg,
                 ]);
             }
-
-            return; // no further processing for json
+            return null; // no further processing for json
         }
 
         if (isset($ps["_route_redirect"])) {
             $rr = $ps["_route_redirect"];
             $this->routeRedirect($rr["method"], $rr["controller"], $rr["args"]);
-            return; // no further processing
+            return null; // no further processing
         }
 
         if (isset($ps["_redirect"])) {
             self::redirect($ps["_redirect"]);
-            return; // no further processing
+            return null; // no further processing
         }
 
-        $layout = $out_format == 'pjax' ? $this->config->PAGE_LAYOUT_PJAX : $this->page_layout;
+        $layout = $out_format == 'pjax' ? $this->config->PAGE_LAYOUT_PJAX : $layout;
         if (isset($ps['_layout'])) {
             #override layout from parse strings
             $layout = $ps['_layout'];
@@ -725,13 +789,89 @@ class fw {
 
         $ps['current_time'] = time();
 
+        #override full basedir
+        if (isset($ps["_basedir"])) {
+            $basedir = $ps["_basedir"];
+            unset($ps["_basedir"]);
+        }
+        if ($basedir === '') {
+            #if basedir not passed - use current controller/action as default then check overrides
+            $controller = $this->route->controller;
+            if ($this->route->prefix) {
+                $basedir    .= '/' . $this->route->prefix;
+                $controller = preg_replace('/^' . preg_quote($this->route->prefix, '/') . '/i', '', $controller);
+            }
+            $basedir .= '/' . $controller;
+
+            #override controller basedir only
+            if (isset($ps["_basedir_controller"])) {
+                $basedir = $ps["_basedir_controller"];
+                unset($ps["_basedir_controller"]);
+            }
+            $basedir .= '/' . $this->route->action;  #add action dir to controller's directory
+        }
+        $basedir = strtolower($basedir);
+
         logger('TRACE', "basedir=[$basedir], layout=[$layout] to [$out_filename]");
-        parse_page($basedir, $layout, $ps, $out_filename);
+
+        $result = $this->parsePage($basedir, $layout, $ps);
+
+        if ($out_filename == 'v') {
+            #if out_filename is 'v' - just return result as string
+            return $result;
+        } elseif ($out_filename) {
+            #if out_filename is not empty - save to file
+            file_put_contents($out_filename, $result);
+        } else {
+            #if out_filename is empty - just print
+            $this->printHeaders();
+            echo $result;
+        }
+        return null;
+    }
+
+    /**
+     * return ParsePage instance (singleton)
+     * @return ParsePage
+     */
+    public function parsePageInstance(): ParsePage {
+        if (!isset($this->pp_instance)) {
+            $this->pp_instance = (new ParsePage())
+                ->setTemplatesRoot($this->config->SITE_TEMPLATES)
+                ->setRootUrl($this->config->ROOT_URL)
+                ->setGlobals(fn() => $this->GLOBAL)
+                ->setLanguage($this->config->LANG);
+        }
+        return $this->pp_instance;
+    }
+
+    /**
+     * Shortcut for ParsePage parser usage
+     * @param string $basedir
+     * @param string $layout
+     * @param array $ps
+     * @return string
+     * @throws Exception
+     */
+    public function parsePage(string $basedir, string $layout, array $ps): string {
+        return $this->parsePageInstance()->parsePage($basedir, $layout, $ps);
     }
 
     public function parserJson(array $ps): void {
         header("Content-Type: application/json; charset=utf-8");
         echo json_encode($ps);
+    }
+
+    /**
+     * Print standard+security headers
+     */
+    public function printHeaders(): void {
+        header("Content-Type: text/html; charset=utf-8");
+        header("X-Content-Type-Options: nosniff");
+        header("Content-Security-Policy: frame-ancestors 'self'");
+        header("X-Frame-Options: DENY");
+        header("X-XSS-Protection: 1; mode=block");
+        header("X-Permitted-Cross-Domain-Policies: master-only");
     }
 
     //flash - read/store flash data (available on the next request and only on it)
@@ -945,7 +1085,7 @@ class fw {
      *   sendEmailTpl( $hU['email'], 'email_invite.txt', $ps);
      */
     public function sendEmailTpl(string|array $to_email, string $tpl, array $ps, array $options = array()): bool {
-        $msg_body = parse_page('/emails', $tpl, $ps, 'v');
+        $msg_body = $this->parsePage('/emails', $tpl, $ps);
         list($msg_subj, $msg_body) = preg_split("/\n/", $msg_body, 2);
 
         return $this->sendEmail($to_email, $msg_subj, $msg_body, $options);
@@ -975,7 +1115,11 @@ class fw {
         logger("REDIRECT to [$url]");
         header("Location: $url");
         if (!$noexit) {
-            exit;
+            if ($GLOBALS['IS_EXCEPTION_ON_REDIRECT'] ?? false) {
+                throw new ExitException("Redirect to $url");
+            } else {
+                exit;
+            }
         }
         return null;
     }
@@ -1099,76 +1243,143 @@ function reqjson(string $name): array {
     return $result;
 }
 
-########################## for debug
-# IN: [logtype (ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL), default DEBUG] and variable number of params
-# OUT: none, just write to $site_error_log
-# If not ALL - limit output to 2048 chars per call
-# example: logger('DEBUG', 'hello there', $var);
-function logger(): void {
-    $args = func_get_args();
-    if (FwHooks::logger($args)) {
-        #if logger overridden - don't use standard logger
+/**
+ * logger
+ *
+ * Usage:
+ *   logger("hello there", $var);
+ *   logger("ERROR", "something went wrong", $someArray);
+ *   logger($throwable); // will be interpreted as DEBUG level if no explicit level is passed
+ *
+ * If no recognized logtype is passed as first param, defaults to 'DEBUG'.
+ *
+ * @param mixed ...$params
+ * @return void
+ */
+function logger(mixed ...$params): void {
+    // 1) Allow hooking/overriding
+    if (FwHooks::logger($params)) {
         return;
     }
 
     global $CONFIG;
-    $log_level = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']];
 
-    if (!$log_level) {
-        #don't log if logger is off (for production)
+    // 2) Determine log level from first argument if it matches
+    //    one of the known $LOG_LEVELS keys. Otherwise, default to 'DEBUG'.
+    $logType           = 'DEBUG';
+    $isExplicitLogType = false;
+
+    if (!empty($params) && is_string($params[0]) && isset(fw::$LOG_LEVELS[$params[0]])) {
+        $logType           = array_shift($params);
+        $isExplicitLogType = true;
+    }
+
+    // 3) Skip logging if current config doesn't permit it
+    $currentLogLevel   = fw::$LOG_LEVELS[$CONFIG['LOG_LEVEL']] ?? fw::$LOG_LEVELS['INFO'];
+    $requestedLogLevel = fw::$LOG_LEVELS[$logType];
+    if ($requestedLogLevel > $currentLogLevel) {
         return;
     }
 
-    $logtype = 'DEBUG'; #default log type
-    if (count($args) > 0 && is_string($args[0]) && preg_match("/^(ALL|TRACE|DEBUG|NOTICE|INFO|WARN|ERROR|FATAL)$/", $args[0], $m)) {
-        $logtype = $m[1];
-        array_shift($args);
-    }
+    // 4) Build the combined log message from remaining arguments
+    //    The first of $params is considered the "main message" if scalar, else var_export
+    $message = '';
+    if (!empty($params)) {
+        // Start with the first item
+        $main    = $params[0];
+        $message = is_scalar($main) ? (string)$main : @var_export($main, true);
 
-    if (fw::$LOG_LEVELS[$logtype] > $log_level) {
-        return; #skip logging if requested level more than config's log level
-    }
-
-    $arr      = debug_backtrace(); #0-logger(),1-func called logger,...
-    $func     = ($arr[1] ?? '');
-    $function = $func['function'] ?? '';
-    $line     = $arr[1]['line'] ?? '';
-    $file     = $func['file'] ?? '';
-
-    //remove unnecessary site_root_offline path
-    $file = str_replace(strtolower($CONFIG['SITE_ROOT']), "", strtolower($file));
-
-    $date   = new DateTime();
-    $strlog = $date->format("Y-m-d H:i:s.v") . ' ' . getmypid() . ' ' . $logtype . ' ' . $file . '::' . $function . '(' . $line . ') ';
-    foreach ($args as $str) {
-        if (is_scalar($str)) {
-            $strlog .= $str;
-        } else {
-            $strlog .= print_r($str, true);
-        }
-        $strlog .= "\n";
-    }
-
-    if ($logtype != 'ALL') {
-        //cut too long logging
-        if (strlen($strlog) > 2048) {
-            $strlog = substr($strlog, 0, 2048) . '...' . substr($strlog, -128);
-        }
-
-        if (!preg_match("/\n$/", $strlog)) {
-            $strlog .= "\n";
+        // Append everything else
+        for ($i = 1, $count = count($params); $i < $count; $i++) {
+            $item = $params[$i];
+            if (is_scalar($item)) {
+                $message .= ' ' . $item;
+            } else {
+                $message .= "\n" . @var_export($item, true);
+            }
         }
     }
 
-    @error_log($strlog, $CONFIG['LOG_MESSAGE_TYPE'], $CONFIG['site_error_log']); #using @ to prevent warnings if log not writable
+    $isLogEnabled = !empty($CONFIG['LOG_DESTINATION']);
 
-    #Sentry support - if enabled also log to Sentry breadcrumbs
-    if (isset($_raven)) {
-        $_raven->breadcrumbs->record(array(
-            'message' => $strlog,
-            'level'   => strtolower($logtype),
-        ));
+    // 5) If logging to file is on, gather file/line info via debug_backtrace.
+    //    (We skip it if we’re not writing anywhere, to save overhead.)
+    $fileName = '';
+    $funcName = '';
+    $line     = '';
+    if ($isLogEnabled) {
+        [$fileName, $funcName, $line] = getCallerInfo();
     }
+
+    // 6) Truncate the final message if it exceeds LOG_LIMIT
+    $txtLimit = $CONFIG['LOG_LIMIT'] ?? 4096;
+    if (strlen($message) > $txtLimit) {
+        // Cut the middle, keep last 512 chars
+        $message = substr($message, 0, $txtLimit) . '...' . substr($message, -512);
+    }
+
+    // 7) If LOG_DESTINATION is set, write to error_log
+    if ($isLogEnabled) {
+        $now    = (new DateTime())->format('Y-m-d H:i:s.v');
+        $pid    = getmypid();
+        $prefix = "$now $pid $logType $fileName::$funcName($line) ";
+
+        if (!str_ends_with($message, "\n")) {
+            $message .= "\n";
+        }
+        error_log($prefix . $message, $CONFIG['LOG_MESSAGE_TYPE'] ?? 0, $CONFIG['LOG_DESTINATION']);
+    }
+
+    // 8) If Sentry is configured, push logs there
+    if (!empty($CONFIG['LOG_SENTRY_DSN'])) {
+        try {
+            //add extra params for Sentry
+            $params[] = [
+                'file'     => $fileName,
+                'function' => $funcName,
+                'line'     => $line,
+            ];
+            Utils::sendToSentry($logType, $isExplicitLogType, $message, $params);
+        } catch (Exception) {
+            // do nothing, ensure we don’t kill the process if Sentry fails
+        }
+    }
+}
+
+/**
+ * Helper to locate the file name, function name, and line number
+ * of the code that called fw::logger(), skipping the framework’s own layers.
+ */
+function getCallerInfo(): array {
+    global $CONFIG;
+    $arr = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 7);
+    // Typical stack:
+    // [0] => FwHooks::logger()
+    // [1] => fw::logger() or current function
+    // [2..] => caller’s function
+
+    $line     = '';
+    $fileName = '';
+    $funcName = '';
+    $i        = 1;
+    while (isset($arr[$i])) {
+        $line      = $arr[$i]['line'] ?? '';
+        $fileName  = $arr[$i]['file'] ?? '';
+        $funcName  = $arr[$i + 1]['function'] ?? '';
+        $className = $arr[$i]['class'] ?? '';
+        $i++;
+        // We find the first frame that’s NOT "logger" or DB calls
+        if ($funcName !== 'logger' && $className !== 'DB') {
+            break;
+        }
+    }
+
+    // Remove site_root path for brevity
+    $siteRootLower = strtolower($CONFIG['SITE_ROOT'] ?? '');
+    $fileNameLower = strtolower($fileName);
+    $fileNameShort = str_replace($siteRootLower, '', $fileNameLower);
+
+    return [$fileNameShort, $funcName, $line];
 }
 
 ########################### for debugging with output right into the browser or console

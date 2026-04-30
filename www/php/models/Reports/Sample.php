@@ -12,7 +12,7 @@ class ReportSample extends Reports {
         parent::__construct();
     }
 
-    public function getReportFilters() {
+    public function getReportFilters(): array {
         $this->f = array_merge($this->f, array(
             #add there data for custom filters
             #'select_users' => Users::i()->listSelectOptions(),
@@ -21,7 +21,7 @@ class ReportSample extends Reports {
         return $this->f;
     }
 
-    public function getReportData($value = '') {
+    public function getReportData($value = ''): array {
         $ps = array();
 
         $list_orderby = 'al.id desc'; #TODO setListSorting

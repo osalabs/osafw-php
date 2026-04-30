@@ -104,7 +104,7 @@
     },
     {
       "type": "plaintext",
-      "lookup_tpl": "/common/sel/status.sel",
+      "lookup_tpl": "/admin/users/status.sel",
       "field": "status",
       "label": "Status"
     },

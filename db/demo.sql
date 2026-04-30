@@ -30,37 +30,37 @@ CREATE TABLE demos
 (
     id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 
-    parent_id         INT UNSIGNED NOT NULL DEFAULT 0,                 -- parent id - combo selection from SQL
-    demo_dicts_id     INT UNSIGNED,                                    -- demo dictionary link
+    parent_id         INT UNSIGNED     NOT NULL DEFAULT 0,                 -- parent id - combo selection from SQL
+    demo_dicts_id     INT UNSIGNED,                                        -- demo dictionary link
 
-    iname             VARCHAR(64)  NOT NULL DEFAULT '',                -- string value for names
-    idesc             TEXT,                                            -- large text value
+    iname             VARCHAR(64)      NOT NULL DEFAULT '',                -- string value for names
+    idesc             TEXT,                                                -- large text value
 
-    email             VARCHAR(128) NOT NULL DEFAULT '',                -- string value for unique field, such as email
+    email             VARCHAR(128)     NOT NULL DEFAULT '',                -- string value for unique field, such as email
 
-    fint              INT UNSIGNED NOT NULL DEFAULT 0,                 -- accept only INT
-    ffloat            FLOAT        NOT NULL DEFAULT 0,                 -- accept float digital values
+    fint              INT UNSIGNED     NOT NULL DEFAULT 0,                 -- accept only INT
+    ffloat            FLOAT            NOT NULL DEFAULT 0,                 -- accept float digital values
 
-    dict_link_auto_id INT UNSIGNED NOT NULL DEFAULT 0,                 -- index of autocomplete field - linked to demo_dicts
-    dict_link_multi   VARCHAR(255) NOT NULL DEFAULT '',                -- multiple select values, link to demo_dicts
+    dict_link_auto_id INT UNSIGNED     NOT NULL DEFAULT 0,                 -- index of autocomplete field - linked to demo_dicts
+    dict_link_multi   VARCHAR(255)     NOT NULL DEFAULT '',                -- multiple select values, link to demo_dicts
 
-    fcombo            INT UNSIGNED NOT NULL DEFAULT 0,                 -- index of combo selection
-    fradio            INT UNSIGNED NOT NULL DEFAULT 0,                 -- index of radio selection
-    fyesno            BIT          NOT NULL DEFAULT 0,                 -- yes/no field 0 - NO, 1 - YES
-    is_checkbox       TINYINT      NOT NULL DEFAULT 0,                 -- checkbox field 0 - not set, 1 - set
+    fcombo            INT UNSIGNED     NOT NULL DEFAULT 0,                 -- index of combo selection
+    fradio            INT UNSIGNED     NOT NULL DEFAULT 0,                 -- index of radio selection
+    fyesno            TINYINT UNSIGNED NOT NULL DEFAULT 0,                 -- yes/no field 0 - NO, 1 - YES - use TINYINT instead of BIT!
+    is_checkbox       TINYINT UNSIGNED NOT NULL DEFAULT 0,                 -- checkbox field 0 - not set, 1 - set
 
-    fdate_combo       DATE,                                            -- date field with 3 combos editing
-    fdate_pop         DATE,                                            -- date field with popup editing
-    fdatetime         DATETIME,                                        -- date+time field
-    ftime             INT UNSIGNED NOT NULL DEFAULT 0,                 -- time field - we always store time as seconds from start of the day [0-86400]
+    fdate_combo       DATE,                                                -- date field with 3 combos editing
+    fdate_pop         DATE,                                                -- date field with popup editing
+    fdatetime         DATETIME,                                            -- date+time field
+    ftime             INT UNSIGNED     NOT NULL DEFAULT 0,                 -- time field - we always store time as seconds from start of the day [0-86400]
 
-    att_id            INT UNSIGNED,                                    -- optional attached image
+    att_id            INT UNSIGNED,                                        -- optional attached image
 
-    status            TINYINT      NOT NULL DEFAULT 0,                 -- 0-ok, 127-deleted
-    add_time          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP, -- date record added
-    add_users_id      INT UNSIGNED          DEFAULT 0,                 -- user added record
-    upd_time          DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
-    upd_users_id      INT UNSIGNED          DEFAULT 0,
+    status            TINYINT          NOT NULL DEFAULT 0,                 -- 0-ok, 127-deleted
+    add_time          DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP, -- date record added
+    add_users_id      INT UNSIGNED              DEFAULT 0,                 -- user added record
+    upd_time          DATETIME         NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id      INT UNSIGNED              DEFAULT 0,
 
     FOREIGN KEY (demo_dicts_id) REFERENCES demo_dicts (id),
     FOREIGN KEY (att_id) REFERENCES att (id),

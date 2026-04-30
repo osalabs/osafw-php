@@ -1,4 +1,10 @@
 <?php
+/*
+My Password Controller
+
+Part of PHP osa framework  www.osalabs.com/osafw/php
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
+*/
 
 class MyPasswordController extends FwController {
     const int    access_level         = 0; #logged only
@@ -63,7 +69,7 @@ class MyPasswordController extends FwController {
     }
 
     public function Validate($id, $item) {
-        $result = $this->validateRequired($item, "email old_pwd pwd pwd2");
+        $result = $this->validateRequired($id, $item, "email old_pwd pwd pwd2");
 
         if ($result) {
             $itemdb = $this->model->one($id);

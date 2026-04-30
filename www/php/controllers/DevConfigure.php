@@ -57,12 +57,33 @@ class DevConfigureController extends FwController {
         }
 
         $ps['is_error_log'] = false;
-        if (is_writable($this->fw->config->site_error_log)) {
+        if (is_writable($this->fw->config->LOG_DESTINATION)) {
             $ps['is_error_log'] = true;
         }
-        $ps['error_log_size'] = Utils::bytes2str(filesize($this->fw->config->site_error_log));
+        $ps['error_log_size'] = Utils::bytes2str(filesize($this->fw->config->LOG_DESTINATION));
 
         return $ps;
+    }
+
+    public function ApplyUpdatesAction(): ?array {
+        //ony for dev
+        if (!$this->fw->config->IS_DEV) {
+            fw::redirect('/Dev/Configure');
+        }
+
+        $FwUpdates = FwUpdates::i();
+        $FwUpdates->loadUpdates();
+
+        #apply updates - if any and echo results. If error happens we stay on this page
+        try {
+            $FwUpdates->applyPending(true);
+        } catch (Exception $e) {
+            rw("Error: " . $e->getMessage());
+            rwe("<a href='/Admin/FwUpdates'>Admin FwUpdates</a>");
+        }
+
+        #all success - show link back to home
+        rw("All updates applied successfully. <a href='/'>Back to Home</a>");
     }
 
 }

@@ -3,7 +3,7 @@
 Demo Admin Controller
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class AdminDemosController extends FwAdminController {
@@ -14,7 +14,7 @@ class AdminDemosController extends FwAdminController {
 
     public string $base_url = '/Admin/Demos';
     public string $required_fields = 'iname email';
-    public string $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_multi att_id status';
+    public string $save_fields = 'parent_id demo_dicts_id iname idesc email fint ffloat fcombo fradio fyesno fdate_pop fdatetime dict_link_auto_id dict_link_multi att_id status';
     public string $save_fields_checkboxes = 'is_checkbox';
     public string $save_fields_nullable = 'demo_dicts_id att_id fdate_pop fdatetime';
 
@@ -47,7 +47,7 @@ class AdminDemosController extends FwAdminController {
     public function setListSearch(): void {
         parent::setListSearch();
 
-        if ($this->list_filter['status'] > '') {
+        if (($this->list_filter['status'] ?? '') > '') {
             $this->list_where .= ' and status=' . dbqi($this->list_filter['status']);
         }
     }
@@ -68,7 +68,7 @@ class AdminDemosController extends FwAdminController {
         $item = $ps['i'];
         $id   = intval($item['id']);
 
-        $item["ftime_str"] = DateUtils::int2timestr($item["ftime"]);
+        $item["ftime_str"] = DateUtils::int2timestr(intval($item["ftime"]));
 
         $ps = array_merge($ps, array(
             'i'                  => $item,
@@ -91,30 +91,6 @@ class AdminDemosController extends FwAdminController {
         return $ps;
     }
 
-    /*
-     *     public override Hashtable ShowFormAction(int id = 0)
-        {
-            // Me.form_new_defaults = New Hashtable 'set new form defaults here if any
-            // Me.form_new_defaults = reqh("item") 'OR optionally set defaults from request params
-            // item["field"]="default value"
-            Hashtable ps = base.ShowFormAction(id);
-
-            // read dropdowns lists from db
-            var item = (Hashtable)ps["i"];
-            ps["select_options_parent_id"] = model.listSelectOptionsParent();
-            ps["select_options_demo_dicts_id"] = model_related.listSelectOptions();
-            ps["dict_link_auto_id_iname"] = model_related.iname(item["dict_link_auto_id"]);
-            ps["multi_datarow"] = model_related.listWithChecked((string)item["dict_link_multi"]);
-            ps["multi_datarow_link"] = fw.model<DemosDemoDicts>().listLinkedByMainId(id);
-            FormUtils.comboForDate((string)item["fdate_combo"], ps, "fdate_combo");
-
-            ps["att"] = fw.model<Att>().one(Utils.f2int(item["att_id"])).toHashtable();
-            ps["att_links"] = fw.model<Att>().listLinked(model.table_name, id);
-
-            return ps;
-        }
-
-     * */
     public function ShowFormAction($form_id): ?array {
         $ps   = parent::ShowFormAction($form_id);
         $id   = intval($ps['id']);
@@ -139,13 +115,13 @@ class AdminDemosController extends FwAdminController {
         #load old record if necessary
         #$item_old = $this->model->one($id);
 
+        $itemdb = parent::getSaveFields($id, $item);
+
         $itemdb['dict_link_auto_id'] = $this->model_related->findOrAddByIname($item['dict_link_auto_id_iname']);
         $itemdb['dict_link_multi']   = FormUtils::multi2ids(reqh('dict_link_multi'));
         $itemdb["fdate_combo"]       = FormUtils::dateForCombo($item, "fdate_combo");
         $itemdb['fdate_pop']         = DateUtils::Str2SQL($item['fdate_pop']);
         $itemdb['ftime']             = DateUtils::timestr2int($item['ftime_str']); #ftime - convert from HH:MM to int (0-24h in seconds)
-
-        $itemdb = parent::getSaveFields($id, $item);
 
         return $itemdb;
     }
@@ -162,7 +138,7 @@ class AdminDemosController extends FwAdminController {
     }
 
     public function Validate($id, $item): void {
-        $result = $this->validateRequired($item, $this->required_fields);
+        $result = $this->validateRequired($id, $item, $this->required_fields);
 
         //check $result here used only to disable further validation if required fields validation failed
         if ($result) {

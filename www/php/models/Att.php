@@ -3,12 +3,26 @@
  Att model class
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2024 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class Att extends FwModel {
+    public const int STORAGE = self::STORAGE_FILE; #default storage for the project
+
+    public const int STORAGE_TABLE = 0; #att.raw
+    public const int STORAGE_FILE  = 10; #0/0/0/att_id.dat
+    public const int STORAGE_S3    = 20; #$S3Bucket/$S3Root/att/att_id
+
     public const string IMGURL_0    = "/img/0.gif";
     public const string IMGURL_FILE = "/img/att_file.png";
+
+    const string SIZE_ORIGINAL = "";
+    const string SIZE_SMALL    = "s";
+    const string SIZE_MEDIUM   = "m";
+    const string SIZE_LARGE    = "l";
+
+    const array ALL_SIZES   = [self::SIZE_ORIGINAL, self::SIZE_SMALL, self::SIZE_MEDIUM, self::SIZE_LARGE];
+    const array THUMB_SIZES = [self::SIZE_SMALL, self::SIZE_MEDIUM, self::SIZE_LARGE];
 
     const int MAX_THUMB_W_S = 180;
     const int MAX_THUMB_H_S = 180;
@@ -16,8 +30,6 @@ class Att extends FwModel {
     const int MAX_THUMB_H_M = 512;
     const int MAX_THUMB_W_L = 1200;
     const int MAX_THUMB_H_L = 1200;
-
-    public const string MIME_MAP = "doc|application/msword docx|application/msword xls|application/vnd.ms-excel xlsx|application/vnd.ms-excel ppt|application/vnd.ms-powerpoint pptx|application/vnd.ms-powerpoint csv|text/csv pdf|application/pdf html|text/html zip|application/x-zip-compressed jpg|image/jpeg jpeg|image/jpeg gif|image/gif png|image/png wmv|video/x-ms-wmv avi|video/x-msvideo mp4|video/mp4";
 
     public function __construct() {
         parent::__construct();
@@ -41,30 +53,32 @@ class Att extends FwModel {
             $ext = UploadUtils::uploadExt($filepath);
 
             // update db with file information
-            $fields = array();
+            $fields = [
+                'fname'   => $file['name'],
+                'fsize'   => filesize($filepath),
+                'ext'     => $ext,
+                'storage' => self::STORAGE_FILE, // initial upload to file, then move to storage
+                'status'  => self::STATUS_ACTIVE, // finished upload - change status to active
+            ];
             if ($is_new) {
                 $fields["iname"] = $file['name'];
             }
 
-            $fields["fname"]  = $file['name'];
-            $fields["fsize"]  = filesize($filepath);
-            $fields["ext"]    = $ext;
-            $fields["status"] = self::STATUS_ACTIVE; // finished upload - change status to active
-            // turn on image flag if it's an image
             if (UploadUtils::isImgExt($ext)) {
-                // if it's an image - turn on flag and resize for thumbs
+                // if it's an image - set flag and resize for thumbs
                 $fields["is_image"] = 1;
 
-                ImageUtils::resize($filepath, self::MAX_THUMB_W_S, self::MAX_THUMB_H_S, $this->getUploadImgPath($id, "s", $ext));
-                ImageUtils::resize($filepath, self::MAX_THUMB_W_M, self::MAX_THUMB_H_M, $this->getUploadImgPath($id, "m", $ext));
-                ImageUtils::resize($filepath, self::MAX_THUMB_W_L, self::MAX_THUMB_H_L, $this->getUploadImgPath($id, "l", $ext));
+                ImageUtils::resize($filepath, self::MAX_THUMB_W_S, self::MAX_THUMB_H_S, $this->getUploadImgPath($id, self::SIZE_SMALL, $ext));
+                ImageUtils::resize($filepath, self::MAX_THUMB_W_M, self::MAX_THUMB_H_M, $this->getUploadImgPath($id, self::SIZE_MEDIUM, $ext));
+                ImageUtils::resize($filepath, self::MAX_THUMB_W_L, self::MAX_THUMB_H_L, $this->getUploadImgPath($id, self::SIZE_LARGE, $ext));
             }
 
             $this->update($id, $fields);
-            $fields["filepath"] = $filepath;
-            $result             = $fields;
 
-            $this->moveToS3($id);
+            $result             = $fields;
+            $result["filepath"] = $filepath; #add full local upload path to result
+
+            $this->moveToStorage($id);
         }
         return $result;
     }
@@ -77,7 +91,7 @@ class Att extends FwModel {
      * @throws DBException
      */
     public function uploadMulti(array $item): array {
-        $result = array();
+        $result = [];
         foreach ($_FILES as $field_name => $file) {
             if ($file['size'] > 0) {
                 // add att db record
@@ -144,9 +158,8 @@ class Att extends FwModel {
             return '';
         }
 
-        $result = '';
-        if ($item['is_s3']) {
-            //TODO $result = S3::i()->getSignedUrl($this->getS3KeyByID($id), $size);
+        if ($item['storage'] == self::STORAGE_S3) {
+            $result = S3::i()->getSignedUrl($this->getS3KeyByID($id), $size);
         } else {
             #if /Att need to be on offline folder
             $result = $this->fw->GLOBAL['ROOT_URL'] . '/Att/' . $id;
@@ -167,9 +180,10 @@ class Att extends FwModel {
     public function getUrlDirect(array|int $id_or_item, string $size = ''): string {
         if (is_array($id_or_item)) {
             $item = $id_or_item;
-            if ($item['is_s3']) {
-                //TODO return S3::i()->getSignedUrl($this->getS3KeyByID($item['id']), $size);
-                return '';
+            if ($item['storage'] == self::STORAGE_S3) {
+                return S3::i()->getSignedUrl($this->getS3KeyByID($item['id']), $size);
+            } elseif ($item['storage'] == self::STORAGE_TABLE) {
+                return $this->getUrl($item['id'], $size); // don't have direct url for table storage
             } else {
                 return $this->getUploadUrl($item['id'], $item['ext'], $size);
             }
@@ -184,23 +198,6 @@ class Att extends FwModel {
         }
     }
 
-    /**
-     * return mime type for extension
-     * @param string $ext extension - doc, jpg, ... (dot is optional)
-     * @return string mime type or application/octetstream if not found
-     */
-    public function getMimeForExt(string $ext): string {
-        $map = Utils::qh(self::MIME_MAP);
-        $ext = preg_replace("/^\./", "", $ext); // remove dot if any
-
-        $result = "application/octetstream";
-        if (isset($map[$ext])) {
-            $result = $map[$ext];
-        }
-
-        return $result;
-    }
-
     public function delete(int $id, bool $is_perm = false): bool {
         // also delete from related tables:
         // users.att_id -> null?
@@ -211,8 +208,18 @@ class Att extends FwModel {
 
             // remove files first
             $item = $this->one($id);
-            if ($item["is_s3"]) {
-                //TODO S3::i()->deleteObject($this->table_name . "/" . $item["id"]);
+            if ($item["storage"] == self::STORAGE_S3) {
+                //delete whole folder
+                S3::i()->deleteObject($this->table_name . "/" . $item["id"]);
+
+            } elseif ($item["storage"] == self::STORAGE_TABLE) {
+                $this->update($id, [
+                    'raw'   => null,
+                    'raw_s' => null,
+                    'raw_m' => null,
+                    'raw_l' => null,
+                ]);
+
             } else {
                 // local storage
                 $this->deleteLocalFiles($id);
@@ -231,7 +238,7 @@ class Att extends FwModel {
         }
         // for images - also delete s/m thumbnails
         if ($item["is_image"]) {
-            foreach (Utils::qw("s m l") as $size) {
+            foreach (self::THUMB_SIZES as $size) {
                 $filepath = $this->getUploadImgPath($id, $size, $item["ext"]);
                 if ($filepath > '') {
                     unlink($filepath);
@@ -298,11 +305,11 @@ class Att extends FwModel {
         }
 
         $filename = str_replace('"', "'", $item['iname']); #quote filename
-        header('Content-type: ' . UploadUtils::getMimeForExt($item['ext']));
+        header('Content-type: ' . UploadUtils::ext2mime($item['ext']));
         header("Content-Length: " . filesize($filepath));
         header('Content-Disposition: ' . $disposition . '; filename="' . $filename . '"');
 
-        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, " . UploadUtils::getMimeForExt($item['ext']));
+        logger('TRACE', "transmit file [$filepath] $id, $size, $disposition, " . UploadUtils::ext2mime($item['ext']));
         $fp = fopen($filepath, 'rb');
         fpassthru($fp);
     }
@@ -320,30 +327,32 @@ class Att extends FwModel {
     public function listLinked(string $entity_icode, int $item_id, int $is_image = -1, string $category_icode = ""): array {
         $fwentities_id = FwEntities::i()->idByIcodeOrAdd($entity_icode);
 
-        $where                    = "";
-        $params                   = array();
-        $params["@fwentities_id"] = $fwentities_id;
-        $params["@item_id"]       = $item_id;
+        $where                   = "";
+        $params                  = array();
+        $params["fwentities_id"] = $fwentities_id;
+        $params["item_id"]       = $item_id;
 
         if ($is_image > -1) {
-            $where               .= " and a.is_image=@is_image";
-            $params["@is_image"] = $is_image;
+            $where              .= " and a.is_image=@is_image";
+            $params["is_image"] = $is_image;
         }
         if ($category_icode > '') {
             $att_category = AttCategories::i()->oneByIcode($category_icode);
             if (count($att_category) > 0) {
-                $where                        .= " and a.att_categories_id=@att_categories_id";
-                $params["@att_categories_id"] = $att_category["id"];
+                $where                       .= " and a.att_categories_id=@att_categories_id";
+                $params["att_categories_id"] = $att_category["id"];
             }
         }
 
-        return $this->db->arrp("select a.* " .
-            " from " . $this->db->qid(AttLinks::i()->table_name) . " al, " . $this->db->qid($this->table_name) . " a " .
-            " where al.fwentities_id=@fwentities_id " .
-            "   and al.item_id=@item_id " .
-            "   and a.id=al.att_id " .
-            $where .
-            " order by a.id", $params);
+        $links_table = AttLinks::i()->qTable();
+
+        return $this->db->arrp("select a.* 
+                from {$this->qTable()} a 
+                    INNER JOIN $links_table al ON (al.att_id=a.id)
+             where al.fwentities_id=@fwentities_id 
+               and al.item_id=@item_id 
+                $where 
+             order by a.id", $params);
     }
 
     /**
@@ -413,6 +422,23 @@ class Att extends FwModel {
     }
 
     /**
+     * return list of records for the att category where status=0 order by add_time desc
+     * @param int $att_categories_id
+     * @return array
+     * @throws DBException
+     */
+    public function listByCategory(int $att_categories_id): array {
+        $where = array(
+            'status' => 0,
+        );
+        if ($att_categories_id > 0) {
+            $where['att_categories_id'] = $att_categories_id;
+        }
+
+        return $this->db->arr($this->table_name, $where, 'add_time desc');
+    }
+
+    /**
      * return one att record with additional check by entity
      * @param int $id
      * @param string $entity_icode
@@ -461,10 +487,58 @@ class Att extends FwModel {
             throw new AuthException(); // denied for non-logged
         }
 
-        throw new ApplicationException("Not implemented");
-        //TODO
-        //        $url = S3::i()->getSignedUrl($this->getS3KeyByID($id, $size));
-        //        $this->fw->redirect($url);
+        $url = S3::i()->getSignedUrl($this->getS3KeyByID($id, $size));
+        fw::redirect($url);
+    }
+
+    /**
+     * move file from local file storage to DB or S3 if default storage is not local file
+     * @param int $id
+     * @return bool
+     * @throws DBException
+     */
+    public function moveToStorage(int $id): bool {
+        if (self::STORAGE == self::STORAGE_FILE) {
+            return true; # no need to move, all uploaded files initially already in file storage
+        }
+
+        if (self::STORAGE == self::STORAGE_TABLE) {
+            return $this->moveToDB($id);
+        }
+
+        if (self::STORAGE == self::STORAGE_S3) {
+            return $this->moveToS3($id);
+        }
+
+        return false;
+    }
+
+    /**
+     * move file from local file storage to DB
+     * @param int $id
+     * @return bool
+     * @throws DBException
+     */
+    public function moveToDB(int $id): bool {
+        $item = $this->one($id);
+        if ($item["storage"] == self::STORAGE_TABLE) {
+            return true; # no need to move, all uploaded files initially already in file storage
+        }
+
+        $fields = [
+            'storage' => self::STORAGE_TABLE
+        ];
+        foreach (self::ALL_SIZES as $size) {
+            $path = $this->getUploadPath($id, $item["ext"], $size);
+            if (file_exists($path)) {
+                $fields["raw_" . $size] = file_get_contents($path);
+            }
+        }
+
+        $this->update($id, $fields);
+        $this->deleteLocalFiles($id);
+
+        return true;
     }
 
     /**
@@ -472,41 +546,31 @@ class Att extends FwModel {
      * @param int $id
      * @return bool
      * @throws DBException
+     * @throws NoModelException
      */
     public function moveToS3(int $id): bool {
-        return false; // TODO IMPLEMENT
-
-        if (!S3::IS_ENABLED) {
-            return false;
-        }
-
         $result = true;
         $item   = $this->one($id);
-        if (intval($item["is_s3"]) == 1) {
-            return true; // already in S3
-        }
 
-        $model_s3 = S3::i();
-        // model_s3.createFolder(Me.table_name)
+        $S3 = S3::i();
         // upload all sizes if exists
         // id=47 -> /47/47 /47/47_s /47/47_m /47/47_l
-        foreach (Utils::qw(" s m l") as $size1) {
-            $size     = trim($size1);
+        foreach (self::ALL_SIZES as $size) {
             $filepath = $this->getUploadImgPath($id, $size, $item["ext"]);
             if (!file_exists($filepath)) {
                 continue;
             }
 
-            $result = $model_s3->uploadLocalFile($this->getS3KeyByID($id, $size), $filepath, "inline");
+            $result = $S3->uploadLocalFile($this->getS3KeyByID($id, $size), $filepath, "inline");
             if (!$result) {
                 break;
             }
         }
 
         if ($result) {
-            // mark as uploaded
-            $this->update($id, array("is_s3" => "1"));
-            // remove local files
+            $this->update($id, [
+                'storage' => self::STORAGE_S3,
+            ]);
             $this->deleteLocalFiles($id);
         }
 
@@ -522,106 +586,18 @@ class Att extends FwModel {
      * @throws \Random\RandomException
      */
     public function downloadFromS3(int $id, string $size = "", string $filepath = ""): string {
-        return ""; //TODO IMPLEMENT
-
         $item = $this->one($id);
-        if ($item["is_s3"] != "1") {
+        if ($item["storage"] != self::STORAGE_S3) {
             logger("att file not in S3");
             return "";
         }
 
-        if (Utils::isEmpty($filepath)) {
+        if (empty($filepath)) {
             $filepath = Utils::getTmpFilename() . $item["ext"];
         }
 
         return S3::i()->download($this->getS3KeyByID($id, $size), $filepath);
     }
-
-    /*
-     *     /// <summary>
-    /// upload all posted files (fw.request.Form.Files) to S3 for the table
-    /// </summary>
-    /// <param name="entity_icode"></param>
-    /// <param name="item_id"></param>
-    /// <param name="att_categories_id"></param>
-    /// <param name="fieldnames">qw string of ONLY field names to upload</param>
-    /// <returns>number of successuflly uploaded files</returns>
-    /// <remarks>also set FLASH error if some files not uploaded</remarks>
-    public int uploadPostedFilesS3(string entity_icode, int item_id, string att_categories_id = null, string fieldnames = "")
-    {
-        var result = 0;
-        var fwentities_id = fw.model<FwEntities>().idByIcodeOrAdd(entity_icode);
-        var honlynames = Utils.qh(fieldnames);
-
-        // create list of eligible file uploads, check for the ContentLength as any 'input type = "file"' creates a System.Web.HttpPostedFile object even if the file was not attached to the input
-        ArrayList afiles = new();
-        if (honlynames.Count > 0)
-        {
-            // if we only need some fields - skip if not requested field
-            for (var i = 0; i <= fw.request.Form.Files.Count - 1; i++)
-            {
-                if (!honlynames.ContainsKey(fw.request.Form.Files[i].FileName))
-                    continue;
-                if (fw.request.Form.Files[i].Length > 0)
-                    afiles.Add(fw.request.Form.Files[i]);
-            }
-        }
-        else
-            // just add all files
-            for (var i = 0; i <= fw.request.Form.Files.Count - 1; i++)
-            {
-                if (fw.request.Form.Files[i].Length > 0)
-                    afiles.Add(fw.request.Form.Files[i]);
-            }
-
-        // do nothing if empty file list
-        if (afiles.Count == 0)
-            return 0;
-
-        // upload files to the S3
-        var model_s3 = fw.model<S3>();
-
-        // create /att folder
-        model_s3.createFolder(this.table_name);
-
-        // upload files to S3
-        foreach (IFormFile file in afiles)
-        {
-            // first - save to db so we can get att_id
-            Hashtable attitem = new();
-            attitem["att_categories_id"] = att_categories_id;
-            attitem["fwentities_id"] = fwentities_id;
-            attitem["item_id"] = Utils.f2str(item_id);
-            attitem["is_s3"] = "1";
-            attitem["status"] = "1";
-            attitem["fname"] = file.FileName;
-            attitem["fsize"] = Utils.f2str(file.Length);
-            attitem["ext"] = UploadUtils.getUploadFileExt(file.FileName);
-            var att_id = fw.model<Att>().add(attitem);
-
-            try
-            {
-                model_s3.uploadPostedFile(getS3KeyByID(att_id.ToString()), file, "inline");
-
-                // TODO check response for 200 and if not - error/delete?
-                // once uploaded - mark in db as uploaded
-                fw.model<Att>().update(att_id, new Hashtable() { { "status", "0" } });
-
-                result += 1;
-            }
-            catch (Exception ex)
-            {
-                logger(ex.Message);
-                logger(ex);
-                fw.flash("error", "Some files were not uploaded due to error. Please re-try.");
-                // TODO if error - don't set status to 0 but remove att record?
-                fw.model<Att>().delete(att_id, true);
-            }
-        }
-
-        return result;
-    }
-     * */
 
     /**
      * upload all posted files ($_FILES) to S3 for the entity/table
@@ -664,10 +640,10 @@ class Att extends FwModel {
         }
 
         // upload files to the S3
-        $model_s3 = S3::i();
+        $S3 = S3::i();
 
         // create /att folder
-        $model_s3->createFolder($this->table_name);
+        $S3->createFolder($this->table_name);
 
         // upload files to S3
         foreach ($afiles as $file) {
@@ -676,48 +652,31 @@ class Att extends FwModel {
             $attitem['att_categories_id'] = $att_categories_id;
             $attitem['fwentities_id']     = $fwentities_id;
             $attitem['item_id']           = $item_id;
-            $attitem['is_s3']             = 1;
-            $attitem['status']            = 1;
+            $attitem['storage']           = self::STORAGE_S3;
+            $attitem['status']            = self::STATUS_UNDER_UPDATE;
             $attitem['fname']             = $file['name'];
             $attitem['fsize']             = $file['size'];
             $attitem['ext']               = UploadUtils::uploadExt($file['name']);
             $att_id                       = $this->add($attitem);
 
             try {
-                $model_s3->uploadPostedFile($this->getS3KeyByID($att_id), $file, "inline");
+                $S3->uploadPostedFile($this->getS3KeyByID($att_id), $file, "inline");
 
                 // TODO check response for 200 and if not - error/delete?
                 // once uploaded - mark in db as uploaded
-                $this->update($att_id, ['status' => 0]);
+                $this->update($att_id, ['status' => self::STATUS_ACTIVE]);
 
                 $result += 1;
             } catch (Exception $ex) {
                 logger($ex->getMessage());
                 logger($ex);
                 $this->fw->flash("error", "Some files were not uploaded due to error. Please re-try.");
-                // TODO if error - don't set status to 0 but remove att record?
+                // if error - don't set status to 0 but remove att record
                 $this->delete($att_id, true);
             }
         }
 
         return $result;
-    }
-
-    /**
-     * return list of records for the att category where status=0 order by add_time desc
-     * @param int $att_categories_id
-     * @return array
-     * @throws DBException
-     */
-    public function listByCategory(int $att_categories_id): array {
-        $where = array(
-            'status' => 0,
-        );
-        if ($att_categories_id > 0) {
-            $where['att_categories_id'] = $att_categories_id;
-        }
-
-        return $this->db->arr($this->table_name, $where, 'add_time desc');
     }
 
 }

@@ -3,7 +3,7 @@
 Base Fw Api Controller class for building APIs
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class FwApiController extends FwController {
@@ -21,14 +21,21 @@ class FwApiController extends FwController {
         'v1users.confirm',
     ];
 
+    #standard names used in JSON response
+    protected const string META_NAME            = "metadata";
+    protected const string LIST_ITEMS_NAME      = "items";
+    protected const string LIST_COUNT_NAME      = "count";
+    protected const string LIST_LIMIT_NAME      = "limit";
+    protected const string LIST_OFFSET_NAME     = "offset";
+    protected const string LIST_SORT_FIELD_NAME = "sortField";
+    protected const string LIST_SORT_ORDER_NAME = "sortOrder";
+    protected const string ITEM_NAME            = "item";
+
+
     protected string $http_origin = '';
     protected ?object $jwt_payload = null; #decoded JWT payload
 
-    protected array $posted_json = []; #original JSON from POST request body
-
     public function __construct($is_auth = true) {
-        $this->posted_json = Utils::parsePostedJson(); #API always parse posted JSON (if any) and it add to $_REQUEST
-
         parent::__construct();
 
         $this->prepare($is_auth);
@@ -62,7 +69,7 @@ class FwApiController extends FwController {
      * @return void
      */
     protected function setHeaders(): void {
-        header("Access-Control-Allow-Origin: {$this->http_origin}");
+        header("Access-Control-Allow-Origin: $this->http_origin");
         header("Access-Control-Allow-Credentials: true");
     }
 
@@ -151,7 +158,8 @@ class FwApiController extends FwController {
 
             \Firebase\JWT\JWT::$leeway = 30; # allow 30 seconds difference
             try {
-                $payload = \Firebase\JWT\JWT::decode($encoded_token, $this->fw->config->JWT_SECRET, ['HS256']);
+                $headers = new stdClass();
+                $payload = \Firebase\JWT\JWT::decode($encoded_token, new \Firebase\JWT\Key($this->fw->config->JWT_SECRET, 'HS256'), $headers);
                 #validate payload
                 //                if (isset($payload->exp) && DateUtils::isExpired($payload->exp, 0)) {
                 //                    throw new AuthException("JWT token expired", FW::HTTP_UNAUTHORIZED); # exp - expiration time

@@ -1,4 +1,10 @@
 <?php
+/*
+Signup Controller
+
+Part of PHP osa framework  www.osalabs.com/osafw/php
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
+*/
 
 class SignupController extends FwAdminController {
     const int    access_level         = Users::ACL_VISITOR;
@@ -28,7 +34,7 @@ class SignupController extends FwAdminController {
     }
 
     public function ShowFormAction($form_id): ?array {
-        $id = $form_id + 0;
+        $id = intval($form_id);
 
         if ($this->isGet()) {
             if ($id > 0) {
@@ -43,8 +49,9 @@ class SignupController extends FwAdminController {
         }
 
         $ps = array(
-            'id' => $id,
-            'i'  => $item,
+            'id'           => $id,
+            'i'            => $item,
+            'hide_sidebar' => true,
         );
 
         return $ps;
@@ -81,7 +88,7 @@ class SignupController extends FwAdminController {
     }
 
     public function Validate($id, $item): void {
-        $result = $this->validateRequired($item, $this->required_fields);
+        $result = $this->validateRequired($id, $item, $this->required_fields);
 
         //result here used only to disable further validation if required fields validation failed
         if ($result) {

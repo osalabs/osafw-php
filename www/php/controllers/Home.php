@@ -1,4 +1,10 @@
 <?php
+/*
+Home Controller
+
+Part of PHP osa framework  www.osalabs.com/osafw/php
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
+*/
 
 class HomeController extends FwController {
     const string route_default_action = FW::ACTION_SHOW;
@@ -13,6 +19,8 @@ class HomeController extends FwController {
     #CACHED as home_page
     public function IndexAction(): ?array {
         #fw::redirect('/Login'); #uncomment to always show login instead of Home
+
+        FwUpdates::i()->checkApplyIfDev();
 
         /*cached version
         $ps = $this->fw->cache->get('home_page');

@@ -37,7 +37,7 @@ class Utils {
         foreach ($arr as $value) {
             $result .= str_replace(' ', '&nbsp;', $value) . ' ';
         }
-        return $result;
+        return rtrim($result);
     }
 
     /**
@@ -106,7 +106,7 @@ class Utils {
      * @param bool $is_strict if true only A-Za-z0-9_ chars allowed, if false - also allows "-"
      * @return string normalized name with only allowed chars
      */
-    public static function routeFixChars(string $str, $is_strict = false): string {
+    public static function routeFixChars(string $str, bool $is_strict = false): string {
         if ($is_strict) {
             return preg_replace("/[^A-Za-z0-9_]+/", "", $str);
         } else {
@@ -137,24 +137,13 @@ class Utils {
         return bin2hex(random_bytes($len));
     }
 
-    //get icode with a given length based on a full set A-Za-z0-9
-    //default length is 4
-    public static function getIcode(int $len = 4): string {
-        $result = '';
-        $chars  = array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-        for ($i = ord('A'); $i <= ord('Z'); $i++) {
-            $chars[] = chr($i);
-        }
-
-        for ($i = ord('a'); $i <= ord('z'); $i++) {
-            $chars[] = chr($i);
-        }
-
-        for ($i = 0; $i < $len; $i++) {
-            $result .= $chars[mt_rand(0, count($chars) - 1)];
-        }
-
-        return $result;
+    /**
+     * generate standard icode code - basically UUID without dashes
+     * @return string
+     * @throws \Random\RandomException
+     */
+    public static function icode(): string {
+        return str_replace("-", "", self::uuid());
     }
 
     /**
@@ -215,10 +204,15 @@ class Utils {
      *   "other value" - use this value
      * @return array
      */
-    public static function commanstr2hash(string $sel_ids, string $value = null): array {
+    public static function commastr2hash(string $sel_ids, string $value = null): array {
         $result = array();
         $ids    = explode(",", $sel_ids);
         foreach ($ids as $i => $v) {
+            //skip empty values
+            if ($v == "") {
+                continue;
+            }
+
             if (is_null($value)) {
                 $result[$v] = $v;
             } elseif ($value == "123...") {
@@ -266,28 +260,42 @@ class Utils {
     }
 
     /**
+     * get random key from weighted array
+     * @param $arr array assoc array : 'some key' => int weight
+     * @return int|string
+     */
+    public static function getRandomFromWeightedArray(array $arr): int|string {
+        $result = '';
+        $rand   = mt_rand(1, (int)array_sum($arr));
+
+        foreach ($arr as $key => $value) {
+            $rand -= $value;
+            if ($rand <= 0) {
+                $result = $key;
+                break;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * array of values to csv-formatted string for one line, order defiled by $fields
-     * @param array $row hash values for csv line
+     * @param array $row [ field => value, ...]
      * @param array $fields plain array - field names
-     * @return string one csv line with properly quoted values and "\n" at the end
+     * @return string one csv line with properly quoted values with quotes and newlines and "\n" at the end
      */
     public static function toCSVRow(array $row, array $fields): string {
         $result = '';
-
-        foreach ($fields as $fld) {
-            $str = strval($row[$fld]);
-            if (preg_match('/[^\x20-\x7f]/', $str)) {
-                //non-ascii data - convert to hex
-                $str = bin2hex($str);
+        foreach ($fields as $field) {
+            $value = $row[$field] ?? '';
+            // check if value needs to be quoted
+            if (str_contains($value, ',') || str_contains($value, '"') || str_contains($value, "\n")) {
+                $value = '"' . str_replace('"', '""', $value) . '"';
             }
-            if (preg_match('/[",]/', $str)) {
-                //quote string
-                $str = '"' . str_replace('"', '""', nl2br($str)) . '"';
-            }
-            $result .= (($result) ? "," : "") . $str;
+            $result .= $value . ',';
         }
-
-        return $result . "\n";
+        return rtrim($result, ',') . "\n";
     }
 
     /**
@@ -302,7 +310,6 @@ class Utils {
         }
 
         #headers - if no fields set - read first row and get header names
-        $headers_str = '';
         if (!count($fields)) {
             if (!count($rows)) {
                 return "";
@@ -317,7 +324,7 @@ class Utils {
         $headers_str = implode(',', $fields_header);
 
         echo $headers_str . "\n";
-        foreach ($rows as $key => $row) {
+        foreach ($rows as $row) {
             echo self::toCSVRow($row, $fields);
         }
     }
@@ -371,7 +378,7 @@ class Utils {
         $ps["headers"] = $headers;
 
         //output headers
-        $filedata = parse_page($tpl_dir, "xls_head.html", $ps, 'v');
+        $filedata = $fw->parsePage($tpl_dir, "xls_head.html", $ps);
         print $filedata;
 
         //output rows in chunks to save memory and keep connection alive
@@ -390,7 +397,7 @@ class Utils {
 
             //write to output every 10000 rows
             if (count($buffer) >= 10000) {
-                $filedata = parse_page($tpl_dir, "xls_rows.html", $psbuffer);
+                $filedata = $fw->parsePage($tpl_dir, "xls_rows.html", $psbuffer);
                 print $filedata;
                 $buffer = array();
             }
@@ -398,12 +405,12 @@ class Utils {
 
         //output if something left
         if (count($buffer) > 0) {
-            $filedata = parse_page($tpl_dir, "xls_rows.html", $psbuffer);
+            $filedata = $fw->parsePage($tpl_dir, "xls_rows.html", $psbuffer);
             print $filedata;
         }
 
         //output footer
-        $filedata = parse_page($tpl_dir, "xls_foot.html", $ps);
+        $filedata = $fw->parsePage($tpl_dir, "xls_foot.html", $ps);
         print $filedata;
     }
 
@@ -488,19 +495,37 @@ class Utils {
     }
 
     /**
-     * return nanoID (2.1 trillion unique IDs)
+     * return random ID (2.18 x 10^14 = 218.3 trillion unique IDs for 8 chars, useful up to 15 million generations because of birthday paradox)
+     * @param int $length
      * @return string
      * @throws \Random\RandomException
      */
-    public static function nanoID(): string {
-        $alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz-';
-        $size     = 21;
-        $id       = '';
-        for ($i = 0; $i < $size; $i++) {
-            $id .= $alphabet[random_int(0, 63)];
+    public static function randomID(int $length = 8): string {
+        $chars    = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $maxIndex = strlen($chars) - 1;
+        $bytes    = random_bytes($length);
+        $result   = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $idx    = ord($bytes[$i]) % ($maxIndex + 1);
+            $result .= $chars[$idx];
         }
-        return $id;
+
+        return $result;
     }
+
+    // implementation for javascript frontend:
+    //    function randomID(length = 8) {
+    //        const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    //        let result = '';
+    //        const randomValues = new Uint8Array(length);
+    //        crypto.getRandomValues(randomValues);
+    //
+    //        for (let i = 0; i < length; i++) {
+    //            result += chars[randomValues[i] % chars.length];
+    //        }
+    //        return result;
+    //    }
 
     /**
      * return path to tmp directory with prefix
@@ -539,7 +564,7 @@ class Utils {
             if ($ts > 3600) {
                 try {
                     unlink($file);
-                } catch (Exception $e) {
+                } catch (Exception) {
                     //ignore errors as it just cleanup, should not affect main logic, could be access denied
                 }
             }
@@ -685,6 +710,23 @@ class Utils {
         return $result;
     }
 
+    /**
+     * calculate sha256 hash
+     * @param string $str
+     * @return string
+     */
+    public static function sha256(string $str): string {
+        return hash('sha256', $str);
+    }
+
+    /**
+     * calculate sha256 hash and return binary string
+     * @param string $str
+     * @return string
+     */
+    public static function sha256bin(string $str): string {
+        return hash('sha256', $str, true);
+    }
 
     /**
      * simple encrypt or decrypt a string with vector/key
@@ -700,10 +742,10 @@ class Utils {
         $encrypt_method = "AES-256-CBC";
 
         // hash
-        $key = hash('sha256', $k);
+        $key = self::sha256($k);
 
         // iv - encrypt method AES-256-CBC expects 16 bytes - else you will get a warning
-        $iv = substr(hash('sha256', $v), 0, 16);
+        $iv = substr(self::sha256($v), 0, 16);
 
         if ($action == 'encrypt') {
             $output = openssl_encrypt($string, $encrypt_method, $key, 0, $iv);
@@ -979,13 +1021,13 @@ class Utils {
     }
 
     /**
-     * prefix string with http:// if not already
-     * @param string $str url like "google.com" or "http://google.com"
-     * @return string url with http:// prefix
+     * prefix string with https:// if not already
+     * @param string $str url like "google.com" or "https://google.com"
+     * @return string url with https:// prefix
      */
     public static function str2url(string $str): string {
         if (!preg_match('!^\w+://!', $str)) {
-            $str = "http://" . $str;
+            $str = "https://" . $str;
         }
         return $str;
     }
@@ -1150,4 +1192,148 @@ class Utils {
         setcookie($name, '', time() - 3600, '/');
     }
 
+    /**
+     * get client IP address
+     * @return string IP address from HTTP_X_FORWARDED_FOR or REMOTE_ADDR
+     */
+    public static function getIP(): string {
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            // This can be spoofed, but our production server are always behind our balancer
+            $ips = explode(",", $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $ip  = trim(end($ips));
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        }
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            $ip = '';
+        }
+
+        return $ip;
+    }
+
+    /**
+     * initialize Sentry error logging if $sentryEndpoint is not empty
+     * REQUIRES: composer require sentry/sdk
+     * @param string $sentryEndpoint
+     * @param string $release
+     * @param string $environment
+     * @return void
+     */
+    public static function initSentry(string $sentryEndpoint, string $release, string $environment): void {
+        if (empty($sentryEndpoint)) {
+            return;
+        }
+
+        try {
+            \Sentry\init([
+                'dsn'                => $sentryEndpoint,
+                'release'            => $release,
+                'environment'        => $environment,
+                'traces_sample_rate' => 1,
+                'error_types'        => E_ALL & ~E_NOTICE,
+            ]);
+            $real_ip = self::getIP();
+            self::setSentryTag("real-ip", $real_ip);
+            \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($real_ip): void {
+                $scope->setUser([
+                    'ip_address' => $real_ip
+                ]);
+            });
+        } catch (Exception) {
+            // do nothing with this exception. it's here to make sure we don't die on failed sentry log.
+        }
+    }
+
+    /**
+     * sets sentry user
+     * @param string $email
+     * @param string $id user id
+     */
+    public static function setSentryScope(string $email, string $id): void {
+        try {
+            \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($email, $id): void {
+                $user = [
+                    'id' => $id,
+                ];
+                if (!empty($email)) {
+                    $user['email'] = $email;
+                }
+                $real_ip = self::getIP();
+                if ($real_ip) {
+                    $user['ip_address'] = $real_ip;
+                }
+                $scope->setUser($user);
+                //$scope->setLevel(\Sentry\Severity::warning());
+                //$scope->setExtra('character_name', 'Mighty Fighter');
+            });
+        } catch (Exception $e) {
+            logger("WARN", "setSentryScope", $e->getMessage());
+        }
+    }
+
+    public static function setSentryTag($tag, $value): void {
+        if ((string)$value === '') {
+            return; #do not add empty value tags, Sentry will complain about it
+        }
+        \Sentry\configureScope(function (\Sentry\State\Scope $scope) use ($tag, $value): void {
+            $scope->setTag($tag, (string)$value);
+        });
+    }
+
+    /**
+     * Helper to send logs/events to Sentry based on the log type.
+     * @param string $logType
+     * @param bool $isExplicitLogType
+     * @param string $message
+     * @param array $extraParams
+     * @return void
+     */
+    public static function sendToSentry(string $logType, bool $isExplicitLogType, string $message, array $extraParams): void {
+        // Map fw log types to Sentry severities
+        // (You can adjust these to your preference.)
+        $levelMap = [
+            'FATAL'  => Sentry\Severity::fatal(),
+            'ERROR'  => Sentry\Severity::error(),
+            'WARN'   => Sentry\Severity::warning(),
+            'INFO'   => Sentry\Severity::info(),
+            'DEBUG'  => Sentry\Severity::debug(),
+            'NOTICE' => Sentry\Severity::info(),
+            'TRACE'  => Sentry\Severity::debug(),
+            'ALL'    => Sentry\Severity::debug(),
+        ];
+
+        // Default to "info" if not found
+        $severity = $levelMap[$logType] ?? Sentry\Severity::info();
+
+        // Decide if we want to capture a full separate Sentry event
+        // for this logType or just add a breadcrumb
+        $shouldCaptureAsEvent = (
+            in_array($logType, ['FATAL', 'ERROR', 'WARN', 'INFO'], true)
+            || ($logType === 'DEBUG' && $isExplicitLogType)
+        );
+
+        // If it’s an actual Throwable at the front, send as exception
+        if ($logType === 'FATAL' && isset($extraParams[0]) && $extraParams[0] instanceof Throwable) {
+            Sentry\withScope(function (Sentry\State\Scope $scope) use ($extraParams) {
+                $scope->setExtra('extra', $extraParams);
+                Sentry\captureException($extraParams[0]);
+            });
+        } elseif ($shouldCaptureAsEvent) {
+            Sentry\withScope(function (Sentry\State\Scope $scope) use ($message, $severity, $extraParams) {
+                $scope->setExtra('extra', $extraParams);
+                Sentry\captureMessage($message, $severity);
+            });
+        }
+
+        // Add a breadcrumb if level <= DEBUG
+        // That means “TRACE” or “DEBUG” become breadcrumbs
+        if (fw::$LOG_LEVELS[$logType] <= fw::$LOG_LEVELS['DEBUG']) {
+            Sentry\addBreadcrumb(new Sentry\Breadcrumb(
+                Sentry\Breadcrumb::LEVEL_INFO,  // or map it more precisely
+                Sentry\Breadcrumb::TYPE_DEFAULT,
+                'log',
+                $message
+            ));
+        }
+    }
 }

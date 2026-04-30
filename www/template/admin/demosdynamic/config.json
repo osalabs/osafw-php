@@ -27,7 +27,7 @@
     "save_fields_checkboxes": {
         "is_checkbox":"0"
     },
-    "save_fields_nullable": "demo_dicts_id att_id fdate_pop",
+    "save_fields_nullable": "demo_dicts_id att_id fdate_pop fdatetime",
 
     "form_new_defaults": {
         "iname": ""
@@ -40,7 +40,7 @@
     "related_field_name": "demo_dicts_id",
 
     "is_dynamic_index": true,
-    "list_view": "(select d.*, dd.iname as demo_dicts_iname, FORMAT(d.fdate_pop, 'MM/dd/yyyy') as fdate_pop_str from demos d LEFT OUTER JOIN demo_dicts dd ON dd.id=d.demo_dicts_id) t",
+    "list_view": "(select d.*, dd.iname as demo_dicts_iname, DATE_FORMAT(d.fdate_pop, '%c/%e/%Y') as fdate_pop_str from demos d LEFT OUTER JOIN demo_dicts dd ON dd.id=d.demo_dicts_id) t",
     "view_list_defaults": "demo_dicts_iname iname email add_time status",
     "###view_list_map": "demo_dicts_iname|DemoDicts iname|Title email|Email add_time|Added&nbsp;on status|Status id|id",
     "view_list_map": {
@@ -105,46 +105,24 @@
                     "type": "plaintext"
                 },
                 {
-                    "type": "row",
-                    "class": ""
+                  "type": "row",
+                  "class": "form-row"
                 },
                     {
-                        "type": "col",
-                        "class": "col-lg-6"
-                    },
-                        {
-                            "field": "fint",
-                            "label": "Integer number",
-                            "type": "plaintext",
-                            "class_label": "col-md-3 col-lg-6",
-                            "class_contents": "col-3"
-                        },
-                    {
-                        "type": "col_end"
+                        "field": "fint",
+                        "label": "Integer number",
+                        "type": "plaintext",
+                        "class": false
                     },
                     {
-                        "type": "col",
-                        "class": "col-lg-6"
-                    },
-                        {
-                            "field": "ffloat",
-                            "label": "Float number",
-                            "type": "float",
-                            "class_label": "col-md-3 col-lg-6",
-                            "class_contents": "col-3"
-                        },
-                    {
-                        "type": "col_end"
+                        "field": "ffloat",
+                        "label": "Float number",
+                        "type": "float",
+                        "class_label": "col-md-3",
+                        "class": false
                     },
                 {
-                    "type": "row_end"
-                },
-                {
-                    "field": "dict_link_auto_id",
-                    "label": "DemoDicts Autocomplete",
-                    "type": "plaintext",
-                    "lookup_model": "DemoDicts",
-                    "lookup_field": "iname"
+                  "type": "row_end"
                 },
                 {
                     "field": "fcombo",
@@ -204,6 +182,13 @@
                     "type": "plaintext"
                 },
                 {
+                    "field": "dict_link_auto_id",
+                    "label": "DemoDicts Autocomplete",
+                    "type": "plaintext_autocomplete",
+                    "lookup_model": "DemoDicts",
+                    "lookup_field": "iname"
+                },
+                {
                     "field": "dict_link_multi",
                     "label": "DemoDicts Multi",
                     "type": "multi",
@@ -217,7 +202,7 @@
                     "model": "DemosDemoDicts"
                 },
                 {
-                    "field": "demos_items_subtable",
+                    "field": "demos_items",
                     "label": "Subtable",
                     "class_label": "col-12 text-start",
                     "type": "subtable",
@@ -330,42 +315,26 @@
                     "maxlength": 128
                 },
                 {
-                    "type": "row",
-                    "class": "row form-row"
+                  "type": "row",
+                  "class": "form-row"
                 },
                     {
-                        "type": "col",
-                        "class": "col-md-6"
-                    },
-                        {
-                            "field": "fint",
-                            "label": "Integer number",
-                            "type": "number",
-                            "min": 0,
-                            "max": 999999,
-                            "class_label": "col-6",
-                            "class_contents": "col-md-4"
-                        },
-                    {
-                        "type": "col_end"
+                        "field": "fint",
+                        "label": "Integer number",
+                        "type": "number",
+                        "min": 0,
+                        "max": 999999,
+                        "class": false
                     },
                     {
-                        "type": "col",
-                        "class": "col-md-6"
-                    },
-                        {
-                            "field": "ffloat",
-                            "label": "Float number",
-                            "type": "number",
-                            "step": 0.1,
-                            "class_label": "col-6",
-                            "class_contents": "col"
-                        },
-                    {
-                        "type": "col_end"
+                        "field": "ffloat",
+                        "label": "Float number",
+                        "type": "number",
+                        "step": 0.1,
+                        "class": false
                     },
                 {
-                    "type": "row_end"
+                  "type": "row_end"
                 },
 
                 {
@@ -436,7 +405,7 @@
                     "field": "dict_link_auto_id",
                     "label": "DemoDicts Autocomplete",
                     "type": "autocomplete",
-                    "autocomplete_url": "/Admin/Demos/(Autocomplete)",
+                    "autocomplete_url": "/Admin/Demos/(Autocomplete)?q=",
                     "lookup_model": "DemoDicts",
                     "lookup_field": "iname",
                     "help_text": "will add new items to DemoDicts"
@@ -455,7 +424,7 @@
                     "model": "DemosDemoDicts"
                 },
                 {
-                    "field": "demos_items_subtable",
+                    "field": "demos_items",
                     "label": "Subtable",
                     "class_label": "col-12 text-start",
                     "type": "subtable_edit",

@@ -35,7 +35,7 @@ class AdminSpagesController extends FwAdminController {
             if ($this->list_count > 0) {
                 #build pages tree
                 $pages_tree      = $this->model->tree($this->list_where, $this->list_where_params, "parent_id, prio desc, iname");
-                $this->list_rows = $this->model->getPagesTreeList($pages_tree, 0);
+                $this->list_rows = $this->model->getPagesTreeList($pages_tree);
 
                 #apply LIMIT
                 if ($this->list_count > $this->list_filter["pagesize"]) {

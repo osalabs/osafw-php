@@ -3,7 +3,7 @@
 Login Controller
 
 Part of PHP osa framework  www.osalabs.com/osafw/php
-(c) 2009-2024 Oleg Savchuk www.osalabs.com
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class LoginController extends FwController {
@@ -12,8 +12,12 @@ class LoginController extends FwController {
     public FwModel|Users $model;
     public string $model_name = 'Users';
 
+    protected Google\Client $client;
+
     public function __construct() {
         parent::__construct();
+
+        $this->base_url = '/Login';
 
         #override layout
         $this->fw->page_layout = $this->fw->config->PAGE_LAYOUT_PUBLIC;
@@ -33,12 +37,12 @@ class LoginController extends FwController {
         return $ps;
     }
 
-    public function SaveAction() {
+    public function SaveAction(): void {
         $item = reqh('item');
 
         try {
             $login = trim($item['login']);
-            $pwd = $item['pwdh'];
+            $pwd   = $item['pwdh'];
             if (($item["chpwd"] ?? '') == "1") {
                 $pwd = $item['pwd'];
             }
@@ -54,14 +58,14 @@ class LoginController extends FwController {
             }
 
             if (!strlen($login) || !strlen($pwd)) {
-                $this->setError("REGISTER", True);
+                $this->setError("REGISTER");
                 throw new ApplicationException("");
             }
 
             $user = Users::i()->oneByEmail($login);
             if (!$is_dev_login) {
                 if (!$user || $user['status'] != 0 || !$this->model->checkPwd($pwd, $user['pwd'])) {
-                    throw new ApplicationException(lng("User Authentication Error"));
+                    throw new ApplicationException("User Authentication Error");
                 }
             }
 
@@ -76,11 +80,11 @@ class LoginController extends FwController {
         } catch (ApplicationException $ex) {
             $this->fw->GLOBAL['err_ctr'] = reqi('err_ctr') + 1;
             $this->setFormError($ex);
-            $this->routeRedirect("Index");
+            $this->routeRedirect(FW::ACTION_INDEX);
         }
     }
 
-    public function LogoffAction() {
+    public function LogoffAction(): void {
         $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGOFF, FwEntities::ICODE_USERS, $this->fw->userId());
 
         @session_start();
@@ -91,6 +95,130 @@ class LoginController extends FwController {
         $this->model->removePermCookie();
 
         fw::redirect($this->fw->config->UNLOGGED_DEFAULT_URL);
+    }
+
+    public function GoogleAction(): void {
+        if (!$this->fw->config->IS_SIGNUP) {
+            throw new ApplicationException("Sign Up denied by site config [IS_SIGNUP]");
+        }
+
+        $code     = reqs('code');
+        $state    = reqs('state');
+        $username = reqs("username");
+
+        $this->client = new Google\Client();
+        $this->client->setClientId($this->fw->config->GOOGLE['CLIENT_ID']);
+        $this->client->setClientSecret($this->fw->config->GOOGLE['CLIENT_SECRET']);
+        $this->client->setRedirectUri($this->fw->config->ROOT_DOMAIN . $this->base_url . '/(Google)');
+        $this->client->addScope(Google\Service\Oauth2::USERINFO_EMAIL);
+        $this->client->addScope(Google\Service\Oauth2::USERINFO_PROFILE);
+
+        if (empty($code)) {
+            $this->redirectToLogin();
+        }
+
+        @session_start();
+        if (empty($_SESSION['oauth2state']) || ($state !== $_SESSION['oauth2state'])) {
+            unset($_SESSION['oauth2state']);
+            throw new ApplicationException("Invalid state");
+            # or redirect back to google login
+        }
+
+        try {
+            $token = $this->client->fetchAccessTokenWithAuthCode($code);
+            if (array_key_exists('error', $token)) {
+                throw new ApplicationException("Error fetching access token");
+            }
+            #token looks like:
+            //array(
+            //    'access_token'  => 'xxx',
+            //    'expires_in'    => 3599,
+            //    'refresh_token' => 'xxx',
+            //    'scope'         => 'https://www.googleapis.com/auth/userinfo.email https://mail.google.com/ openid https://www.googleapis.com/auth/userinfo.profile',
+            //    'token_type'    => 'Bearer',
+            //    'id_token'      => 'xxx',
+            //    'created'       => 1717174381,
+            //);
+
+            #$token = json_encode($token);
+            #$this->client->setAccessToken($token);
+
+            #get user info
+            $oauth2 = new Google\Service\Oauth2($this->client);
+            $user   = $oauth2->userinfo_v2_me;
+            if (!$user) {
+                throw new ApplicationException("Google account has no email");
+            }
+
+            #check if user already registered
+            $email = trim($user['email']);
+            if (!$email) {
+                throw new ApplicationException("Google account has no email");
+            }
+
+            #get received scopes
+            $scopes = $token['scope'];
+
+            #check if user already registered
+            $dbuser = Users::i()->oneByEmail($email);
+            if ($dbuser) {
+                $users_id = $dbuser['id'];
+                #update scopes
+                Users::i()->update($users_id, [
+                    'oauth_scopes' => $scopes,
+                ]);
+            } else {
+                #register
+                $users_id = Users::i()->add([
+                    'email'        => $email,
+                    'fname'        => $user['name'],
+                    'access_level' => Users::ACL_USER,
+                    'status'       => Users::STATUS_ACTIVE,
+                    'pwd'          => '', #empty password for google users
+                    'oauth_scopes' => $scopes,
+                ]);
+            }
+
+            #login
+            Users::i()->doLogin($users_id);
+            fw::redirect($this->fw->config->LOGGED_DEFAULT_URL);
+
+        } catch (InvalidArgumentException $e) {
+            $err = $e->getMessage();
+            logger($err);
+            if ($err != 'NO_CODE') {
+                logger('WARN', '[Handled] Google auth: ' . $err, $e);
+                $this->client->setPrompt("consent");
+            }
+            if ($username) {
+                $this->client->setLoginHint($username); // If username (email) is known pass it to Google oAuth - Google will narrow down consent screen to the selected email
+            }
+            // InvalidArgumentException here happens if Google cannot auth due to bad/invalid token, so we just redirect user to auth again
+            $this->redirectToLogin();
+
+        } catch (Exception $ex) {
+            logger('ERROR', 'Google auth: ' . $ex->getMessage(), $ex);
+            $this->redirectToLogin();
+        }
+    }
+
+    private function redirectToLogin(string $warning = ''): void {
+        if (!empty($warning)) {
+            logger('WARN', $warning);
+        }
+
+        # to prevent CSRF attacks
+        # https://auth0.com/docs/protocols/state-parameters
+        $state_token = Utils::getRandStr(16);
+        $this->client->setState($state_token);
+        @session_start();
+        $_SESSION['oauth2state'] = $state_token;
+        session_write_close();
+
+        $authUrl = $this->client->createAuthUrl();
+
+        logger("Google OAuth2: redirecting to [$authUrl]");
+        fw::redirect($authUrl);
     }
 
 }//end of class

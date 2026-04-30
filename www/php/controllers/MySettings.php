@@ -1,4 +1,10 @@
 <?php
+/*
+My Settings Controller
+
+Part of PHP osa framework  www.osalabs.com/osafw/php
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
+*/
 
 class MySettingsController extends FwController {
     const int    access_level         = 0; #logged only
@@ -61,7 +67,7 @@ class MySettingsController extends FwController {
     }
 
     public function Validate($id, $item) {
-        $result = $this->validateRequired($item, "email");
+        $result = $this->validateRequired($id, $item, "email");
 
         if ($result) {
             if ($this->model->isExists($item['email'], $id)) {

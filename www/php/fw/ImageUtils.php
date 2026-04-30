@@ -90,7 +90,7 @@ class ImageUtils {
                         }
                     }
 
-                    $a = imagecopyresampled($s_img, $img, 0, 0, 0, 0, $new_w, $new_h, $old_w, $old_h);
+                    imagecopyresampled($s_img, $img, 0, 0, 0, 0, $new_w, $new_h, $old_w, $old_h);
 
                     self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format));
 
@@ -119,7 +119,7 @@ class ImageUtils {
      * @return false|GdImage
      * @throws Exception if no GD installed
      */
-    public static function openImage(string $in_file, string $img_format): false|GdImage {
+    public static function openImage(string $in_file, string &$img_format): false|GdImage {
 
         if (($img_format == 'jpg' || preg_match("/\.jpe?g$/i", $in_file)) && function_exists('imagecreatefromjpeg')) {
             $img_format = 'jpg';
@@ -386,7 +386,7 @@ class ImageUtils {
             $src_h = $old_h;
             $src_w = floor($w * $old_h / $h);
 
-            $src_x = floor(0 + ($old_w - $src_w) / 2);
+            $src_x = floor(($old_w - $src_w) / 2);
             $src_y = 0;
         } else {
             //to horiz image
@@ -394,7 +394,7 @@ class ImageUtils {
             $src_h = floor($h * $old_w / $w);
 
             $src_x = 0;
-            $src_y = floor(0 + ($old_h - $src_h) / 4); // div by 4 because we want to crop closer to top of the image
+            $src_y = floor(($old_h - $src_h) / 4); // div by 4 because we want to crop closer to top of the image
         }
 
         $new_w = $w;
@@ -420,7 +420,7 @@ class ImageUtils {
         //crop and resize
         //bool imagecopyresampled ( resource $dst_image , resource $src_image , int $dst_x , int $dst_y , int $src_x , int $src_y , int $dst_w , int $dst_h , int $src_w , int $src_h )
         //rw("src xy=$src_x,$src_y wh=$src_w,$src_h, to $w,$h");
-        $a = imagecopyresampled($s_img, $img, 0, 0, $src_x, $src_y, $w, $h, $src_w, $src_h);
+        imagecopyresampled($s_img, $img, 0, 0, $src_x, $src_y, $w, $h, $src_w, $src_h);
 
         //save result
         self::saveImage($s_img, $out_file, self::imageType($out_file, $img_format));

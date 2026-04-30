@@ -1,9 +1,9 @@
 <div class="card">
     <div class="svg-container <~value_class>">
-       <i class="bi bi-file-earmark-richtext ifeq="icon" value="pages""></i>
-       <i class="bi bi-cloud-upload ifeq="icon" value="uploads""></i>
-       <i class="bi bi-people ifeq="icon" value="users""></i>
-       <i class="bi bi-clock ifeq="icon" value="events""></i>
+       <~icon1 ifeq="icon" value="emails" inline><i class="bi bi-at"></i></~icon1>
+       <~icon2 ifeq="icon" value="domains" inline><i class="bi bi-globe2"></i></~icon2>
+       <~icon3 ifeq="icon" value="users" inline><i class="bi bi-people"></i></~icon3>
+       <~icon4 ifeq="icon" value="events" inline><i class="bi bi-clock"></i></~icon4>
     </div>
     <div class="card-body <~blink3 if="url" inline>on-card-click</~blink3>" data-url="<~url>">
       <div class="card-content">
@@ -21,6 +21,7 @@
         <~type_piechart ifeq="type" value="piechart">
         <~type_table ifeq="type" value="table">
         <~type_linechart ifeq="type" value="linechart">
+        <~type_html ifeq="type" value="html">
       </div>
     </div>
 </div>

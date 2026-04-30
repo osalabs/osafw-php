@@ -74,12 +74,15 @@ function add_lockfile($logfile, $outstr, $isReplace = '', $isBinary = 1, $usemas
     $savemask = 0;
 
     $mode = 'a';
-    if ($isReplace)
+    if ($isReplace) {
         $mode = 'w';
-    if ($usemask)
+    }
+    if ($usemask) {
         $savemask = umask($usemask);
-    if ($isBinary)
+    }
+    if ($isBinary) {
         $mode .= 'b';
+    }
 
     $LFILE = fopen($logfile, $mode) or die("Can't open [$logfile] mode [$mode] file");
     flock($LFILE, LOCK_EX); #write_lock
@@ -87,8 +90,9 @@ function add_lockfile($logfile, $outstr, $isReplace = '', $isBinary = 1, $usemas
     fwrite($LFILE, $outstr);
     fclose($LFILE);
 
-    if ($usemask)
+    if ($usemask) {
         umask($savemask);
+    }
 }
 
 ###################### truncate file to empty file
@@ -105,18 +109,21 @@ function clear_lockfile($filename) {
 function add_file_counter($filename, $amount = 1, $maxvalue = 0) {
     $count = 0;
 
-    if (!$amount && $maxvalue >= 0)
+    if (!$amount && $maxvalue >= 0) {
         $amount = 1;
+    }
 
     $FILE = fopen($filename, "r+") or die("Can't open [$filename] file $!");
     flock($FILE, LOCK_EX);
     $count = trim(fread($FILE, filesize($filename)));
-    if (!$count)
+    if (!$count) {
         $count = 0;
-    if ($maxvalue && ($count > $maxvalue))
+    }
+    if ($maxvalue && ($count > $maxvalue)) {
         $count = 0;
+    }
     $count += $amount;
-    fseek($FILE, 0, SEEK_SET);
+    fseek($FILE, 0);
     fwrite($FILE, "$count");
     ftruncate($FILE, ftell($FILE));
     fclose($FILE);

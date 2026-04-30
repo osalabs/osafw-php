@@ -68,6 +68,17 @@ class RolesResourcesPermissions extends FwModel {
     }
 
     /**
+     * list of records for given MULTIPLE roles and resources
+     * @param array $roles_ids
+     * @param array $resources_ids
+     * @return array
+     * @throws DBException
+     */
+    public function listByRolesResources(array $roles_ids, array $resources_ids): array {
+        return $this->db->arr($this->table_name, ["roles_id" => $this->db->opIN($roles_ids), "resources_id" => $this->db->opIN($resources_ids)]);
+    }
+
+    /**
      * return hashtable of [resources_id#permissions_id => row] for given role and resource
      * @param int $roles_id
      * @param int $resources_id

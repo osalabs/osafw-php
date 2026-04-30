@@ -4,7 +4,7 @@ Fw Cache class
 Application-level cache
 2 types of cache:
 - request methods - caches only for current request lifetime in memory
-- use with memcached by setting fw->config->cache to array of servers and then use fw->cache->get/set/remove
+- use with memcached by setting fw->config->CACHE to array of servers and then use fw->cache->get/set/remove
 
 You may overload it with something more specific.
 For example, good caching class - http://www.phpfastcache.com/
@@ -18,15 +18,15 @@ class FwCache {
 
     static array $storage = array(); #this is request storage
 
-    private $handler = null; # Memcached handler
+    private ?Memcached $handler = null; # Memcached handler
     private array $lock_tokens = []; // Store lock tokens per key
 
     public function __construct(FW $fw) {
-        $cache_servers = $fw->config->cache ?? [];
+        $cache_servers = $fw->config->CACHE ?? [];
         if ($cache_servers) {
             //check if memcached extension is loaded
             if (!extension_loaded('memcached')) {
-                throw new Exception('Memcached extension is not loaded, but config->cache is set');
+                throw new Exception('Memcached extension is not loaded, but config->CACHE is set');
             }
 
             $this->handler = new Memcached();
@@ -234,7 +234,7 @@ class FwCache {
                 $code = $this->handler->getResultCode();
 
                 // Only set the key if the error code indicates that the key was not found
-                if ($code == \Memcached::RES_NOTFOUND || $code == \Memcached::RES_NOTSTORED) {
+                if ($code == Memcached::RES_NOTFOUND || $code == Memcached::RES_NOTSTORED) {
                     $this->handler->set($nkey, $value, $ttl);
                     $result = $value;
                 } else {

@@ -16,8 +16,9 @@ class Spages extends FwModel {
      * @param int $id page id
      * @param bool $is_perm if true - permanently delete from db
      * @return bool
+     * @throws DBException
      */
-    public function delete($id, $is_perm = NULL): bool {
+    public function delete(int $id, bool $is_perm = false): bool {
         $item = $this->one($id);
         # home page cannot be deleted
         if ($item['is_home'] != 1) {
@@ -31,9 +32,10 @@ class Spages extends FwModel {
      * return one latest record by url (i.e. with most recent pub_time if there are more than one page with such url)
      * @param string $url url of the page (without parent url path)
      * @param int $parent_id parent page id to search within
-     * @return db array
+     * @return array array
+     * @throws DBException
      */
-    public function oneByUrl($url, $parent_id) {
+    public function oneByUrl(string $url, int $parent_id): array {
         $where = array(
             'parent_id' => $parent_id,
             'url'       => $url
@@ -45,7 +47,7 @@ class Spages extends FwModel {
      * return one latest record by full_url (i.e. relative url from root, without domain)
      * @param string $full_url full url (without domain)
      * @return array
-     * @throws NoModelException
+     * @throws NoModelException|DBException
      */
     public function oneByFullUrl(string $full_url): array {
         $url_parts = explode('/', $full_url);
@@ -101,8 +103,11 @@ class Spages extends FwModel {
      * @return array array
      * @throws DBException
      */
-    public function listChildren($parent_id) {
-        return $this->db->arrp("SELECT * FROM $this->table_name WHERE status<>127 and parent_id=" . dbqi($parent_id) . " ORDER BY iname");
+    public function listChildren(int $parent_id): array {
+        return $this->db->arr($this->table_name, [
+            'status'    => $this->db->opNOT(self::STATUS_DELETED),
+            'parent_id' => $parent_id
+        ], 'iname');
     }
 
     /**
@@ -114,27 +119,26 @@ class Spages extends FwModel {
      * @throws DBException
      */
     public function tree(string $where, array $params, string $orderby): array {
-        $rows       = $this->db->arrp("SELECT * FROM $this->table_name WHERE $where ORDER BY $orderby", $params);
-        $pages_tree = $this->getPagesTree($rows, 0);
-        return $pages_tree;
+        $rows = $this->db->arrp("SELECT * FROM $this->table_name WHERE $where ORDER BY $orderby", $params);
+        return $this->getPagesTree($rows, 0);
     }
 
     /**
      * return parsepage array list of rows with hierarcy (children rows added to parents as "children" key)
      * @param array $rows rows from tree(), not muted, by ref just to save memory
-     * @param integer $parent_id parent id to search children for
-     * @param integer $level
+     * @param int $parent_id parent id to search children for
+     * @param int $level
      * @param string $parent_full_url parent full url, call with '' for top, used to build 'full_url' for each page recursively
      * @return array                parsepage array (children rows added to parents as "children" key)
      * RECURSIVE!
      */
-    public function getPagesTree(&$rows, $parent_id, $level = 0, $parent_full_url = '') {
+    public function getPagesTree(array &$rows, int $parent_id, int $level = 0, string $parent_full_url = ''): array {
         $result = array();
 
         foreach ($rows as $row) {
             if ($parent_id == $row["parent_id"]) {
                 $row2             = $row; #clone
-                $row2['full_url'] = $parent_full_url . (substr($parent_full_url, -1) == '/' ? '' : '/') . $row2['url'];
+                $row2['full_url'] = $parent_full_url . (str_ends_with($parent_full_url, '/') ? '' : '/') . $row2['url'];
                 $row2["_level"]   = $level;
                 #$row2["_level1"] = level + 1 'to easier use in templates
                 $row2["children"] = $this->getPagesTree($rows, $row['id'], $level + 1, $row2['full_url']);
@@ -148,11 +152,11 @@ class Spages extends FwModel {
     /**
      * Generate parsepage array of plain list with levelers based on tree structure from getPagesTree()
      * @param array $pages_tree result of getPagesTree(), not muted
-     * @param integer $level optional, used in recursive calls
+     * @param int $level optional, used in recursive calls
      * @return array                parsepage array with "leveler" array added to each row with level>0
      * RECURSIVE!
      */
-    public function getPagesTreeList(&$pages_tree, $level = 0) {
+    public function getPagesTreeList(array $pages_tree, int $level = 0): array {
         $result = array();
 
         if ($pages_tree) {
@@ -178,11 +182,11 @@ class Spages extends FwModel {
      * Generate HTML with options for select with indents for hierarcy
      * @param string $selected_id selected id
      * @param array   &$pages_tree result of getPagesTree()
-     * @param integer $level optional, used in recursive calls
+     * @param int $level optional, used in recursive calls
      * @return string               HTML with options
      * RECURSIVE!
      */
-    public function getPagesTreeSelectHtml($selected_id, &$pages_tree, $level = 0) {
+    public function getPagesTreeSelectHtml(string $selected_id, array $pages_tree, int $level = 0): string {
         $result = array();
         if ($pages_tree) {
             foreach ($pages_tree as $row) {
@@ -201,7 +205,7 @@ class Spages extends FwModel {
      * @return string           URL like /page/subpage/subsubpage
      * RECURSIVE!
      */
-    public function getFullUrl($id) {
+    public function getFullUrl(int $id): string {
         if (!$id) {
             return '';
         }
@@ -211,9 +215,9 @@ class Spages extends FwModel {
     }
 
     #return correct url - TODO
-    public function getUrl($id, $icode, $url = null) {
+    public function getUrl(int $id, string $icode, string $url = null): string {
         if ($url > '') {
-            if (preg_match("!^/!", $url)) {
+            if (str_starts_with($url, "/")) {
                 $url = $this->fw->config->ROOT_URL . $url;
             }
             return $url;
@@ -227,10 +231,10 @@ class Spages extends FwModel {
         }
     }
 
-    public function str2icode($str) {
-        $str = Trim($str);
-        $str = preg_replace("/[^\w ]/g", " ", $str);
-        $str = preg_replace("/ +/g", "-", $str);
+    public function str2icode(string $str): string {
+        $str = trim($str);
+        $str = preg_replace("/[^\w ]/", " ", $str);
+        $str = preg_replace("/ +/", "-", $str);
         return $str;
     }
 
@@ -238,13 +242,15 @@ class Spages extends FwModel {
      * render page by full url
      * @param string $full_url full page url (without domain)
      * @return void, parser called with output to browser
+     * @throws DBException
+     * @throws NoModelException
      */
     public function showPageByFullUrl(string $full_url): void {
         $ps = array();
 
         #for navigation
         $pages_tree  = $this->tree('status=0', [], "parent_id, prio desc, iname"); #published only
-        $ps['pages'] = $this->getPagesTreeList($pages_tree, 0);
+        $ps['pages'] = $this->getPagesTreeList($pages_tree);
 
         $item = $this->oneByFullUrl($full_url);
         if (!$item || $item['status'] == 127) { #don't show deleted too

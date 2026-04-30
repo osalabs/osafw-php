@@ -3,11 +3,11 @@
  Base Fw Controller class for standard module with list/form screens
 
  Part of PHP osa framework  www.osalabs.com/osafw/php
- (c) 2009-2024 Oleg Savchuk www.osalabs.com
+ (c) 2009-2025 Oleg Savchuk www.osalabs.com
 */
 
 class FwDynamicController extends FwController {
-    const int access_level = 100; #by default Admin Controllers allowed only for Admins
+    const int access_level = Users::ACL_SITE_ADMIN; #by default Admin Controllers allowed only for Admins
 
     // public string $base_url = '/Admin/Controller'; # define in inherited controller for loadControllerConfig
 
@@ -46,6 +46,11 @@ class FwDynamicController extends FwController {
             return [];// return empty hashtable just in case action overriden to avoid check for null
         }
 
+        if ($this->is_dynamic_index) {
+            #customizable headers
+            $this->setViewList();
+        }
+
         $ps = $this->setPS();
 
         // userlists support if necessary
@@ -54,11 +59,6 @@ class FwDynamicController extends FwController {
         }
 
         $ps["select_userfilters"] = UserFilters::i()->listSelectByIcode($this->fw->GLOBAL["controller.action"]);
-
-        if ($this->is_dynamic_index) {
-            #customizable headers
-            $this->setViewList($ps, reqh("search"));
-        }
 
         return $ps;
     }
@@ -83,8 +83,7 @@ class FwDynamicController extends FwController {
         $this->setListSearchStatus();
 
         // get all ids
-        $sql = "SELECT id FROM " . $this->list_view . " WHERE " . $this->list_where . " ORDER BY " . $this->list_orderby;
-        $ids = $this->db->colp($sql, $this->list_where_params);
+        $ids = $this->getListIds();
         if (count($ids) == 0) {
             return fw::redirect($this->base_url);
         }
@@ -155,12 +154,18 @@ class FwDynamicController extends FwController {
             'is_userlists'     => $this->is_userlists,
             'is_activity_logs' => $this->is_activity_logs,
             'is_readonly'      => $this->is_readonly,
+            'tab'              => $this->form_tab,
         );
 
         $this->setAddUpdUser($ps, $item);
 
         #dynamic fields
         if ($this->is_dynamic_show) {
+            //add form_tabs only if we have more than one tab
+            if (is_array($this->config["form_tabs"] ?? false) && count($this->config["form_tabs"]) > 1) {
+                $ps["form_tabs"] = $this->config["form_tabs"];
+            }
+
             $ps["fields"] = $this->prepareShowFields($item, $ps);
         }
 
@@ -177,6 +182,9 @@ class FwDynamicController extends FwController {
             $ps["activity_rows"]               = FwActivityLogs::i()->listByEntityForUI($this->model->table_name, $id, $this->list_filter["tab_activity"]);
         }
 
+        //for RBAC
+        $ps["rbac"] = $this->rbac;
+
         return $ps;
     }
 
@@ -186,10 +194,14 @@ class FwDynamicController extends FwController {
 
         if ($this->isGet()) {
             if ($id > 0) {
+                // edit screen
                 $item = $this->model->one($id);
             } else {
-                #defaults
-                $item = array_merge($item, $this->form_new_defaults);
+                // add new screen
+                $item_new = [];
+                $item_new = array_merge($item_new, $this->form_new_defaults); // use hardcoded defaults if any
+                $item_new = array_merge($item_new, $item); // override with passed defaults
+                $item     = $item_new;
             }
         } else {
             $itemdb = $id ? $this->model->one($id) : array();
@@ -202,8 +214,13 @@ class FwDynamicController extends FwController {
             'return_url'  => $this->return_url,
             'related_id'  => $this->related_id,
             'is_readonly' => $this->is_readonly,
+            'tab'         => $this->form_tab,
+            'is_showform' => true // flag for template that we are in show form
         );
         $this->setAddUpdUser($ps, $item);
+
+        //for RBAC
+        $ps["rbac"] = $this->rbac;
 
         if ($this->is_dynamic_showform) {
             $ps["fields"] = $this->prepareShowFormFields($item, $ps);
@@ -230,7 +247,8 @@ class FwDynamicController extends FwController {
         $this->route_onerror = FW::ACTION_SHOW_FORM;
 
         Users::i()->checkReadOnly();
-        if (reqi("refresh") == 1) {
+        $is_refresh = reqb("refresh");
+        if ($is_refresh && empty($form_id)) { //for new record - just refresh the form, for existing - also try to save
             $this->fw->routeRedirect(FW::ACTION_SHOW_FORM, null, [$form_id]);
             return null;
         }
@@ -238,7 +256,7 @@ class FwDynamicController extends FwController {
         $id   = intval($form_id);
         $item = reqh('item');
 
-        $success = true;
+        $success = !$is_refresh; #if refresh - force route redirect to form
         $is_new  = ($id == 0);
 
         $this->Validate($id, $item);
@@ -261,7 +279,7 @@ class FwDynamicController extends FwController {
      * @throws ValidationException
      */
     public function Validate(int $id, array $item): void {
-        $result = $this->validateRequiredDynamic($item);
+        $result = $this->validateRequiredDynamic($id, $item);
 
         if ($result && $this->is_dynamic_showform) {
             $this->validateSimpleDynamic($id, $item);
@@ -275,22 +293,34 @@ class FwDynamicController extends FwController {
         $this->validateCheckResult();
     }
 
-    protected function validateRequiredDynamic($item): bool {
+    /**
+     * return config for show/showform fields by tab
+     * @param string $prefix show_fields or showform_fields
+     * @param string|null $tab optional tab code, if ommited - form_tab used
+     * @return array
+     */
+    protected function getConfigShowFormFieldsByTab(string $prefix, string $tab = null): array {
+        $tab = $tab ?? $this->form_tab;
+        $key = $prefix . ($tab ? "_" . $tab : "");
+        return $this->config[$key] ?? [];
+    }
+
+    protected function validateRequiredDynamic($id, $item): bool {
         $result = true;
 
         if (!$this->required_fields && $this->is_dynamic_showform) {
             #if required_fields not defined - fill from showform_fields
-            $fields = $this->config["showform_fields"];
+            $fields = $this->getConfigShowFormFieldsByTab("showform_fields");
             $req    = array();
             foreach ($fields as $def) {
                 if ($def['required'] ?? false) {
                     $req[] = $def['field'];
                 }
             }
-            $result = $this->validateRequired($item, $req);
+            $result = $this->validateRequired($id, $item, $req);
 
         } else {
-            $result = $this->validateRequired($item, $this->required_fields);
+            $result = $this->validateRequired($id, $item, $this->required_fields);
         }
 
         return $result;
@@ -300,9 +330,10 @@ class FwDynamicController extends FwController {
     public function validateSimpleDynamic(int $id, array $item): bool {
         $result = true;
 
+        $is_new       = ($id == 0);
         $subtable_del = reqh("subtable_del");
 
-        $fields = $this->config["showform_fields"];
+        $fields = $this->getConfigShowFormFieldsByTab("showform_fields");
         foreach ($fields as $def) {
             $field = $def['field'] ?? '';
             if (!$field) {
@@ -320,11 +351,11 @@ class FwDynamicController extends FwController {
                 $save_fields_checkboxes = $def['save_fields_checkboxes'];
 
                 //check if we delete specific row
-                $del_id = $subtable_del[$model_name] ?? '';
+                $del_id = $subtable_del[$field] ?? '';
 
-                // row ids submitted as: item-<~model>[<~id>]
-                // input name format: item-<~model>#<~id>[field_name]
-                $hids = reqh("item-" . $model_name);
+                // row ids submitted as: item-<~field>[<~id>]
+                // input name format: item-<~field>#<~id>[field_name]
+                $hids = reqh("item-" . $field);
                 // sort hids.Keys, so numerical keys - first and keys staring with "new-" will be last
                 $sorted_keys = array_keys($hids);
                 usort($sorted_keys, function ($a, $b) {
@@ -345,9 +376,9 @@ class FwDynamicController extends FwController {
                         continue; //skip deleted row
                     }
 
-                    $row_item = reqh("item-" . $model_name . "#" . $row_id);
+                    $row_item = reqh("item-" . $field . "#" . $row_id);
                     $itemdb   = FormUtils::filter($row_item, $save_fields);
-                    FormUtils::filterCheckboxes($itemdb, $row_item, $save_fields_checkboxes);
+                    FormUtils::filterCheckboxes($itemdb, $row_item, $save_fields_checkboxes, $this->isPatch());
 
                     if (str_starts_with($row_id, "new-")) {
                         $itemdb[$sub_model->junction_field_main_id] = $id;
@@ -360,14 +391,19 @@ class FwDynamicController extends FwController {
                 // other types - use "validate" field
                 $val = Utils::qh($def["validate"] ?? '');
                 if (count($val) > 0) {
+                    //for existing records only validate submitted fields
+                    if (!$is_new && !array_key_exists($field, $item)) {
+                        continue;
+                    }
+
                     $field_value = $item[$field] ?? '';
 
-                    if (array_key_exists('exists', $val) && $this->model->isExists($field_value, $id)) {
+                    if (array_key_exists('exists', $val) && $this->model->isExistsByField($field_value, $field, $id)) {
                         $this->setError($field, 'EXISTS');
                         $result = false;
                     }
                     if (array_key_exists('isemail', $val) && !FormUtils::isEmail($field_value)) {
-                        $this->setError($field, 'WRONG');
+                        $this->setError($field, 'EMAIL');
                         $result = false;
                     }
                     if (array_key_exists('isphone', $val) && !FormUtils::isPhone($field_value)) {
@@ -396,31 +432,31 @@ class FwDynamicController extends FwController {
      * Override in controller and add custom validation if needed
      * @param string $row_id row_id can start with "new-" (for new rows) or be numerical id (existing rows)
      * @param array $item submitted row data from the form
-     * @param array $def subable definition from config.json
+     * @param array $def subtable definition from config.json
      * @return bool
      */
     public function validateSubtableRowDynamic(string $row_id, array $item, array $def): bool {
         $result          = true;
         $required_fields = Utils::qw($def["required_fields"] ?? "");
         if (count($required_fields) == 0) {
-            return $result; //nothing to validate
+            return true; //nothing to validate
         }
 
         $row_errors = array();
-        $result     = $this->validateRequired($item, $required_fields, $row_errors);
+        $id         = intval(str_starts_with($row_id, "new-") ? 0 : $row_id);
+        $result     = $this->validateRequired($id, $item, $required_fields, $row_errors);
         if (!$result) {
             //fill global fw.FormErrors with row errors
-            $model_name = $def["model"];
+            $field = $def["field"];
             foreach ($row_errors as $field_name => $value) {
-                // row input names format: item-<~model>#<~id>[field_name]
-                $this->fw->FormErrors["item-" . $model_name . "#" . $row_id . "[$field_name]"] = true;
+                // row input names format: item-<~field>#<~id>[field_name]
+                $this->fw->FormErrors["item-$field#{$row_id}[$field_name]"] = true;
             }
             $this->fw->FormErrors["REQUIRED"] = true; // also set global error
         }
 
         return $result;
     }
-
 
     public function ShowDeleteAction($form_id): ?array {
         Users::i()->checkReadOnly();
@@ -454,7 +490,7 @@ class FwDynamicController extends FwController {
             }
 
             $this->fw->flash("error", $msg);
-            return fw::redirect("{$this->base_url}/{$id}/delete");
+            return fw::redirect("$this->base_url/$id/delete");
         }
 
         $this->model->delete($id);
@@ -491,27 +527,8 @@ class FwDynamicController extends FwController {
             }
         }
 
-        $ctr = 0;
-        foreach ($acb as $id => $value) {
-            $id = intval($id);
-            if ($is_delete) {
-                $this->model->deleteWithPermanentCheck($id);
-                $ctr += 1;
-            } elseif ($user_lists_id) {
-                UserLists::i()->addItemList($user_lists_id, $id);
-                $ctr += 1;
-            } elseif ($remove_user_lists_id) {
-                UserLists::i()->delItemList($remove_user_lists_id, $id);
-                $ctr += 1;
-            }
-        }
-
-        if ($is_delete) {
-            $this->fw->flash("multidelete", $ctr);
-        }
-        if ($user_lists_id) {
-            $this->fw->flash("success", "$ctr records added to the list");
-        }
+        $ctr = $this->saveMultiRows(array_keys($acb), $is_delete, $user_lists_id, $remove_user_lists_id);
+        $this->saveMultiResult($ctr, $is_delete, $user_lists_id, $remove_user_lists_id);
 
         return $this->afterSaveJson(true, ['ctr' => $ctr]);
     }
@@ -520,15 +537,44 @@ class FwDynamicController extends FwController {
      * Autocomplete action for related items
      * @return array|null
      * @throws ApplicationException
+     * @throws DBException
+     * @throws NoModelException
      */
     public function AutocompleteAction(): ?array {
-        $items = $this->model_related->listAutocomplete(reqs("q"));
+        $q = reqs("q"); //required - query string
+
+        //optional params
+        $id         = reqi("id"); //specific id, if just need iname for it (used to preload existing id/label for edit form)
+        $model_name = reqs("model");
+        $ac_model   = null;
+        if (empty($model_name)) {
+            //if no model passed - use model_related
+            $ac_model = $this->model_related;
+        } else {
+            //validation - only allow models from showform_fields type=autocomplete
+            $form_tabs = $this->config["form_tabs"] ?? [];
+            foreach ($form_tabs as $form_tab) {
+                $fields = $this->getConfigShowFormFieldsByTab("showform_fields", $form_tab["tab"]);
+                foreach ($fields as $def) {
+                    if (($def["type"] ?? '') == "autocomplete" && ($def["lookup_model"] ?? '') == $model_name) {
+                        $ac_model = fw::model($model_name);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!$ac_model) {
+            throw new ApplicationException("No model defined");
+        }
+
+        $items = $id > 0 ? [$ac_model->iname($id)] : $ac_model->listAutocomplete($q);
 
         return ['_json' => $items];
     }
 
     ###################### support for customizable list screen
-    public function UserViewsAction($form_id): ?array {
+    public function UserViewsAction(): ?array {
         $ps = array(
             'rows'             => $this->getViewListArr($this->getViewListUserFields(), true),
             'select_userviews' => UserViews::i()->listSelectByIcode($this->base_url),
@@ -538,94 +584,47 @@ class FwDynamicController extends FwController {
         return null;
     }
 
-    /*
-     * public virtual Hashtable SaveUserViewsAction()
-    {
-        var fld = reqh("fld");
-        var load_id = reqi("load_id");
-        var is_reset = reqi("is_reset");
-        var density = reqs("density");
-
-        if (load_id > 0)
-            // set fields from specific view
-            fw.model<UserViews>().setViewForIcode(base_url, load_id);
-        else if (is_reset == 1)
-            // reset fields to defaults
-            fw.model<UserViews>().updateByIcodeFields(base_url, view_list_defaults);
-        else if (density.Length > 0)
-        {
-            // save density
-            // validate density can be only table-sm, table-dense, table-normal, otherwise - set empty
-            if (!"table-sm table-dense table-normal".Contains(density))
-                density = "";
-            fw.model<UserViews>().updateByIcode(base_url, DB.h("density", density));
-        }
-        else
-        {
-            var item = reqh("item");
-            var iname = Utils.f2str(item["iname"]);
-
-            // save fields
-            // order by value
-            var ordered = fld.Cast<DictionaryEntry>().OrderBy(entry => Utils.f2int(entry.Value)).ToList();
-            // and then get ordered keys
-            List<string> anames = new();
-            foreach (var el in ordered)
-                anames.Add((string)el.Key);
-            var fields = string.Join(" ", anames);
-
-            if (!string.IsNullOrEmpty(iname))
-            {
-                // create new view by name or update if this name exists
-                fw.model<UserViews>().addOrUpdateByUK(base_url, fields, iname);
-            }
-            // update default view with fields
-            fw.model<UserViews>().updateByIcodeFields(base_url, fields);
-        }
-
-        return afterSave(true, null, false, "no_action", return_url);
-    }
-
-     * */
     public function SaveUserViewsAction(): ?array {
-        $fld      = reqh("fld");
-        $load_id  = reqi("load_id");
-        $is_reset = reqi("is_reset");
-        $density  = reqs("density");
+        $fld          = reqh("fld");
+        $load_id      = reqi("load_id");
+        $is_reset     = reqi("is_reset");
+        $density      = reqs("density");
+        $is_list_edit = reqb("is_list_edit");
+
+        $icode = UserViews::icodeByUrl($this->base_url, $is_list_edit);
 
         if ($load_id > 0) {
             // set fields from specific view
-            UserViews::i()->setViewForIcode($this->base_url, $load_id);
+            UserViews::i()->setViewForIcode($icode, $load_id);
         } elseif ($is_reset == 1) {
             // reset fields to defaults
-            UserViews::i()->updateByIcodeFields($this->base_url, $this->view_list_defaults);
+            UserViews::i()->updateByIcodeFields($icode, $this->view_list_defaults);
         } elseif ($density) {
             // save density
             // validate density can be only table-sm, table-dense, table-normal, otherwise - set empty
             if (!in_array($density, ["table-sm", "table-dense", "table-normal"])) {
                 $density = "";
             }
-            UserViews::i()->updateByIcode($this->base_url, ['density' => $density]);
+            UserViews::i()->updateByIcode($icode, ['density' => $density]);
         } else {
             $item  = reqh("item");
             $iname = $item["iname"] ?? '';
 
             // save fields
             // order by value
-            $ordered = array();
-            foreach ($fld as $key => $value) {
-                $ordered[$key] = intval($value);
-            }
+            $ordered = array_map(function ($value) {
+                return intval($value);
+            }, $fld);
             asort($ordered);
             $anames = array_keys($ordered);
             $fields = implode(" ", $anames);
 
             if ($iname) {
                 // create new view by name or update if this name exists
-                UserViews::i()->addOrUpdateByUK($this->base_url, $fields, $iname);
+                UserViews::i()->addOrUpdateByUK($icode, $fields, $iname);
             }
             // update default view with fields
-            UserViews::i()->updateByIcodeFields($this->base_url, $fields);
+            UserViews::i()->updateByIcodeFields($icode, $fields);
         }
 
         return $this->afterSave(true, '', false, "no_action", $this->return_url);
@@ -672,7 +671,7 @@ class FwDynamicController extends FwController {
     public function prepareShowFields(array $item, array $ps): array {
         $id = intval($item['id'] ?? 0);
 
-        $fields = $this->config["show_fields"];
+        $fields = $this->getConfigShowFormFieldsByTab("show_fields");
         if (!$fields) {
             throw new ApplicationException("Controller config.json doesn't contain 'show_fields'");
         }
@@ -716,7 +715,8 @@ class FwDynamicController extends FwController {
 
             } elseif ($dtype == "att_links") {
                 $def["att_links"] = Att::i()->listLinked($this->model->table_name, $id);
-
+            } elseif ($dtype == "att_files") {
+                $def["att_files"] = Att::i()->listByEntity($this->model->table_name, $id);
             } elseif ($dtype == "subtable") {
                 #subtable functionality
                 $model_name = $def["model"];
@@ -747,7 +747,12 @@ class FwDynamicController extends FwController {
                         $def["admin_url"] = "/Admin/" . $def["lookup_model"]; #default admin url from model name
                     }
                 } elseif (array_key_exists('lookup_tpl', $def)) {
-                    $def["value"] = FormUtils::selectTplName($def["lookup_tpl"], $item[$field]);
+                    $def["value"] = FormUtils::selectTplName($def["lookup_tpl"], $item[$field], strtolower($this->fw->route->controller_path));
+
+                } elseif (array_key_exists('options', $def)) {
+                    // select options
+                    $options      = $def["options"];
+                    $def["value"] = $options[$field_value] ?? '';
                 } else {
                     $def["value"] = $field_value;
                 }
@@ -755,7 +760,7 @@ class FwDynamicController extends FwController {
                 #convertors
                 if (array_key_exists('conv', $def)) {
                     if ($def["conv"] == "time_from_seconds") {
-                        $def["value"] = DateUtils::int2timestr($def["value"]);
+                        $def["value"] = DateUtils::int2timestr(intval($def["value"]));
                     }
                 }
             }
@@ -771,7 +776,7 @@ class FwDynamicController extends FwController {
         $subtable_add = reqh("subtable_add");
         $subtable_del = reqh("subtable_del");
 
-        $fields = $this->config["showform_fields"];
+        $fields = $this->getConfigShowFormFieldsByTab("showform_fields");
         if (!$fields) {
             throw new ApplicationException("Controller config.json doesn't contain 'showform_fields'");
         }
@@ -829,6 +834,9 @@ class FwDynamicController extends FwController {
             } elseif ($dtype == "att_links_edit") {
                 $def["att_links"] = Att::i()->listLinked($this->model->table_name, $id);
 
+            } elseif ($dtype == "att_files_edit") {
+                $def["att_files"] = Att::i()->listByEntity($this->model->table_name, $id);
+
             } elseif ($dtype == "subtable_edit") {
                 // subtable functionality
                 $model_name = $def["model"];
@@ -843,12 +851,12 @@ class FwDynamicController extends FwController {
                     }
                 } else {
                     //check if we deleted specific row
-                    $del_id = $subtable_del[$model_name] ?? '';
+                    $del_id = $subtable_del[$field] ?? '';
 
                     //copy list related rows from the form
-                    // row ids submitted as: item-<~model>[<~id>]
-                    // input name format: item-<~model>#<~id>[field_name]
-                    $hids = reqh("item-" . $model_name);
+                    // row ids submitted as: item-<~field>[<~id>]
+                    // input name format: item-<~field>#<~id>[field_name]
+                    $hids = reqh("item-" . $field);
                     // sort hids.Keys, so numerical keys - first and keys staring with "new-" will be last
                     $sorted_keys = array_keys($hids);
                     usort($sorted_keys, function ($a, $b) {
@@ -869,7 +877,7 @@ class FwDynamicController extends FwController {
                             continue; //skip deleted row
                         }
 
-                        $row_item       = reqh("item-" . $model_name . "#" . $row_id);
+                        $row_item       = reqh("item-" . $field . "#" . $row_id);
                         $row_item["id"] = $row_id;
 
                         $list_rows[] = $row_item;
@@ -887,7 +895,7 @@ class FwDynamicController extends FwController {
                 //}
 
                 //add new clicked
-                if (array_key_exists($model_name, $subtable_add)) {
+                if (array_key_exists($field, $subtable_add)) {
                     $sub_model->prepareSubtableAddNew($list_rows, $id, $def);
                 }
 
@@ -908,41 +916,68 @@ class FwDynamicController extends FwController {
                     $def["value"]      = $lookup_row[$lookup_field];
 
                 } elseif (array_key_exists('lookup_model', $def)) {
+                    $lookup_model = $this->getModelWithRelated($def["lookup_model"]);
                     if ($dtype == "select" || $dtype == "radio") {
                         // lookup select
-                        $def["select_options"] = $this->getModelWithRelated($def["lookup_model"])->listSelectOptions($def);
+                        $def["select_options"] = $lookup_model->listSelectOptions($def);
                         $def["value"]          = $field_value;
                     } else {
                         // single value from lookup
-                        $lookup_model      = $this->getModelWithRelated($def["lookup_model"]);
-                        $def["lookup_id"]  = intval($field_value);
-                        $lookup_row        = $lookup_model->one($def["lookup_id"]);
-                        $def["lookup_row"] = $lookup_row;
+                        if ($this->isGet()) {
+                            $def["lookup_id"]  = intval($field_value);
+                            $lookup_row        = $lookup_model->one($def["lookup_id"]);
+                            $def["lookup_row"] = $lookup_row;
 
-                        $lookup_field = $def["lookup_field"] ?? $lookup_model->field_iname;
-                        $def["value"] = $lookup_row[$lookup_field] ?? '';
+                            $lookup_field = $def["lookup_field"] ?? $lookup_model->field_iname;
+                            $def["value"] = $lookup_row[$lookup_field] ?? '';
+                        } else {
+                            //when form refreshed - get value from the form
+                            if ($dtype == "autocomplete") {
+                                $def["value"] = $item[$field . "_iname"];
+                            } //for autocomplete get from _iname
+                            else {
+                                $def["value"] = $item[$field];
+                            }
+                        }
+
                         if (!array_key_exists('admin_url', $def)) {
                             $def["admin_url"] = "/Admin/" . $def["lookup_model"]; // default admin url from model name
                         }
                     }
 
                 } elseif (array_key_exists('lookup_tpl', $def)) {
-                    $def["select_options"] = FormUtils::selectTplOptions($def["lookup_tpl"]);
+                    $def["select_options"] = FormUtils::selectTplOptions($def["lookup_tpl"], strtolower($this->fw->route->controller_path));
                     $def["value"]          = $field_value;
-                    foreach ($def["select_options"] as &$row) {
+                    foreach ($def["select_options"] as &$row) { // contains id, iname
                         $row["is_inline"] = $def["is_inline"] ?? false;
                         $row["field"]     = $def["field"];
                         $row["value"]     = $field_value;
                     }
                     unset($row);
+                } elseif (array_key_exists('options', $def)) {
+                    // select options as array - convert to arraylist of id => iname
+                    $options        = $def["options"];
+                    $select_options = array();
+                    foreach ($options as $key => $value) {
+                        $select_options[] = [
+                            "id"        => $key,
+                            "iname"     => $value,
+                            "is_inline" => $def["is_inline"] ?? false,
+                            "field"     => $def["field"],
+                            "value"     => $field_value
+                        ];
+                    }
+                    $def["select_options"] = $select_options;
+                    $def["value"]          = $field_value;
                 } else {
+                    $def["value"] = $field_value;
                     $def["value"] = $field_value;
                 }
 
                 // convertors
                 if (array_key_exists('conv', $def)) {
                     if ($def["conv"] == "time_from_seconds") {
-                        $def["value"] = DateUtils::int2timestr($def["value"]);
+                        $def["value"] = DateUtils::int2timestr(intval($def["value"]));
                     }
                 }
             }
@@ -956,32 +991,36 @@ class FwDynamicController extends FwController {
     protected function processSaveShowFormFields($id, &$fields): void {
         $item = reqh("item");
 
-        $showform_fields = $this->_fieldsToHash($this->config["showform_fields"]);
+        $showform_fields = $this->_fieldsToHash($this->getConfigShowFormFieldsByTab("showform_fields"));
         $fnullable       = Utils::qh($this->save_fields_nullable);
         #special auto-processing for fields of particular types
         foreach ($fields as $field => $value) {
-            if (array_key_exists($field, $showform_fields)) {
-                $def  = $showform_fields[$field];
-                $type = $def["type"];
-                if ($type == "autocomplete") {
-                    $fields[$field] = $this->getModelWithRelated($def["lookup_model"])->findOrAddByIname($value, $out);
-                } elseif ($type == "date_combo") {
-                    $fields[$field] = FormUtils::dateForCombo($item, $field);
-                } elseif ($def['type'] == 'date_popup') {
-                    $fields[$field] = DateUtils::Str2SQL($value); #convert date to sql format
-                } elseif ($type == "time") {
-                    $fields[$field] = DateUtils::timestr2int($value); // ftime - convert from HH:MM to int (0-24h in seconds)
-                } elseif ($type == "number") {
-                    if (array_key_exists($field, $fnullable) && empty($value)) {
-                        // if field nullable and empty - pass NULL
-                        $fields[$field] = null;
-                    } else {
-                        $fields[$field] = floatval($value); // number - convert to number (if field empty or non-number - it will become 0)
-                    }
+            if (!array_key_exists($field, $showform_fields)) {
+                continue;
+            }
+
+            $def  = $showform_fields[$field];
+            $type = $def["type"];
+            if ($type == "autocomplete") {
+                $lookup_model   = $this->getModelWithRelated($def["lookup_model"]);
+                $field_value    = $item[$field . '_iname'] ?? ''; // autocomplete value is in "${field}_iname"
+                $is_added       = false;
+                $fields[$field] = $lookup_model->findOrAddByIname($field_value, $is_added);
+            } elseif ($type == "date_combo") {
+                $fields[$field] = FormUtils::dateForCombo($item, $field);
+            } elseif ($def['type'] == 'date_popup') {
+                $fields[$field] = DateUtils::Str2SQL($value); #convert date to sql format
+            } elseif ($type == "time") {
+                $fields[$field] = DateUtils::timestr2int($value); // ftime - convert from HH:MM to int (0-24h in seconds)
+            } elseif ($type == "number") {
+                if (array_key_exists($field, $fnullable) && empty($value)) {
+                    // if field nullable and empty - pass NULL
+                    $fields[$field] = null;
+                } else {
+                    $fields[$field] = floatval($value); // number - convert to number (if field empty or non-number - it will become 0)
                 }
             }
         }
-
     }
 
     /**
@@ -990,7 +1029,7 @@ class FwDynamicController extends FwController {
      * @param array $fields
      * @return void
      * @throws DBException
-     * @throws NoModelException
+     * @throws NoModelException|ApplicationException
      */
     protected function processSaveShowFormFieldsAfter(int $id, array $fields): void {
         $subtable_del = reqh("subtable_del");
@@ -998,27 +1037,64 @@ class FwDynamicController extends FwController {
         $fields_update = array();
 
         // for now we just look if we have att_links_edit field and update att links
-        $showform_fields = $this->_fieldsToHash($this->config["showform_fields"]);
+        $showform_fields = $this->_fieldsToHash($this->getConfigShowFormFieldsByTab("showform_fields"));
         foreach ($showform_fields as $def) {
-            $type = $def["type"];
+            $field = $def["field"] ?? '';
+            $type  = $def["type"] ?? '';
             if ($type == "att_links_edit") {
-                AttLinks::i()->updateJunctionByKeys($this->model->table_name, $id, reqh("att")); // TODO make att configurable
+                $att_post_param = "att";
+                if (isset($def["att_post_prefix"])) {
+                    $att_post_param = $def["att_post_prefix"];
+                }
+                // if PATCH - only update is post param is present (otherwise it will delete all records)
+                if ($this->isPatch() && is_null(req($att_post_param, null))) {
+                    continue;
+                }
+                AttLinks::i()->updateJunctionByKeys($this->model->table_name, $id, reqh($att_post_param));
+
+            } elseif ($type == "att_files_edit") {
+                // Prepare the record that Att::uploadMulti expects
+                $itemdb = [
+                    'fwentities_id' => FwEntities::i()->idByIcodeOrAdd($this->model->table_name),
+                    'item_id'       => $id,
+                ];
+                Att::i()->uploadMulti($itemdb);
+
             } elseif ($type == "multicb") {
+                if ($this->isPatch() && is_null(req($field . "_multi", null))) {
+                    continue;
+                }
                 if (empty($def["model"])) {
-                    $fields_update[$def["field"]] = FormUtils::multi2ids(reqh($def["field"] . "_multi")); // multiple checkboxes -> single comma-delimited field
+                    // multiple checkboxes -> non-junction model single comma-delimited field
+                    // if PATCH - only update is post param is present (otherwise it will delete all records)
+                    $fields_update[$field] = FormUtils::multi2ids(reqh($field . "_multi")); // multiple checkboxes -> single comma-delimited field
                 } else {
-                    if ($def["is_by_linked"]) {
+                    //junction model based
+                    // if PATCH - only update is post param is present (otherwise it will delete all records)
+
+                    if ($def["is_by_linked"] ?? false) {
                         //by linked id
-                        $this->getModelWithRelated($def["model"])->updateJunctionByLinkedId($id, reqh($def["field"] . "_multi")); // junction model
+                        $this->getModelWithRelated($def["model"])->updateJunctionByLinkedId($id, reqh($field . "_multi")); // junction model
                     } else {
                         //by main id
-                        $this->getModelWithRelated($def["model"])->updateJunctionByMainId($id, reqh($def["field"] . "_multi")); // junction model
+                        $this->getModelWithRelated($def["model"])->updateJunctionByMainId($id, reqh($field . "_multi")); // junction model
                     }
                 }
+
             } elseif ($type == "multicb_prio") {
-                $this->getModelWithRelated($def["model"])->updateJunctionByMainId($id, reqh($def["field"] . "_multi")); // junction model
+                // if PATCH - only update is post param is present (otherwise it will delete all records)
+                if ($this->isPatch() && is_null(req($field . "_multi", null))) {
+                    continue;
+                }
+                $this->getModelWithRelated($def["model"])->updateJunctionByMainId($id, reqh($field . "_multi")); // junction model
+
             } elseif ($type == "subtable_edit") {
                 //save subtable
+                // if PATCH - only update is post param is present (otherwise it will delete all records)
+                if ($this->isPatch() && is_null(req("item-" . $field, null))) {
+                    continue;
+                }
+
                 $model_name = $def["model"];
                 $sub_model  = $this->getModelWithRelated($model_name);
 
@@ -1026,16 +1102,16 @@ class FwDynamicController extends FwController {
                 $save_fields_checkboxes = $def["save_fields_checkboxes"];
 
                 //check if we delete specific row
-                $del_id = $subtable_del[$model_name] ?? '';
+                $del_id = $subtable_del[$field] ?? '';
 
                 //mark all related records as under update (status=1)
                 $sub_model->setUnderUpdateByMainId($id);
 
                 //update and add new rows
 
-                // row ids submitted as: item-<~model>[<~id>]
-                // input name format: item-<~model>#<~id>[field_name]
-                $hids = reqh("item-" . $model_name);
+                // row ids submitted as: item-<~field>[<~id>]
+                // input name format: item-<~field>#<~id>[field_name]
+                $hids = reqh("item-" . $field);
                 // sort hids.Keys, so numerical keys - first and keys staring with "new-" will be last
                 $sorted_keys = array_keys($hids);
                 usort($sorted_keys, function ($a, $b) {
@@ -1057,9 +1133,9 @@ class FwDynamicController extends FwController {
                         continue; //skip deleted row
                     }
 
-                    $row_item = reqh("item-" . $model_name . "#" . $row_id);
+                    $row_item = reqh("item-" . $field . "#" . $row_id);
                     $itemdb   = FormUtils::filter($row_item, $save_fields);
-                    FormUtils::filterCheckboxes($itemdb, $row_item, $save_fields_checkboxes);
+                    FormUtils::filterCheckboxes($itemdb, $row_item, $save_fields_checkboxes, $this->isPatch());
 
                     $itemdb[$junction_field_status] = FwModel::STATUS_ACTIVE; // mark new and updated existing rows as active
 
@@ -1085,7 +1161,6 @@ class FwDynamicController extends FwController {
      * @param FwModel|null $sub_model optional subtable model, if not passed def[model] will be used
      * @return int
      * @throws DBException
-     * @throws NoModelException
      */
     public function modelAddOrUpdateSubtableDynamic(int $main_id, string $row_id, array $fields, array $def, ?FwModel $sub_model = null): int {
         if ($sub_model === null) {

@@ -1,4 +1,10 @@
 <?php
+/*
+Password reset Controller
+
+Part of PHP osa framework  www.osalabs.com/osafw/php
+(c) 2009-2025 Oleg Savchuk www.osalabs.com
+*/
 
 class PasswordController extends FwController {
     const string route_default_action = '';
@@ -49,7 +55,7 @@ class PasswordController extends FwController {
     }
 
     public function Validate(int $id, array $item): void {
-        $result = $this->validateRequired($item, "login");
+        $result = $this->validateRequired($id, $item, "login");
 
         if ($result) {
             $user = $this->model->oneByEmail($item['login']);
