@@ -8,6 +8,11 @@ www/php/vendor/*
 doc/
 .idea/
 
+docs/agents/artifacts/*
+!docs/agents/artifacts/.gitkeep
+docs/agents/local/*
+!docs/agents/local/.gitkeep
+
 upload/*
 !upload/.gitkeep
 
