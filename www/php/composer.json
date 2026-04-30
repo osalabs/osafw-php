@@ -1,6 +1,7 @@
 {
     "require": {
         "phpmailer/phpmailer": "^6.9",
-        "google/apiclient": "^2.18"
+        "google/apiclient": "^2.18",
+        "aws/aws-sdk-php": "^3.340"
     }
 }
