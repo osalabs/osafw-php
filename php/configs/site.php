@@ -1,6 +1,6 @@
 <?php
 # config file for specific server
-# if you set settings here, they will override default settings from config.site.php
+# if you set settings here, they will override default settings from config.php
 
 date_default_timezone_set('UTC'); #required in PHP 5.3
 
@@ -10,8 +10,8 @@ $SITE_CONFIG = array(
     #'ROOT_DOMAIN'           => $FW_CONFIG['PROTO'].'://DOMAIN.com',        #full domain url with http or https, example: http://domain.com
     #'ROOT_URL'              => '',                                         #use only if site installed in subdirectory of domain like domain.com/sub_site, example: /sub_site
 
-    #'SITE_ROOT_OFFLINE'     => '/var/www/website',
-    #'SITE_ROOT'             => '/var/www/website/public_html',
+    #'SITE_ROOT_OFFLINE'     => dirname(__DIR__, 2),
+    #'SITE_ROOT'             => dirname(__DIR__, 2) . '/www',
 
     #'SUPPORT_EMAIL'         => 'support@website.com',
     #'FROM_EMAIL'            => 'noreply@website.com',

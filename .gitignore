@@ -2,15 +2,15 @@
 www/assets/lib/*
 !www/assets/lib/.gitkeep
 
-www/php/vendor/*
-!www/php/vendor/.gitkeep
+php/vendor/*
+!php/vendor/.gitkeep
 
 # Local public DB/admin consoles and backups must not be staged.
 www/ppm.php
 www/web.config.bak
 
 # Machine-local host configs must not be staged.
-www/php/configs/*.lo.php
+php/configs/*.lo.php
 
 doc/
 .idea/
@@ -22,9 +22,6 @@ docs/agents/local/*
 
 upload/*
 !upload/.gitkeep
-
-www/upload/*
-!www/upload/.gitkeep
 
 # Log files
 *.log

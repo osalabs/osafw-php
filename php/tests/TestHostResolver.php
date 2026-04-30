@@ -95,7 +95,7 @@ final class TestHostResolver {
     }
 
     private static function envFilePath(): string {
-        return dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . '.env.test.local';
+        return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . '.env.test.local';
     }
 
     private static function configsDir(): string {
@@ -195,7 +195,7 @@ final class TestHostResolver {
             '1. CLI hostname argument.',
             '2. OSAFW_TEST_HOST or OSAFW_CLI_HOST environment variable.',
             "3. {$envFile}.",
-            '4. Auto-detect from www/php/configs/ using localhost.php, osafw-php.lo.php, or lo-* local configs.',
+            '4. Auto-detect from php/configs/ using localhost.php, osafw-php.lo.php, or lo-* local configs.',
             '',
             'Create /.env.test.local with:',
             'OSAFW_TEST_HOST=localhost',

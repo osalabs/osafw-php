@@ -41,7 +41,7 @@ Set `base_url`, set the model, load config, and add explicit overrides only when
 The controller loads `config.json` from the template base directory:
 
 ```text
-www/template/admin/demosdynamic/config.json
+template/admin/demosdynamic/config.json
 ```
 
 That file is the main contract for list behavior, save fields, validation, show fields, showform fields, tabs, and custom rendering.
@@ -129,9 +129,9 @@ Common showform-field types:
 
 The shared markup lives under:
 
-- `www/template/common/form/show/`
-- `www/template/common/form/showform/`
-- `www/template/common/vue/`
+- `template/common/form/show/`
+- `template/common/form/showform/`
+- `template/common/vue/`
 
 ## Minimal Config Example
 

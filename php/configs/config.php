@@ -19,8 +19,9 @@ if (PHP_SAPI === 'cli') {
     }
 }
 ######### set all variables to defaults with detection of base dirs
-$site_root         = dirname(__FILE__, 3);# level up as we are under /configs dir
-$site_root_offline = dirname($site_root);
+$site_root_offline = dirname(__FILE__, 3); # repository root
+$site_root         = $site_root_offline . '/www'; # public web root
+$php_root          = $site_root_offline . '/php';
 
 #!note, these will be empty if script run from command line
 # X-forwarded are for the load balancer setup.
@@ -36,8 +37,9 @@ $root_url     = "";
 
 #global site config
 $FW_CONFIG = array(
-    'SITE_ROOT'         => $site_root,          #site root usually is parent of this file dir (inc)
-    'SITE_ROOT_OFFLINE' => $site_root_offline,  #offline dir usually is parent to site_root dir (www)
+    'SITE_ROOT'         => $site_root,          #public web root
+    'SITE_ROOT_OFFLINE' => $site_root_offline,  #repository/offline root
+    'PHP_ROOT'          => $php_root,           #framework PHP root
     'PROTO'             => $proto,
     'ROOT_DOMAIN0'      => $root_domain0,       #domain without proto, without port, example: domain.com
     'ROOT_DOMAIN'       => $root_domain,        #full domain url with http or https, example: http://domain.com
@@ -81,8 +83,9 @@ $FW_CONFIG = array(
     'UNLOGGED_DEFAULT_URL' => '/',
     'LOGGED_DEFAULT_URL'   => '/Main',
 
-    'SITE_TEMPLATES'        => $site_root . '/template',
-    'PUBLIC_UPLOAD_DIR'     => $site_root . '/upload',
+    'SITE_TEMPLATES'        => $site_root_offline . '/template',
+    'PUBLIC_UPLOAD_DIR'     => $site_root_offline . '/upload',
+    # only for explicitly public-mapped upload roots; default attachments use /Att/<id>
     'PUBLIC_UPLOAD_URL'     => $root_url . '/upload',
     'ASSETS_URL'            => $root_url . '/assets',
 

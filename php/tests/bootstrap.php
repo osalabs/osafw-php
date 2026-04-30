@@ -22,7 +22,7 @@ require_once __DIR__ . '/../fw/FwVueController.php';
 fw::initOffline(__FILE__);
 
 $fw      = fw::i();
-$logFile = dirname(__DIR__, 3) . '/logs/test.log';
+$logFile = dirname(__DIR__, 2) . '/logs/test.log';
 $fw->config->LOG_DESTINATION = $logFile;
 $fw->config->LOG_LEVEL       = 'DEBUG';
 

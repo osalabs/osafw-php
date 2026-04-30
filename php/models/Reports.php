@@ -139,7 +139,7 @@ class Reports extends FwModel {
 
                 } else {
                     ### if Dompdf
-                    require_once $this->fw->config->SITE_ROOT . '/php/dompdf/autoload.inc.php';
+                    require_once $this->fw->config->PHP_ROOT . '/dompdf/autoload.inc.php';
                     #use Dompdf\Dompdf;
                     $dompdf = new Dompdf\Dompdf();
                     $dompdf->loadHtml($html);
@@ -160,7 +160,7 @@ class Reports extends FwModel {
                 //
                 //                ini_set('display_errors', '0'); #disable "Strict Standards" errors in VsWord
                 //                error_reporting(0);
-                //                require_once $this->fw->config->SITE_ROOT . '/php/vsword/VsWord.php';
+                //                require_once $this->fw->config->PHP_ROOT . '/vsword/VsWord.php';
                 //                VsWord::autoLoad();
                 //
                 //                $html = $this->fw->parsePage($base_dir, $common_dir . '/docx.html', $ps);

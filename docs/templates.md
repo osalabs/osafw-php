@@ -1,6 +1,6 @@
 # Templates and ParsePage
 
-The framework renders HTML through ParsePage templates under `www/template/`. The template layer is intentionally lightweight: it handles composition, repetition, small conditionals, and output formatting. Business rules belong in controllers and models.
+The framework renders HTML through ParsePage templates under `template/`. The template layer is intentionally lightweight: it handles composition, repetition, small conditionals, and output formatting. Business rules belong in controllers and models.
 
 ## Mental Model
 
@@ -14,7 +14,7 @@ The framework renders HTML through ParsePage templates under `www/template/`. Th
 A standard admin screen usually looks like this:
 
 ```text
-www/template/admin/<screen>/
+template/admin/<screen>/
   config.json
   index/
     main.html
@@ -30,10 +30,10 @@ www/template/admin/<screen>/
 
 Shared building blocks live under:
 
-- `www/template/common/list/`
-- `www/template/common/form/`
-- `www/template/common/vue/`
-- `www/template/layout/`
+- `template/common/list/`
+- `template/common/form/`
+- `template/common/vue/`
+- `template/layout/`
 
 ## ParsePage Blocks
 
@@ -119,7 +119,7 @@ Truthiness matters: a non-empty string such as `"false"` still counts as true.
 
 ## Output Modifiers
 
-Common modifiers implemented in `www/php/fw/ParsePage.php` include:
+Common modifiers implemented in `php/fw/ParsePage.php` include:
 
 - `date`
 - `number_format`
@@ -154,14 +154,14 @@ Examples:
 
 These shared fragments are intended for reuse:
 
-- `www/template/common/list/form_list.html`
-- `www/template/common/list/thead.html`
-- `www/template/common/list/tbody.html`
-- `www/template/common/list/pagination.html`
-- `www/template/common/form/show/`
-- `www/template/common/form/showform/`
-- `www/template/common/form/tabs.html`
-- `www/template/common/vue/`
+- `template/common/list/form_list.html`
+- `template/common/list/thead.html`
+- `template/common/list/tbody.html`
+- `template/common/list/pagination.html`
+- `template/common/form/show/`
+- `template/common/form/showform/`
+- `template/common/form/tabs.html`
+- `template/common/vue/`
 
 Recent generic hooks:
 

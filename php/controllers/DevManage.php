@@ -81,7 +81,7 @@ class DevManageController extends FwController {
         }
 
         #copy DemoDicts.vb to model_name.vb
-        $path = $this->fw->config->SITE_ROOT . "/php/models";
+        $path = $this->fw->config->PHP_ROOT . "/models";
 
         #replace: DemoDicts => ModelName, demo_dicts => table_name
         $replacements = array(
@@ -112,7 +112,7 @@ class DevManageController extends FwController {
         }
 
         #copy DemoDicts.php to $model_name.php
-        $path    = $this->fw->config->SITE_ROOT . "/php/controllers";
+        $path    = $this->fw->config->PHP_ROOT . "/controllers";
         $path_to = $path;
 
         if ($controller_type == "vue") {
@@ -228,7 +228,7 @@ class DevManageController extends FwController {
     }
 
     public function LibManAction() {
-        $jsonPath = $this->fw->config->SITE_ROOT . '/php/libman.json';
+        $jsonPath = $this->fw->config->PHP_ROOT . '/libman.json';
         $rootPath = $this->fw->config->SITE_ROOT;
 
         rw("started libman install");
@@ -246,7 +246,7 @@ class DevManageController extends FwController {
         // get all controller classes from /php/controllers folder including subfolders
         // for each controller call IndexAction using fw->runController, check if it returns array (OK) or emtpty|null (warning)
 
-        $path        = $this->fw->config->SITE_ROOT . '/php/controllers';
+        $path        = $this->fw->config->PHP_ROOT . '/controllers';
         $controllers = array();
         $dir         = new RecursiveDirectoryIterator($path);
         $it          = new RecursiveIteratorIterator($dir);
@@ -303,7 +303,7 @@ class DevManageController extends FwController {
 
         $dirs = method_exists($this->fw, 'getAutoloadModelDirs')
             ? $this->fw->getAutoloadModelDirs()
-            : [$this->fw->config->SITE_ROOT . '/php/models'];
+            : [$this->fw->config->PHP_ROOT . '/models'];
 
         foreach ($dirs as $dir) {
             if (!is_dir($dir)) {
@@ -326,7 +326,7 @@ class DevManageController extends FwController {
 
     private function _controllers() {
         $result = array();
-        $dir    = $this->fw->config->SITE_ROOT . '/php/controllers';
+        $dir    = $this->fw->config->PHP_ROOT . '/controllers';
         $files  = scandir($dir);
         foreach ($files as $value) {
             if (!preg_match('/^(.+)\.php$/', $value, $m)) {

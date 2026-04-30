@@ -13,9 +13,9 @@
 
 - External application guide and reviewer guide, adapted without recording machine-local source paths.
 - Framework repository docs and code:
-  `README.md`, `db/README.md`, `www/php/composer.json`, `www/php/fw/FwModel.php`,
-  `www/php/fw/FwController.php`, `www/php/fw/FwAdminController.php`, `www/php/fw/FwApiController.php`,
-  `www/php/fw/fw.php`, `www/php/configs/config.php`, `www/php/controllers/v1/v1DemosApi.php`
+  `README.md`, `db/README.md`, `php/composer.json`, `php/fw/FwModel.php`,
+  `php/fw/FwController.php`, `php/fw/FwAdminController.php`, `php/fw/FwApiController.php`,
+  `php/fw/fw.php`, `php/configs/config.php`, `php/controllers/v1/v1DemosApi.php`
 
 ## Commands used / verification
 

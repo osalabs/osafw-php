@@ -228,7 +228,7 @@ class Att extends FwModel {
             } elseif ($item['storage'] == self::STORAGE_TABLE) {
                 return $this->getUrl($item['id'], $size); // don't have direct url for table storage
             } else {
-                return $this->getUploadUrl($item['id'], $item['ext'], $size);
+                return $this->getUrl($item['id'], $size);
             }
         } else {
             $id   = intval($id_or_item);

@@ -329,7 +329,7 @@ class fw {
 
     //autoload controller/model classes
     public function autoload(string $class_name): void {
-        // bdir points to "/www/php/fw" directory
+        // bdir points to "/php/fw" directory
         $bdir = __DIR__ . '/';
 
         // Decide if class is a controller
@@ -372,9 +372,9 @@ class fw {
             }
         }
 
-        // Also check fw core directory itself, then "/www/php"
-        $dirs[] = $bdir;         // "/www/php/fw"
-        $dirs[] = $bdir . '../'; // "/www/php"
+        // Also check fw core directory itself, then "/php"
+        $dirs[] = $bdir;         // "/php/fw"
+        $dirs[] = $bdir . '../'; // "/php"
 
         // Check if OS is Linux for case sensitivity checks
         // (store this in a property if you want to avoid checking on every autoload)

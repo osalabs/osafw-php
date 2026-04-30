@@ -1,6 +1,6 @@
 # Database Access
 
-This framework uses the `DB` wrapper in `www/php/fw/db.php` for MySQL access. The goal is straightforward data access: common CRUD operations are concise, advanced queries are still possible, and existing code can mix table-based helpers with raw SQL where that is clearer.
+This framework uses the `DB` wrapper in `php/fw/db.php` for MySQL access. The goal is straightforward data access: common CRUD operations are concise, advanced queries are still possible, and existing code can mix table-based helpers with raw SQL where that is clearer.
 
 ## Choosing the Layer
 

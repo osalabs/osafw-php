@@ -34,14 +34,14 @@ chdir($rootDir);
 
 $autoload = $phpDir . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 if (!is_file($autoload)) {
-    fwrite(STDERR, 'Composer dependencies are not installed. Run composer install from www/php with dev dependencies enabled.' . PHP_EOL);
+    fwrite(STDERR, 'Composer dependencies are not installed. Run composer install from php with dev dependencies enabled.' . PHP_EOL);
     exit(1);
 }
 
 require $autoload;
 
 if (!class_exists(PHPUnit\TextUI\Application::class)) {
-    fwrite(STDERR, 'PHPUnit is not installed. Run composer install from www/php with dev dependencies enabled.' . PHP_EOL);
+    fwrite(STDERR, 'PHPUnit is not installed. Run composer install from php with dev dependencies enabled.' . PHP_EOL);
     exit(1);
 }
 
