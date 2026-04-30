@@ -8,7 +8,8 @@ ALTER TABLE users
     MODIFY lname VARCHAR(127) NOT NULL DEFAULT '',
     MODIFY iname VARCHAR(255) AS (CONCAT(fname, ' ', lname));
 
-CREATE TABLE IF NOT EXISTS locks
+DROP TABLE IF EXISTS locks;
+CREATE TABLE locks
 (
     icode        VARCHAR(255) NOT NULL,
     environment VARCHAR(16)  NOT NULL DEFAULT '',
@@ -26,6 +27,3 @@ CREATE TABLE IF NOT EXISTS locks
 
     PRIMARY KEY (icode, environment, item_id)
 ) ENGINE = InnoDB;
-
-ALTER TABLE locks
-    ADD COLUMN IF NOT EXISTS upd_time DATETIME NULL ON UPDATE CURRENT_TIMESTAMP;

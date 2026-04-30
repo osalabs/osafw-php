@@ -25,40 +25,9 @@ class Locks extends FwModel {
         #$this->db = SiteUtils::connectDBHostQuick($this->fw); #this model works with Quick DB
     }
 
-    protected function lockTimeField(): string {
-        $schema = $this->schema();
-        $fields = array_column($schema, 'name');
-        if (in_array('upd_time', $fields, true)) {
-            return 'upd_time';
-        }
-        if (in_array('updated', $fields, true)) {
-            return 'updated';
-        }
-        return 'add_time';
-    }
-
-    protected function lockTimeSql(): string {
-        $schema = $this->schema();
-        $fields = array_column($schema, 'name');
-        $qadd = $this->db->qid('add_time');
-        $hasUpdTime = in_array('upd_time', $fields, true);
-        $hasUpdated = in_array('updated', $fields, true);
-
-        if ($hasUpdTime && $hasUpdated) {
-            return 'IFNULL(' . $this->db->qid('upd_time') . ', IFNULL(' . $this->db->qid('updated') . ', ' . $qadd . '))';
-        }
-        if ($hasUpdTime) {
-            return 'IFNULL(' . $this->db->qid('upd_time') . ', ' . $qadd . ')';
-        }
-        if ($hasUpdated) {
-            return 'IFNULL(' . $this->db->qid('updated') . ', ' . $qadd . ')';
-        }
-        return $qadd;
-    }
-
     #cleanup - auto-expire locks
     public function cleanup(): void {
-        $this->db->exec("delete from " . $this->qTable() . " where DATE_ADD(" . $this->lockTimeSql() . ", INTERVAL " . $this->db->qid('expires') . " SECOND)<NOW()");
+        $this->db->exec("delete from " . $this->qTable() . " where DATE_ADD(IFNULL(" . $this->db->qid('upd_time') . ", " . $this->db->qid('add_time') . "), INTERVAL " . $this->db->qid('expires') . " SECOND)<NOW()");
     }
 
     // check if lock exists
@@ -74,7 +43,7 @@ class Locks extends FwModel {
         ]);
         if ($row) {
             $expires         = $row['expires'] ?? 3600;
-            $upd_time        = $row['upd_time'] ?? $row['updated'] ?? $row['add_time'];
+            $upd_time        = $row['upd_time'] ?? $row['add_time'];
             $expiration_time = strtotime($upd_time) + $expires;
             return $expiration_time > time();
         }
@@ -163,12 +132,8 @@ class Locks extends FwModel {
         }
 
         try {
-            $time_field = $this->lockTimeField();
-            if ($time_field === 'add_time') {
-                return false;
-            }
             $rows_updated_ctr = $this->db->update($this->table_name, [
-                $time_field => DB::NOW()
+                'upd_time' => DB::NOW()
             ], [
                 'icode'       => $icode,
                 'environment' => $environment,
