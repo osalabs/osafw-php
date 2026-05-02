@@ -1,0 +1,2 @@
+<~has_lookup if="lookup_row" inline><p class="form-control-plaintext text-break"><a href="<~admin_url>/<~lookup_id>?return_url=<~GLOBAL[request_url] urlencode noescape>"><~value><~lookup_id unless="value" if="lookup_id"></a></p></~has_lookup>
+<~no_lookup unless="lookup_row" inline><p class="form-control-plaintext text-break"><~value><~lookup_id unless="value" if="lookup_id"></p></~no_lookup>

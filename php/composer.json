@@ -1,0 +1,15 @@
+{
+    "require": {
+        "phpmailer/phpmailer": "^6.9",
+        "google/apiclient": "^2.18"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.3"
+    },
+    "scripts": {
+        "test": "php tests/run-local-phpunit.php",
+        "test:unit": "php tests/run-local-phpunit.php --testsuite Unit",
+        "test:models": "php tests/run-local-phpunit.php --testsuite Models",
+        "test:controllers": "php tests/run-local-phpunit.php --testsuite Controllers"
+    }
+}

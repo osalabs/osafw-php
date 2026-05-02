@@ -23,8 +23,8 @@ Created as simplified and lightweight alternative to other PHP frameworks
 
 ### Development/Deployment
 
-1. put contents of `/www` into your webserver's public html folder
-2. edit `/www/php/config.site.php` (or `config.localhost.php` for development)
+1. point your web server document root to `www/`
+2. edit `php/configs/site.php` (or `php/configs/localhost.php` for development)
 3. create database from `/db/fwdatabase.sql`, `/db/lookups.sql` and others (if needed)
 4. open site in your browser and login with credentials as defined in fwdatabase.sql
 5. review log in `/logs/osafw.log`
@@ -35,14 +35,6 @@ Created as simplified and lightweight alternative to other PHP frameworks
 /db                  - initial fwdatabase.sql script and update sql scripts
 /logs/osafw.log      - application log (ensure to enable write rights to /logs dir for webserver)
 /www                 - application public root folder
-  /php               - all the PHP code is here
-    /controllers     - your controllers
-    /fw              - framework core libs
-    /models          - your models
-    /vendor          - composer libs
-    /config.*.php    - settings for db connection, mail, logging...
-  /template          - all the html templates
-  /upload            - upload dir for public files
   /assets            - your web frontend assets
     /css
     /fonts
@@ -50,6 +42,15 @@ Created as simplified and lightweight alternative to other PHP frameworks
     /js
   /favicon.ico       - change to your favicon!
   /robots.txt        - default robots.txt (empty)
+/php                 - PHP code outside the public web root
+  /controllers       - your controllers
+  /fw                - framework core libs
+  /models            - your models
+  /tools             - non-public developer/admin tools
+  /vendor            - composer libs
+  /configs           - settings for db connection, mail, logging...
+/template            - ParsePage templates outside the public web root
+/upload              - non-public attachment storage served through framework routes
 ```
 
 ### REST mappings
@@ -70,7 +71,7 @@ Controllers automatically directly mapped to URLs, so developer doesn't need to 
   case action name should be less than 32 characters
 
 For example `GET /Products` will call `ProductsController.IndexAction()`
-And this will cause rendering templates from `/www/template/products/index`
+And this will cause rendering templates from `template/products/index`
 
 ID can be numeric or 32-char string like UUID (without dashes)
 For example `GET /Products/123` will call `ProductsController.ShowAction(123)`
@@ -164,10 +165,10 @@ Most of the global settings defined in `config.*.php`. But there are several cac
 | hostname    | set from server variable HTTP_HOST                        | osalabs.com                                       |
 | ROOT_DOMAIN | protocol+hostname                                         | https://osalabs.com                               |
 | ROOT_URL    | part of the url if Application installed under sub-url    | /suburl if App installed under osalabs.com/suburl |
-| site_root   | physical application path to the root of public directory | C:\inetpub\somesite\www                           |
-| template    | physical path to the root of templates directory          | C:\inetpub\somesite\www\template                  |
-| log         | physical path to application log file                     | C:\inetpub\somesite\logs\osafw.log                |
-| tmp         | physical path to the system tmp directory                 | C:\Windows\Temp                                   |
+| site_root   | physical application path to the root of public directory | `www`                                             |
+| template    | physical path to the root of templates directory          | `template`                                        |
+| log         | physical path to application log file                     | `logs/osafw.log`                                  |
+| tmp         | physical path to the system tmp directory                 | system temp directory                             |
 
 ### config.json
 
@@ -323,9 +324,10 @@ Another debug functions that might be helpful are:
     - for example, if for a logged user you need to show detailed data and always skip list view - in the
       `IndexAction()` just use `fw.routeRedirect("ShowForm")`
 - uploads
-    - save all public-readable uploads under `/www/upload` (default, see "UPLOAD_DIR" in `config.*.php`)
-    - for non-public uploads use `/upload`
-    - or `S3` model and upload to the cloud
+    - save attachment files under `upload/` outside the public web root
+    - access default file/table attachments through `/Att/<id>` URLs
+    - set `PUBLIC_UPLOAD_URL` only when you intentionally expose a separate upload base through the web server
+    - or use `S3` model and upload to the cloud
 - put all validation code into controller's `Validate()`. See usage example in `AdminDemosController`
 - use `logger()` and review `/logs/osafw.log` if you stuck
     - make sure you have "LOG_LEVEL" set to "DEBUG" in your `config.*.php`
@@ -339,16 +341,16 @@ Another debug functions that might be helpful are:
 - base report model is `FwReports`, major methods (you may override in the specific report):
     - `getReportFilters()` - set data for the report filters
     - `getReportData()` - returns report data, usually based on some sql query (see Sample report)
-- `ReportSample` model (in `\www\php\models\Reports` folder) is a sample report implementation, that can be used as a
+- `ReportSample` model (in `php/models/Reports` folder) is a sample report implementation, that can be used as a
   template to build custom reports
 - basic steps to create a new report:
-    - copy `\www\php\models\Reports\Sample.php` to `\www\php\models\Reports\Cool.php` (to create Cool report)
+    - copy `php/models/Reports/Sample.php` to `php/models/Reports/Cool.php` (to create Cool report)
     - edit `Cool.php` and rename "Sample" to "Cool"
     - modify `getReportFilters()` to match your report filters
     - modify `getReportData()` to edit sql query and related post-processing
-    - copy templates folder `\www\template\reports\sample` to `\www\template\reports\cool`
+    - copy templates folder `template/reports/sample` to `template/reports/cool`
     - edit templates:
         - `title.html` - report title
         - `list_filter.html` - for filters
         - `report_html.html` - for report table/layout/appearance
-    - add link to a new report to `\www\template\reports\index\main.html`
+    - add link to a new report to `template/reports/index/main.html`

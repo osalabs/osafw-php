@@ -44,7 +44,7 @@ Check, in this order:
 
 ## Framework-Specific Checks
 
-- Core files under `www/php/fw/` must remain generic and must not depend on product-specific controllers, models, config
+- Core files under `php/fw/` must remain generic and must not depend on product-specific controllers, models, config
   keys, hosts, secrets, or data.
 - Preserve PHP 8.3+ compatibility. Typed class constants are already used; do not introduce syntax that raises the target
   version without documenting it.
@@ -54,13 +54,13 @@ Check, in this order:
   auth alternatives, and standard metadata field names.
 - For admin controllers, verify `model_name`, `base_url`, `required_fields`, `save_fields`, `list_sortdef`,
   `list_sortmap`, `search_fields`, and related templates/config remain aligned.
-- For dynamic controllers, verify `config.json` fields and templates under `www/template/<route>/` agree with controller
+- For dynamic controllers, verify `config.json` fields and templates under `template/<route>/` agree with controller
   expectations.
 - Keep business rules out of ParsePage templates. Templates should render data and small conditional fragments, not own
   model/query decisions.
 - When schema changes are present, verify the create-from-scratch SQL and `db/updates/` migration both changed.
-- Do not commit credentials or machine-specific host config under `www/php/configs/`.
-- Composer dependency changes should update `www/php/composer.json` and `www/php/composer.lock`. Treat vendor/generated
+- Do not commit credentials or machine-specific host config under `php/configs/`.
+- Composer dependency changes should update `php/composer.json` and `php/composer.lock`. Treat vendor/generated
   metadata changes skeptically unless the task intentionally refreshes tracked vendor output.
 - Do not run DB-backed checks in parallel against the same local database.
 
@@ -85,7 +85,7 @@ Use this shape:
 ## Findings
 
 ### High - API auth gate skipped on private action
-- Location: `www/php/controllers/v1/Example.php:42`
+- Location: `php/controllers/v1/Example.php:42`
 - Problem: ...
 - Impact: ...
 - Fix direction: ...

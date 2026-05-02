@@ -2,7 +2,7 @@
 
 ## What changed
 
-- Added a framework-specific `AGENTS.md` based on the useful workflow patterns from the application project, updated for
+- Added a framework-specific `AGENTS.md` based on useful workflow patterns from a downstream application, updated for
   this osafw-php repository.
 - Mirrored the same guidance to `.github/copilot-instructions.md`.
 - Added `docs/agents/code_reviewer.md` with framework-focused review priorities.
@@ -11,21 +11,18 @@
 
 ## Scope reviewed
 
-- Source application guide:
-  `C:\DOCS_PROJ\_my\planplango.com\backend.planplango.com\AGENTS.md`
-- Source reviewer guide:
-  `C:\DOCS_PROJ\_my\planplango.com\backend.planplango.com\docs\agents\code_reviewer.md`
+- External application guide and reviewer guide, adapted without recording machine-local source paths.
 - Framework repository docs and code:
-  `README.md`, `db/README.md`, `www/php/composer.json`, `www/php/fw/FwModel.php`,
-  `www/php/fw/FwController.php`, `www/php/fw/FwAdminController.php`, `www/php/fw/FwApiController.php`,
-  `www/php/fw/fw.php`, `www/php/configs/config.php`, `www/php/controllers/v1/v1DemosApi.php`
+  `README.md`, `db/README.md`, `php/composer.json`, `php/fw/FwModel.php`,
+  `php/fw/FwController.php`, `php/fw/FwAdminController.php`, `php/fw/FwApiController.php`,
+  `php/fw/fw.php`, `php/configs/config.php`, `php/controllers/v1/v1DemosApi.php`
 
 ## Commands used / verification
 
 - `rg --files`
-- `git -c safe.directory=C:/DOCS_PROJ/github/osafw-php status --short`
+- `git status --short`
 - `Compare-Object (Get-Content 'AGENTS.md') (Get-Content '.github\copilot-instructions.md')`
-- `rg -n "backend/php|PlanPlanGo|planplango|PPG|APP-|billing|destination|push" AGENTS.md docs .github`
+- Product-specific term scan across `AGENTS.md`, `docs/`, and `.github/`
 - `rg -n "code_revewer|code_reviewer" AGENTS.md docs .github`
 
 ## Decisions - why
@@ -33,14 +30,14 @@
 - Kept the task-summary, local-instructions, reviewer-loop, and agent-workspace workflow because those are useful for
   ongoing framework development.
 - Made sub-agent guidance conditional on runtime/user permission rather than absolute, so it fits newer agent constraints.
-- Removed product-specific observability, billing, push, destination, and PlanPlanGo domain rules from the framework guide.
+- Removed product-specific observability, billing, push, destination, and domain rules from the framework guide.
 - Used PHP 8.3+ as the documented framework target because the current core uses typed class constants.
 - Used the correct `code_reviewer.md` spelling from the source repository.
 
 ## Pitfalls - fixes
 
-- Git status initially failed because this checkout is considered dubious ownership for the current Windows user. Used
-  `git -c safe.directory=C:/DOCS_PROJ/github/osafw-php ...` for inspection instead of changing global config.
+- Git status initially failed because this checkout is considered dubious ownership for the current Windows user. Used a
+  local command override for inspection instead of changing global config.
 - The first large patch exceeded the Windows tool runner command length. Split file creation into smaller edits.
 
 ## Risks / follow-ups
