@@ -12,3 +12,7 @@ Use this file for dated lessons that are helpful but may become stale. Revisit e
   timezone.
 - 2026-08-09: Treat LibMan's successful exit as provisional because its default mode continues after package errors;
   scan warnings, verify declared files, and syntax-check downloaded JavaScript before accepting updated pins.
+- 2026-08-09: Load reviewer overlays only for triggered risks; a focused overlay can add specialist depth without
+  requiring another agent or a standing review panel.
+- 2026-08-09: Separate deterministic instruction-routing checks from full real-work evaluations. Require the latter before
+  claiming improved task success or broad efficiency, not for every small policy correction.

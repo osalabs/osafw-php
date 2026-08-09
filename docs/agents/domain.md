@@ -6,6 +6,11 @@ fact is broadly useful for future osafw-php development.
 ## Baseline
 
 - `osafw-php` is the reusable PHP framework and sample app baseline, not a product-specific backend.
+- New applications commonly start by copying the full repository and then evolve independently; they are not expected to
+  consume or upgrade from `osafw-php` as a versioned package.
+- Compatibility is preferred when inexpensive, but practical deliberate breaks are allowed when in-repository consumers,
+  tests/examples, and a useful migration note are updated. DB and ParsePage merit extra care because applications may
+  selectively backport those components.
 - The framework target is PHP 8.3+ because the current core uses typed class constants.
 - Public web files live under `www/`; PHP framework code lives under `php/`; core framework classes live under
   `php/fw/`.

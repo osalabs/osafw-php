@@ -1,124 +1,120 @@
-# Code Reviewer Agent Instructions
+# Integrating Code Review
 
-Use these instructions when reviewing a task that changed source code, schema, templates, scripts, tests, documentation
-that affects runtime behavior, or framework configuration in this repository.
+Use this file when independent review is required. Review the completed in-scope change as a skeptical maintainer,
+adjudicate any specialist overlays selected by `review-routing.md`, and return the sole deduplicated verdict. The reviewer
+does not edit unless explicitly asked to fix findings.
 
-The reviewer is an independent quality gate. Review the final changed code as a skeptical framework maintainer would:
-find production risks, compatibility breaks, missed requirements, brittle implementation choices, unnecessary complexity,
-and cleanup opportunities that matter before the work ships. Do not rewrite code unless the caller explicitly asks you to.
+When no independent reviewer is available, the implementing agent applies this checklist as self-review and states that
+the review was not independent.
 
-## Inputs
+## Handoff and setup
 
-- Read `AGENTS.md` and `docs/agents/local/instructions.md` first when the local file exists.
-- Read the active task summary under `docs/agents/tasks/` when the caller provides it or when it is obvious from the task.
-- Review the diff for the current task. Prefer `git status --short`, `git diff --stat`, `git diff -- <paths>`, and
-  targeted file reads. Include untracked task files by reading them directly because they do not appear in `git diff`
-  until staged.
-- Read nearby implementation, templates, schema, docs, and examples needed to understand the change. Avoid broad repo
-  sweeps unless the diff touches shared framework behavior.
+The handoff should provide:
 
-## Review Priorities
+- objective, acceptance criteria, important invariants, and repository role;
+- exact in-scope paths and deliberate exclusions;
+- baseline such as `HEAD`, a base commit, or a described before/after state;
+- task-summary path, or an explicit statement that none is required;
+- commands/checks already run with results and skips;
+- accepted, external, out-of-scope, or intentionally deferred residual risks;
+- selected specialist reports, if separate reviewers were used.
 
-Focus depth on issues that can cause wrong behavior, downstream compatibility breaks, security exposure, data corruption,
-broken contracts, hard-to-debug support load, or future maintenance traps.
+Recover an unambiguous missing item from task context and state the assumption. Do not infer scope from the entire dirty
+worktree. Read in-scope untracked files directly because a normal Git diff omits them.
 
-Check, in this order:
+Read `AGENTS.md`, the active task summary, the exact diff, and only the nearby implementation, tests, templates, schema,
+config, public docs, or history needed to verify the contract. Search `docs/agents/heuristics.md` for the changed
+subsystem rather than loading unrelated memory. Broaden for shared framework, persistence, security, or agent-workflow
+changes.
 
-1. Correctness: Does the change implement the requested behavior for the real framework flow? Look for missed branches,
-   stale assumptions, route/action mismatches, idempotency gaps, transaction mistakes, ordering/time bugs, and inconsistent
-   status handling.
-2. Compatibility: Does it preserve public framework contracts used by downstream apps: controller routes/actions, template
-   variables, dynamic `config.json` keys, model CRUD methods, DB helper semantics, API payload shapes, and config names?
-3. Data integrity: Are DB writes, migrations, defaults, nullable fields, foreign keys, JSON payloads, date/time handling,
-   cache invalidation, and rollback/idempotency safe?
-4. Security and privacy: Are auth/access levels, role checks, CSRF/XSS gates, API keys/JWT/session auth, upload handling,
-   path handling, secrets, logs, and PII exposure still correct?
-5. Project fit: Does the implementation follow osafw PHP patterns, model/controller boundaries, ParsePage conventions,
-   Bootstrap/template conventions, helper APIs, and local naming style?
-6. Simplicity: Flag shallow wrappers, unjustified defensive casts/defaults, duplicated logic, over-broad abstractions,
-   generated-file churn, and comments that describe obvious code instead of intent.
-7. Tests and verification: Are the right syntax checks, Composer validation, local DB/manual checks, or browser/API checks
-   present for the risk? Flag missing regression tests if a test harness exists for the touched area.
-8. Documentation sync: If the change touches routing, request flow, config, schema, dynamic CRUD, setup, or agent workflow,
-   verify relevant docs were updated or that the task summary explains why no doc update is needed.
+## Review priorities
 
-## Framework-Specific Checks
+Check in order and scale depth to risk:
 
-- Core files under `php/fw/` must remain generic and must not depend on product-specific controllers, models, config
-  keys, hosts, secrets, or data.
-- Preserve PHP 8.3+ compatibility. Typed class constants are already used; do not introduce syntax that raises the target
-  version without documenting it.
-- Controllers should return parse arrays. API controllers should return `['_json' => $payload]`; do not echo JSON or exit
-  directly except where existing low-level framework behavior requires it.
-- For API controllers, preserve `FwApiController` auth flow, OPTIONS handling, CORS/header behavior, JWT/API-key/session
-  auth alternatives, and standard metadata field names.
-- For admin controllers, verify `model_name`, `base_url`, `required_fields`, `save_fields`, `list_sortdef`,
-  `list_sortmap`, `search_fields`, and related templates/config remain aligned.
-- For dynamic controllers, verify `config.json` fields and templates under `template/<route>/` agree with controller
-  expectations.
-- Keep business rules out of ParsePage templates. Templates should render data and small conditional fragments, not own
-  model/query decisions.
-- When schema changes are present, verify the create-from-scratch SQL and `db/updates/` migration both changed.
-- Do not commit credentials or machine-specific host config under `php/configs/`.
-- Composer dependency changes should update `php/composer.json` and `php/composer.lock`. Treat vendor/generated
-  metadata changes skeptically unless the task intentionally refreshes tracked vendor output.
-- Do not run DB-backed checks in parallel against the same local database.
+1. **Correctness:** requested behavior, real control/data flow, sibling branches, state transitions, ordering/time,
+   idempotency, transactions, retries, and failure paths.
+2. **Contracts:** routes/actions, public/overridable methods, API/admin payloads, template variables, ParsePage, dynamic
+   config, DB helpers/schema, configuration, examples, and intentional compatibility decisions.
+3. **Data integrity:** writes, schema/update convergence, existing rows, defaults/nulls/FKs/indexes, JSON, cache,
+   filesystem effects, rollback, retry, and concurrency.
+4. **Security/privacy:** authentication, actor/object authorization, method/token gates, raw output, URLs/redirects,
+   uploads/paths, secrets, logs, public errors, and external-service boundaries.
+5. **Performance/scale:** repeated DB/remote/file/template work, large materialization, missing limits/projection,
+   cache isolation/staleness, and blocking calls on reachable repeated paths.
+6. **Project fit/simplicity:** correct framework-versus-derived-application role, controller/model/template boundaries,
+   existing helpers, avoidable wrappers/casts/defaults, duplication, and generated churn.
+7. **Verification:** behavior-level regression/negative evidence proportional to risk, including skipped or unavailable
+   checks. Do not demand production seams solely to test private implementation detail.
+8. **Documentation/memory:** public owner docs, migration notes, task-summary evidence, and promotion without duplicate or
+   stale instruction owners.
 
-## Report Format
+For docs/process-only work, focus on authority, concise routing, concrete failure modes, duplicate/stale rules, link/path
+accuracy, capability assumptions, portable public policy, and evidence that representative work improves. Reject
+wording-only churn without a specific failure mode or measured cost.
 
-Start with the verdict:
+Treat specialist reports as hypotheses. Confirm source location, reachability, impact, and counter-evidence; distinguish
+confirmed defects from environment-dependent risks. Prefer the smallest falsifying check over speculative breadth.
 
-- `No issues found.` when there are no blocking issues or improvement points worth another loop.
-- `Issues found.` when the implementation should be changed before the task closes.
+## Framework/application checks
 
-Then list findings in descending severity. Each finding must include:
+- In the framework baseline, `php/fw/` remains generic and sample code/docs/schema stay coherent. In a derived
+  application, do not reject an intentional product specialization merely because it is not reusable upstream.
+- PHP remains compatible with the repository's declared target (PHP 8.3+ in this baseline).
+- Controllers return arrays; API controllers use `_json`; auth, OPTIONS/CORS, standard metadata, and public error
+  boundaries remain correct where affected.
+- Dynamic controller defaults, `config.json`, list/search/sort fields, and templates agree.
+- ParsePage templates stay mostly presentational; raw output has an explicit safety boundary.
+- Schema changes pair fresh-install SQL with `db/updates/` and use disposable/serialized DB verification.
+- Composer changes align manifest/lock; tracked vendor/generated changes are intentional.
+- Credentials, host-local config, product payloads, DB dumps, and large logs are absent.
+- A practical breaking change may be correct, but its affected in-repository consumers, examples/tests, and migration
+  note must be complete.
 
-- Severity: `Blocker`, `High`, `Medium`, or `Low`.
-- Location: file path and tight line range when possible.
-- Problem: what is wrong.
-- Impact: what can happen in production, downstream apps, or maintenance.
-- Fix direction: the smallest practical correction.
+## Severity and loop decision
 
-Use this shape:
+- **Blocker:** likely security exposure, data corruption, destructive resource mistake, irreversible migration risk, or
+  unusable core flow.
+- **High:** likely important runtime bug, broken public/internal contract, missed authorization, or missing required
+  migration.
+- **Medium:** material edge-case bug, meaningful coverage gap, misleading operational/public documentation, or a
+  maintenance trap likely to cause wrong future changes.
+- **Low observation:** cleanup, naming, redundancy, minor documentation/test clarity, or optional hardening.
+
+Blocker, High, and Medium findings continue the review-fix loop. Low observations do not continue it by default. An open
+product/maintainer question blocks only when correctness depends on the answer.
+
+## Report format
+
+Start with exactly one verdict:
+
+- `Issues found. Review loop should continue.`
+- `No blocking issues. Review loop can stop.`
+
+Then use:
 
 ```md
 ## Findings
 
-### High - API auth gate skipped on private action
-- Location: `php/controllers/v1/Example.php:42`
-- Problem: ...
-- Impact: ...
-- Fix direction: ...
-```
+None.
 
-If there are no findings, still include:
+## Observations
 
-```md
+None.
+
 ## Verification Reviewed
 
-- Diff/files reviewed: ...
-- Tests reviewed or run: ...
-- Residual risk: ...
+- Scope and baseline: ...
+- Requirements/invariants: ...
+- Commands/evidence reviewed: ...
+
+## Tests Not Run
+
+- ...
+
+## Residual Risk
+
+- ...
 ```
 
-## Severity Guide
-
-- `Blocker`: likely security issue, data corruption, deploy breakage, irreversible migration risk, or a core framework
-  flow cannot work.
-- `High`: likely production bug in an important flow, broken public/admin/API contract, missed auth/access check, or
-  missing migration for code that writes data.
-- `Medium`: edge-case bug, missing meaningful verification for non-trivial logic, docs drift that can mislead downstream
-  developers, or avoidable maintenance risk.
-- `Low`: cleanup, naming, redundant casts/defaults, shallow wrappers, minor docs/test clarity, or small style issues worth
-  fixing while the context is loaded.
-
-## Operating Rules
-
-- Be specific and evidence-based. Do not speculate without naming the assumption and how to verify it.
-- Prefer fewer, higher-signal findings over a long checklist recital.
-- Do not report pure style preferences unless they hide real maintenance or correctness risk.
-- Do not ask the implementation agent to do broad rewrites when a targeted fix handles the risk.
-- If a finding may require framework ownership or compatibility judgment, mark it as an open question after findings
-  instead of inventing policy.
-- If earlier review-loop findings were already fixed, do not repeat them unless the fix is still incomplete.
-- Finish with either `Review loop should continue.` or `Review loop can stop.`
+Each finding includes severity, tight location, problem, impact, and smallest fix direction. Prefer a few evidence-backed
+findings over checklist recital; do not report pure style preferences or repeat resolved findings.

@@ -1,5 +1,8 @@
 # Glossary
 
+- `framework baseline` - this generic framework plus sample app, intended to seed new application repositories.
+- `derived application` - an independently evolving repository initially copied from the framework baseline; it is not
+  assumed to track or upgrade from this repository.
 - `FwController` - base controller for web/admin flows.
 - `FwAdminController` - standard list/form admin controller base.
 - `FwApiController` - API controller base with auth, CORS/header, and JSON response conventions.
