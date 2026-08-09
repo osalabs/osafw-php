@@ -97,11 +97,11 @@ class Users extends FwModel {
     }
 
     #return standard list of id,iname where status=0 order by iname
-    public function ilist(?array $statuses = null, ?array $def = null): array {
+    public function ilist(?array $statuses = null): array {
         if (is_null($statuses)) {
             $statuses = [FwModel::STATUS_ACTIVE];
         }
-        return parent::ilist($statuses, $def);
+        return parent::ilist($statuses);
     }
 
     public function ilistByACL(?int $min_acl = null): array {
@@ -321,7 +321,7 @@ class Users extends FwModel {
 
     //<editor-fold defaultstate="collapsed" desc="Login/Session">
 
-    public function doLogin(int $id, bool $is_remember = false): void {
+    public function doLogin(int $id): void {
         $is_just_registered = intval($_SESSION['is_just_registered'] ?? 0);
 
         @session_destroy();
@@ -336,13 +336,6 @@ class Users extends FwModel {
         session_write_close();
 
         $this->fw->logActivity(FwLogTypes::ICODE_USERS_LOGIN, FwEntities::ICODE_USERS, $id);
-
-        //set permanent login if requested
-        if ($is_remember) {
-            $this->createPermCookie($id);
-        } else {
-            $this->removePermCookie();
-        }
 
         $this->updateAfterLogin($id);
     }
@@ -413,16 +406,12 @@ class Users extends FwModel {
 
 
     private function permCookieName(): string {
-        if (empty($this->fw->config->PERM_COOKIE_ENV_SUFFIX)) {
+        $suffix = trim((string)($this->fw->config->PERM_COOKIE_ENV_SUFFIX ?? ''));
+        if ($suffix === '') {
             return self::$PERM_COOKIE_NAME;
         }
 
-        $environment = $this->fw->config->environment ?? $this->fw->config->ENVIRONMENT ?? '';
-        if (!$environment || $environment === 'production') {
-            return self::$PERM_COOKIE_NAME;
-        }
-
-        $suffix = preg_replace('/[^a-z0-9_-]/i', '', (string)$environment);
+        $suffix = preg_replace('/[^a-z0-9_-]/i', '', $suffix);
         if (!$suffix) {
             return self::$PERM_COOKIE_NAME;
         }
@@ -477,7 +466,7 @@ class Users extends FwModel {
             if ($u_id > 0) {
                 $result = true;
                 #logger("PERMANENT LOGIN");
-                $this->doLogin($u_id, true);
+                $this->doLogin($u_id);
             } else {
                 #cookie is not found in DB - clean it (so it will not put load on DB during next pages)
                 setcookie($cookie_name, FALSE, -1, "/", $this->permCookieDomain($root_domain0));

@@ -80,7 +80,12 @@ class LoginController extends FwController {
                 }
             }
 
-            $this->model->doLogin($user['id'], !empty($remember));
+            $this->model->doLogin($user['id']);
+            if (!empty($remember)) {
+                $this->model->createPermCookie($user['id']);
+            } else {
+                $this->model->removePermCookie();
+            }
 
             if ($gourl && !preg_match("/^http/i", $gourl)) { #if url set and not external url (hack!) given
                 fw::redirect($gourl);

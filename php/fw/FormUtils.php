@@ -542,10 +542,10 @@ class FormUtils {
             return ['', ''];
         }
 
-        $parts = Utils::split2(trim(self::AUTOCOMPLETE_SEPARATOR), $value);
-        return [
-            trim($parts[0]),
-            trim($parts[1]),
-        ];
+        if (!preg_match('/^(.*?)\s*:::\s*([0-9]+)$/s', $value, $matches)) {
+            return [$value, ''];
+        }
+
+        return [trim($matches[1]), $matches[2]];
     }
 }

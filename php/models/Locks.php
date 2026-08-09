@@ -36,19 +36,17 @@ class Locks extends FwModel {
             $environment = SiteUtils::getEnvironment();
         }
 
-        $row = $this->db->row($this->table_name, [
+        return (bool)$this->db->valuep("SELECT 1
+              FROM {$this->qTable()}
+             WHERE icode=@icode
+               AND environment=@environment
+               AND item_id=@item_id
+               AND DATE_ADD(IFNULL(upd_time, add_time), INTERVAL expires SECOND)>=NOW()
+             LIMIT 1", [
             'icode'       => $icode,
             'environment' => $environment,
-            'item_id'     => $item_id
+            'item_id'     => $item_id,
         ]);
-        if ($row) {
-            $expires         = $row['expires'] ?? 3600;
-            $upd_time        = $row['upd_time'] ?? $row['add_time'];
-            $expiration_time = strtotime($upd_time) + $expires;
-            return $expiration_time > time();
-        }
-
-        return false;
     }
 
     /**
@@ -60,8 +58,6 @@ class Locks extends FwModel {
      * @return boolean          true if lock obtained
      */
     public function lock(string $icode, int $item_id = 0, int $expires = 3600, ?string $environment = null): bool {
-        $result = false;
-
         if (empty($environment)) {
             $environment = SiteUtils::getEnvironment();
         }
@@ -78,14 +74,19 @@ class Locks extends FwModel {
         );
         try {
             $this->db->insert($this->table_name, $item);
-            $result = true;
+            return true;
         } catch (Exception $e) {
-            #if exception then insert failed - current lock exists or db error
-            #just launch cleanup before exit
-            $this->cleanup();
+            // An expired row can still occupy the unique key. Clean it and retry once.
+            try {
+                $this->cleanup();
+                $this->db->insert($this->table_name, $item);
+                return true;
+            } catch (Exception $retry_exception) {
+                logger('NOTICE', 'Locks lock failed', $retry_exception->getCode(), $retry_exception->getMessage());
+            }
         }
 
-        return $result;
+        return false;
     }
 
     /**

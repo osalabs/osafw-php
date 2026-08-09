@@ -56,7 +56,10 @@ class FwActivityLogs extends FwModel {
         if ($payload) {
             $payload_encoded = json_encode($payload);
             if ($payload_encoded !== false && strlen($payload_encoded) > self::PAYLOAD_MAX_BYTES) {
-                $payload_encoded = substr($payload_encoded, 0, self::PAYLOAD_MAX_BYTES - 14) . "... [truncated]";
+                $payload_encoded = json_encode([
+                    '_truncated'     => true,
+                    '_original_bytes' => strlen($payload_encoded),
+                ]);
             }
             $fields["payload"] = $payload_encoded === false ? '' : $payload_encoded;
         }

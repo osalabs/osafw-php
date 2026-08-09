@@ -345,15 +345,14 @@ class DateUtils {
      * Return time difference in minutes between two datetimes, always positive.
      */
     public static function differenceMinutes($from, $to): int {
-        if (!($from instanceof DateTime)) {
+        if (!($from instanceof DateTimeInterface)) {
             $from = new DateTime($from);
         }
-        if (!($to instanceof DateTime)) {
+        if (!($to instanceof DateTimeInterface)) {
             $to = new DateTime($to);
         }
 
-        $interval = $from->diff($to, true);
-        return $interval->y * 365 * 24 * 60 + $interval->m * 30 * 24 * 60 + $interval->d * 24 * 60 + $interval->h * 60 + $interval->i;
+        return intdiv(abs($to->getTimestamp() - $from->getTimestamp()), 60);
     }
 
     /**

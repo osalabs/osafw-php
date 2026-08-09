@@ -301,9 +301,7 @@ class DevManageController extends FwController {
     private function _models() {
         $result = [];
 
-        $dirs = method_exists($this->fw, 'getAutoloadModelDirs')
-            ? $this->fw->getAutoloadModelDirs()
-            : [$this->fw->config->PHP_ROOT . '/models'];
+        $dirs = $this->fw->getAutoloadModelDirs();
 
         foreach ($dirs as $dir) {
             if (!is_dir($dir)) {

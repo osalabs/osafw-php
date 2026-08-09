@@ -121,7 +121,14 @@ class Att extends FwModel {
 
         $ext      = UploadUtils::uploadExt($filename);
         $filepath = $this->getUploadPath($id, $ext, self::SIZE_ORIGINAL);
-        file_put_contents($filepath, $content);
+        $bytes_written = file_put_contents($filepath, $content);
+        if ($bytes_written === false || $bytes_written !== strlen($content)) {
+            if (is_file($filepath)) {
+                unlink($filepath);
+            }
+            parent::delete($id, true);
+            throw new ApplicationException('Unable to write attachment file');
+        }
 
         logger("uploaded to [" . $filepath . "]");
 
@@ -253,7 +260,7 @@ class Att extends FwModel {
             $item = $this->one($id);
             if ($item["storage"] == self::STORAGE_S3) {
                 //delete whole folder
-                S3::i()->deleteObject($this->table_name . "/" . $item["id"]);
+                S3::i()->deleteObject($this->table_name . "/" . $item["id"] . "/");
 
             } elseif ($item["storage"] == self::STORAGE_TABLE) {
                 // no need to clear raw fields as the whole record is deleted below
@@ -581,14 +588,26 @@ class Att extends FwModel {
             return true; # no need to move, all uploaded files initially already in file storage
         }
 
+        $original_path = $this->getUploadPath($id, $item["ext"], self::SIZE_ORIGINAL);
+        if (!is_file($original_path)) {
+            logger('ERROR', "Attachment source file not found [$original_path]");
+            return false;
+        }
+
         $fields = [
             'storage' => self::STORAGE_TABLE
         ];
         foreach (self::ALL_SIZES as $size) {
             $path = $this->getUploadPath($id, $item["ext"], $size);
-            if (file_exists($path)) {
+            if (is_file($path)) {
+                $content = file_get_contents($path);
+                if ($content === false) {
+                    logger('ERROR', "Unable to read attachment source file [$path]");
+                    return false;
+                }
+
                 $suffix                  = $size == self::SIZE_ORIGINAL ? "" : "_" . $size;
-                $fields["raw" . $suffix] = file_get_contents($path);
+                $fields["raw" . $suffix] = $content;
             }
         }
 
@@ -609,12 +628,18 @@ class Att extends FwModel {
         $result = true;
         $item   = $this->one($id);
 
+        $original_path = $this->getUploadImgPath($id, self::SIZE_ORIGINAL, $item["ext"]);
+        if (!is_file($original_path)) {
+            logger('ERROR', "Attachment source file not found [$original_path]");
+            return false;
+        }
+
         $S3 = S3::i();
         // upload all sizes if exists
         // id=47 -> /47/47 /47/47_s /47/47_m /47/47_l
         foreach (self::ALL_SIZES as $size) {
             $filepath = $this->getUploadImgPath($id, $size, $item["ext"]);
-            if (!file_exists($filepath)) {
+            if (!is_file($filepath)) {
                 continue;
             }
 

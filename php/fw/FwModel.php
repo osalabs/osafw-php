@@ -309,11 +309,10 @@ abstract class FwModel {
     /**
      * return standard list of id,iname for all non-deleted OR wtih specified statuses order by by getOrderBy
      * @param array|null $statuses
-     * @param array|null $def not used here, for compatibility with dynamic controllers
      * @return array<int, array<string, mixed>>
      * @throws DBException
      */
-    public function ilist(?array $statuses = null, ?array $def = null): array {
+    public function ilist(?array $statuses = null): array {
         $where = '1=1';
         if (strlen($this->field_status)) {
             if ($statuses && count($statuses) > 0) {
@@ -326,6 +325,14 @@ abstract class FwModel {
         $orderby = $this->field_iname > '' ? $this->db->qid($this->field_iname) : null;
 
         return $this->db->arrp("SELECT * from {$this->qTable()} WHERE $where ORDER BY $orderby");
+    }
+
+    /**
+     * Dynamic-controller extension point for lookup definitions without changing the public ilist() contract.
+     * Override this method when a model needs lookup behavior from $def.
+     */
+    public function ilistByDef(?array $statuses = null, ?array $def = null): array {
+        return $this->ilist($statuses);
     }
 
     /**
@@ -738,7 +745,7 @@ abstract class FwModel {
     public function listLinkedByMainId(int $main_id, ?array $def = null): array {
         $linked_rows = $this->listByMainId($main_id, $def);
 
-        $lookup_rows = $this->junction_model_linked->ilist(null, $def);
+        $lookup_rows = $this->junction_model_linked->ilistByDef(null, $def);
         foreach ($lookup_rows as $k => $row) {
             $lookup_rows[$k]['is_checked'] = false;
             $lookup_rows[$k]['_link']      = [];
@@ -774,7 +781,7 @@ abstract class FwModel {
     public function listMainByLinkedId(int $linked_id, ?array $def = null): array {
         $linked_rows = $this->listByLinkedId($linked_id, $def);
 
-        $lookup_rows = $this->junction_model_main->ilist(null, $def);
+        $lookup_rows = $this->junction_model_main->ilistByDef(null, $def);
         foreach ($lookup_rows as $k => $row) {
             $lookup_rows[$k]['is_checked'] = false;
             $lookup_rows[$k]['_link']      = [];
@@ -849,7 +856,7 @@ abstract class FwModel {
         if (!is_array($hsel_ids)) {
             $hsel_ids = explode(",", $hsel_ids);
         }
-        $rows = $this->setMultiListChecked($this->ilist(null, $def), $hsel_ids, $def);
+        $rows = $this->setMultiListChecked($this->ilistByDef(null, $def), $hsel_ids, $def);
         return $rows;
     }
 

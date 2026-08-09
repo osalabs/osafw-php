@@ -327,6 +327,31 @@ class fw {
         $this->db = new DB($this->config->DB);
     }
 
+    /**
+     * Return the configured model directories used by autoloading and developer tools.
+     */
+    public function getAutoloadModelDirs(): array {
+        $php_root   = rtrim((string)($this->config->PHP_ROOT ?? dirname(__DIR__)), '/\\');
+        $model_root = $php_root . '/models';
+        $dirs       = [$model_root];
+
+        foreach (($this->config->AUTOLOAD_MODELS ?? []) as $subfolder) {
+            $subfolder = str_replace('\\', '/', trim((string)$subfolder));
+            if ($subfolder === '' || !str_starts_with($subfolder, '/')) {
+                continue;
+            }
+
+            $segments = explode('/', trim($subfolder, '/'));
+            if (!$segments || array_filter($segments, static fn(string $segment): bool => $segment === '' || $segment === '.' || $segment === '..')) {
+                continue;
+            }
+
+            $dirs[] = $model_root . '/' . implode('/', $segments);
+        }
+
+        return array_values(array_unique($dirs));
+    }
+
     //autoload controller/model classes
     public function autoload(string $class_name): void {
         // bdir points to "/php/fw" directory
@@ -353,17 +378,8 @@ class fw {
             }
         } else {
             // For models
-            $dirs[] = $bdir . '../models/';
-            foreach (($this->config->AUTOLOAD_MODELS ?? []) as $subfolder) {
-                $subfolder = trim((string)$subfolder);
-                if ($subfolder === '' || !str_starts_with($subfolder, '/')) {
-                    continue;
-                }
-
-                $subfolder = trim($subfolder, '/');
-                if ($subfolder !== '') {
-                    $dirs[] = $bdir . '../models/' . $subfolder . '/';
-                }
+            foreach ($this->getAutoloadModelDirs() as $dir) {
+                $dirs[] = rtrim($dir, '/\\') . '/';
             }
 
             // If not a framework’s own model - remove the suffix
@@ -1439,10 +1455,13 @@ function getCallerInfo(): array {
         }
     }
 
-    // Remove site_root path for brevity
-    $siteRootLower = strtolower($CONFIG['SITE_ROOT'] ?? '');
-    $fileNameLower = strtolower($fileName);
-    $fileNameShort = str_replace($siteRootLower, '', $fileNameLower);
+    // Remove repository root for brevity, including framework files now outside the public root.
+    $fileNameShort = str_replace('\\', '/', strtolower($fileName));
+    $siteRoot      = $CONFIG['SITE_ROOT_OFFLINE'] ?? $CONFIG['SITE_ROOT'] ?? '';
+    $siteRoot      = rtrim(str_replace('\\', '/', strtolower((string)$siteRoot)), '/');
+    if ($siteRoot !== '' && ($fileNameShort === $siteRoot || str_starts_with($fileNameShort, $siteRoot . '/'))) {
+        $fileNameShort = substr($fileNameShort, strlen($siteRoot));
+    }
 
     return [$fileNameShort, $funcName, $line];
 }

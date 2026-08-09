@@ -15,3 +15,7 @@ fact is broadly useful for future osafw-php development.
 - Standalone developer/admin tools that should not be directly served live under `php/tools/` and must be exposed only
   through authenticated framework routes when needed.
 - Database bootstrap and migration SQL lives under `db/`.
+- `FwModel::ilist(?array $statuses = null)` is a downstream override contract; dynamic lookup definitions flow through
+  `ilistByDef()` so existing model subclasses remain loadable.
+- Configured model subfolders are resolved by `fw::getAutoloadModelDirs()` for both runtime autoloading and DevManage.
+- Lock expiry is evaluated by MySQL using `NOW()` because framework lock timestamps are timezone-naive `DATETIME` values.

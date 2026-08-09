@@ -160,19 +160,15 @@ class S3 extends FwModel {
             $max_age = $expires; //special case to match max_age to expires
         }
 
-        $cmd     = $this->client->getCommand('GetObject', [
-            'Bucket' => $this->bucket,
-            'Key'    => $this->root . $key,
+        // Response overrides must be part of the command before signing because they are included in SigV4.
+        $cmd = $this->client->getCommand('GetObject', [
+            'Bucket'               => $this->bucket,
+            'Key'                  => $this->root . $key,
+            'ResponseCacheControl' => 'private, max-age=' . $max_age . ', immutable',
         ]);
         $request = $this->client->createPresignedRequest($cmd, '+' . $expires . ' seconds');
 
-        //override cache control
-        //max age=31536000 with immuatable avoids send revalidation request from browser to resource https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching#avoiding_revalidation
-        $request = $request->withHeader('Cache-Control', 'private, max-age=' . $max_age . ', immutable');
-
-        $url = (string)$request->getUri();
-        $url .= (str_contains($url, '?') ? '&' : '?') . 'max-age=' . $max_age; // help CDN/browser cache heuristics
-        return $url;
+        return (string)$request->getUri();
     }
 
     /**

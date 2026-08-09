@@ -46,8 +46,9 @@ Most modules keep the defaults and only override what differs.
 | `idByIcode($icode)` | Resolve a numeric id from an external code |
 | `listByWhere($where, $orderBy = null, ...)` | Load rows by filters |
 | `listMulti($ids)` | Load many rows by ids |
-| `ilist(...)` | Read data shaped for select/dropdown lists |
-| `getCount($where = [])` | Count rows |
+| `ilist($statuses = null)` | Read data shaped for select/dropdown lists; keep this one-argument contract when overriding |
+| `ilistByDef($statuses = null, $def = null)` | Dynamic-lookup extension point when field configuration is needed |
+| `getCount($statuses = null, $sinceDays = null)` | Count rows by lifecycle status and optional age |
 
 `one()` and `oneByIcode()` use request-scoped caching, so repeated reads for the same row are cheap inside one request.
 

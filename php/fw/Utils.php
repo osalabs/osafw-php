@@ -921,8 +921,16 @@ class Utils {
             #if failed - just remove tmp file
             if ($tmp_file > '' && file_exists($tmp_file)) {
                 if ($result !== false) {
-                    rename($tmp_file, $to_file);
-                    $result = '';
+                    if (rename($tmp_file, $to_file)) {
+                        $result = '';
+                    } else {
+                        $curlinfo['error'] = 'Failed to finalize downloaded file';
+                        if ($report_errors) {
+                            logger('ERROR', 'CURL error: ' . $curlinfo['error']);
+                        }
+                        unlink($tmp_file);
+                        $result = false;
+                    }
                 } else {
                     unlink($tmp_file);
                 }
