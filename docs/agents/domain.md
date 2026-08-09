@@ -19,3 +19,5 @@ fact is broadly useful for future osafw-php development.
   `ilistByDef()` so existing model subclasses remain loadable.
 - Configured model subfolders are resolved by `fw::getAutoloadModelDirs()` for both runtime autoloading and DevManage.
 - Lock expiry is evaluated by MySQL using `NOW()` because framework lock timestamps are timezone-naive `DATETIME` values.
+- `FwApiController` uses the direct `firebase/php-jwt:^7.1` dependency for HS256 tokens; `JWT_SECRET` must contain at
+  least 32 bytes.

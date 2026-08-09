@@ -153,4 +153,27 @@ final class FrameworkBootstrapTest extends FrameworkTestCase {
             }
         }
     }
+
+    public function testJwtDependencySupportsFrameworkHs256Contract(): void {
+        $secret         = str_repeat('x', 32);
+        $now            = time();
+        $originalLeeway = Firebase\JWT\JWT::$leeway;
+
+        try {
+            Firebase\JWT\JWT::$leeway = 30;
+            $token = Firebase\JWT\JWT::encode([
+                'sub' => 'phpunit',
+                'iat' => $now,
+                'nbf' => $now - 1,
+                'exp' => $now + 60,
+            ], $secret, 'HS256');
+            $headers = new stdClass();
+            $payload = Firebase\JWT\JWT::decode($token, new Firebase\JWT\Key($secret, 'HS256'), $headers);
+
+            $this->assertSame('phpunit', $payload->sub);
+            $this->assertSame('HS256', $headers->alg);
+        } finally {
+            Firebase\JWT\JWT::$leeway = $originalLeeway;
+        }
+    }
 }

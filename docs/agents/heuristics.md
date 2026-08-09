@@ -10,3 +10,5 @@ Use this file for dated lessons that are helpful but may become stale. Revisit e
   compatibility; prefer a separate extension method when widening the parent signature would make legacy overrides fatal.
 - 2026-08-09: Compare timezone-naive database timestamps inside the database rather than parsing them with PHP's process
   timezone.
+- 2026-08-09: Treat LibMan's successful exit as provisional because its default mode continues after package errors;
+  scan warnings, verify declared files, and syntax-check downloaded JavaScript before accepting updated pins.

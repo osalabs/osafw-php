@@ -129,6 +129,7 @@ $FW_CONFIG = array(
     ),
 
     'IS_API'                 => null, #null - disable, true - only allow API controllers, false - only allow NON-API controllers (to enable same code deployment for API and NON-API)
+    'JWT_SECRET'             => '', #HS256 secret, define in site/local config; firebase/php-jwt 7 requires at least 32 bytes
     'PERM_COOKIE_ENV_SUFFIX' => '', #optional suffix for remember-me cookie names across shared domains
 
     #multilanguage support settings

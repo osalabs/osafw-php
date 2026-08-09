@@ -24,10 +24,12 @@ Created as simplified and lightweight alternative to other PHP frameworks
 ### Development/Deployment
 
 1. point your web server document root to `www/`
-2. edit `php/configs/site.php` (or `php/configs/localhost.php` for development)
-3. create database from `/db/fwdatabase.sql`, `/db/lookups.sql` and others (if needed)
-4. open site in your browser and login with credentials as defined in fwdatabase.sql
-5. review log in `/logs/osafw.log`
+2. run `composer install` from `php/`
+3. run `php bin/libman.php` from the repository root to install browser libraries
+4. edit `php/configs/site.php` (or `php/configs/localhost.php` for development)
+5. create database from `/db/fwdatabase.sql`, `/db/lookups.sql` and others (if needed)
+6. open site in your browser and login with credentials as defined in fwdatabase.sql
+7. review log in `/logs/osafw.log`
 
 ### Directory structure
 
@@ -159,6 +161,9 @@ The following controller fields used above can be defined in controller's `init(
 
 Application configuration available via `fw.config->[SettingName]`.
 Most of the global settings defined in `config.*.php`. But there are several caclulated settings:
+
+For HS256 JWT authentication, define `JWT_SECRET` in the site or local config as a cryptographically random secret of at
+least 32 bytes. `firebase/php-jwt` 7 rejects shorter secrets.
 
 | SettingName | Description                                               | Example                                           |
 |-------------|-----------------------------------------------------------|---------------------------------------------------|

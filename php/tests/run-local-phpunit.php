@@ -5,7 +5,7 @@ require_once __DIR__ . '/TestHostResolver.php';
 
 $testsDir = __DIR__;
 $phpDir   = dirname($testsDir);
-$rootDir  = dirname($phpDir, 2);
+$rootDir  = dirname($phpDir);
 
 $phpunitArgs = [
     __FILE__,

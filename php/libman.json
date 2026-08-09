@@ -4,7 +4,7 @@
   "defaultDestination": "assets/lib",
   "libraries": [
     {
-      "library": "bootstrap@5.3.3",
+      "library": "bootstrap@5.3.8",
       "destination": "assets/lib/bootstrap",
       "files": [
         "dist/css/bootstrap.min.css",
@@ -14,7 +14,7 @@
       ]
     },
     {
-      "library": "bootstrap-icons@1.11.3",
+      "library": "bootstrap-icons@1.13.1",
       "destination": "assets/lib/bootstrap-icons",
       "files": [
         "font/fonts/bootstrap-icons.woff2",
@@ -50,7 +50,7 @@
       ]
     },
     {
-      "library": "jquery-ui@1.14.1",
+      "library": "jquery-ui@1.14.2",
       "destination": "assets/lib/jquery-ui",
       "files": [
         "dist/jquery-ui.min.js"
@@ -81,14 +81,14 @@
       ]
     },
     {
-      "library": "turndown@7.2.0",
+      "library": "turndown@7.2.4",
       "destination": "assets/lib/turndown",
       "files": [
         "dist/turndown.js"
       ]
     },
     {
-      "library": "markdown-it@14.1.0",
+      "library": "markdown-it@14.3.0",
       "destination": "assets/lib/markdown-it",
       "files": [
         "dist/markdown-it.min.js"
@@ -137,7 +137,7 @@
       ]
     },
     {
-      "library": "markdown-it-attrs@4.2.0",
+      "library": "markdown-it-attrs@4.5.0",
       "destination": "assets/lib/markdown-it-attrs",
       "files": [
         "markdown-it-attrs.browser.js"
@@ -145,7 +145,7 @@
     },
 
     {
-      "library": "vue@3.5.13",
+      "library": "vue@3.5.41",
       "destination": "assets/lib/vue",
       "files": [
         "dist/vue.global.js",
@@ -155,15 +155,15 @@
       ]
     },
     {
-      "library": "@vue/devtools-api@7.6.8",
+      "library": "@vue/devtools-api@7.7.10",
       "destination": "assets/lib/vue-devtools-api"
     },
     {
-      "library": "@vue/devtools-kit@7.6.8",
+      "library": "@vue/devtools-kit@7.7.10",
       "destination": "assets/lib/vue-devtools-kit"
     },
     {
-      "library": "@vue/devtools-shared@7.6.8",
+      "library": "@vue/devtools-shared@7.7.10",
       "destination": "assets/lib/vue-devtools-shared"
     },
     {
@@ -181,7 +181,7 @@
       ]
     },
     {
-      "library": "birpc@0.2.19",
+      "library": "birpc@2.9.0",
       "destination": "assets/lib/birpc",
       "files": [
         "dist/index.mjs"
@@ -195,18 +195,24 @@
       ]
     },
     {
-      "library": "pinia@2.3.0",
+      "library": "pinia@2.3.1",
       "destination": "assets/lib/pinia",
       "files": [
         "dist/pinia.esm-browser.js"
       ]
     },
     {
-      "library": "mande@2.0.9",
+      "library": "mande@2.0.10",
       "destination": "assets/lib/mande",
       "files": [
-        "dist/mande.mjs",
-        "dist/mande.prod.mjs"
+        {
+          "src": "dist/index.mjs",
+          "to": "dist/mande.mjs"
+        },
+        {
+          "src": "dist/index.mjs",
+          "to": "dist/mande.prod.mjs"
+        }
       ]
     },
     {
@@ -218,7 +224,7 @@
       ]
     },
     {
-      "library": "vue-draggable-next@2.2.1",
+      "library": "vue-draggable-next@2.3.0",
       "destination": "assets/lib/vue-draggable-next",
       "files": [
         "dist/vue-draggable-next.esm-browser.js"
