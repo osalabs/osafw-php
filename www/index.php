@@ -1,6 +1,6 @@
 <?php
 
- require_once dirname(__FILE__)."/php/fw/fw.php";
+ require_once dirname(__DIR__)."/php/fw/fw.php";
 
  $ROUTES = array(
     '/Logoff' => '/Login/(Logoff)', //special case for Logoff

@@ -79,6 +79,27 @@ CREATE TABLE fwupdates
     UNIQUE INDEX UX_fwupdates_iname (iname)
 ) ENGINE = InnoDB;
 
+-- distributed lock manager
+DROP TABLE IF EXISTS locks;
+CREATE TABLE locks
+(
+    icode        VARCHAR(255) NOT NULL,            -- lock code
+    environment VARCHAR(16)  NOT NULL DEFAULT '', -- empty(production), staging, develop, local
+    item_id     INT UNSIGNED NOT NULL DEFAULT 0,  -- if >0, lock applies only to this id
+
+    host         VARCHAR(255) NOT NULL DEFAULT '',
+    script       VARCHAR(255) NOT NULL DEFAULT '',
+    pid          INT UNSIGNED NOT NULL DEFAULT 0,
+    expires      INT UNSIGNED NOT NULL DEFAULT 0, -- expiration in seconds
+
+    add_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    add_users_id INT UNSIGNED          DEFAULT 0,
+    upd_time     DATETIME     NULL ON UPDATE CURRENT_TIMESTAMP,
+    upd_users_id INT UNSIGNED          DEFAULT 0,
+
+    PRIMARY KEY (icode, environment, item_id)
+) ENGINE = InnoDB;
+
 -- upload categories
 DROP TABLE IF EXISTS att_categories;
 CREATE TABLE att_categories
@@ -110,7 +131,7 @@ CREATE TABLE att
     item_id           INT UNSIGNED,
 
     storage           TINYINT UNSIGNED                         DEFAULT 0,  -- 0 - table, 10 - local file (0/0/0/att_id.dat), 20 - s3 (see config: $S3Bucket/$S3Root/att/att_id)
-    -- raw file data, if storage=0, invisible so not used in regualr selects
+    -- raw file data, if storage=0, invisible so not used in regular selects
     raw               LONGBLOB INVISIBLE,
     raw_s             LONGBLOB INVISIBLE,                                  -- small thumbnail
     raw_m             LONGBLOB INVISIBLE,                                  -- medium thumbnail
@@ -167,9 +188,9 @@ CREATE TABLE users
     access_level     TINYINT                         NOT NULL,              -- 0 - visitor, 1 - usual user, 80 - moderator, 100 - admin
     is_readonly      TINYINT                         NOT NULL DEFAULT 0,    -- 1 if user is readonly
 
-    fname            VARCHAR(32)                     NOT NULL DEFAULT '',
-    lname            VARCHAR(32)                     NOT NULL DEFAULT '',
-    iname            VARCHAR(128) AS (CONCAT(fname, ' ', lname)),           -- calculated column
+    fname            VARCHAR(127)                    NOT NULL DEFAULT '',
+    lname            VARCHAR(127)                    NOT NULL DEFAULT '',
+    iname            VARCHAR(255) AS (CONCAT(fname, ' ', lname)),           -- calculated column
 
     title            VARCHAR(128)                    NOT NULL DEFAULT '',
 
@@ -340,7 +361,7 @@ CREATE TABLE activity_logs
     idate         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP, -- default now, but can be different
     users_id      INT UNSIGNED NULL,                               -- default logged user, but can be different if adding "on behalf of"
     idesc         TEXT,
-    payload       TEXT,                                            -- serialized/json - arbitrary payload
+    payload       LONGTEXT,                                        -- serialized/json - arbitrary payload
 
     status        TINYINT      NOT NULL DEFAULT 0,                 -- 0-active, 10-inactive/hidden, 20-draft, 127-deleted
     add_time      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

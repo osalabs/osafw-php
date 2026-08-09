@@ -83,13 +83,15 @@ data.
 - `db/updates/` - dated update scripts. Pair schema changes with a matching update script.
 - `www/` - public web root.
 - `www/index.php` - web entrypoint.
-- `www/php/` - PHP code, config, Composer metadata, framework core, controllers, models, hooks, and vendor files.
-- `www/php/fw/` - framework core (`fw`, dispatcher, controllers, model base, DB wrapper, ParsePage, utilities).
-- `www/php/controllers/` - sample/admin/app controllers built on the framework.
-- `www/php/controllers/v1/` - sample versioned API controllers.
-- `www/php/models/` - sample/admin models and shared framework models.
-- `www/php/configs/` - default and host-local config files. Never commit secrets.
-- `www/template/` - ParsePage templates and dynamic-controller `config.json` files.
+- `php/` - PHP code, config, Composer metadata, framework core, controllers, models, hooks, and vendor files.
+- `php/fw/` - framework core (`fw`, dispatcher, controllers, model base, DB wrapper, ParsePage, utilities).
+- `php/controllers/` - sample/admin/app controllers built on the framework.
+- `php/controllers/v1/` - sample versioned API controllers.
+- `php/models/` - sample/admin models and shared framework models.
+- `php/tools/` - non-public standalone developer/admin tools invoked through framework routes.
+- `php/configs/` - default and host-local config files. Never commit secrets.
+- `template/` - ParsePage templates and dynamic-controller `config.json` files.
+- `upload/` - default non-public attachment storage served through framework routes.
 - `www/assets/` - CSS, JavaScript, images, and optional downloaded frontend libraries.
 - `docs/agents/` - agent workflow notes, task summaries, reusable review instructions, and scratch-space conventions.
 - `.github/copilot-instructions.md` - mirror of this file for tools that read GitHub Copilot instructions.
@@ -117,7 +119,7 @@ data.
 
 ## Framework Development Rules
 
-- Core changes under `www/php/fw/` must be generic. Do not assume application-specific models, templates, routes, or
+- Core changes under `php/fw/` must be generic. Do not assume application-specific models, templates, routes, or
   config keys beyond the framework baseline.
 - Maintain backward compatibility for downstream apps when practical. If a change alters routing, controller contracts,
   model CRUD behavior, template variables, config names, DB wrapper semantics, or JSON shape, document the break and
@@ -130,9 +132,9 @@ data.
   and templates aligned. Check both controller defaults and template fragments.
 - For schema changes, update the create-from-scratch SQL (`db/fwdatabase.sql` or the relevant `db/*.sql`) and add a dated
   update under `db/updates/`.
-- Do not commit secrets or machine-only host config. Use local files under `www/php/configs/` for developer machines and
+- Do not commit secrets or machine-only host config. Use local files under `php/configs/` for developer machines and
   keep credentials out of docs and logs.
-- Composer dependency changes belong in `www/php/composer.json` and `www/php/composer.lock`. Do not manually edit generated
+- Composer dependency changes belong in `php/composer.json` and `php/composer.lock`. Do not manually edit generated
   vendor metadata unless the repository intentionally tracks that generated output for the task.
 - Keep downloaded frontend libraries under `www/assets/lib/`; this path is ignored except for `.gitkeep`.
 
@@ -159,26 +161,27 @@ data.
 
 ## Common Tasks
 
-- Add or adjust controllers under `www/php/controllers/` or `www/php/controllers/v1/`, then update matching templates or
+- Add or adjust controllers under `php/controllers/` or `php/controllers/v1/`, then update matching templates or
   API response handling.
-- Extend models under `www/php/models/` or generic model behavior in `www/php/fw/FwModel.php`.
-- Update dynamic CRUD by changing the controller defaults and `www/template/<route>/config.json` together.
-- Update ParsePage layouts/fragments under `www/template/`; keep template logic minimal.
+- Extend models under `php/models/` or generic model behavior in `php/fw/FwModel.php`.
+- Update dynamic CRUD by changing the controller defaults and `template/<route>/config.json` together.
+- Update ParsePage layouts/fragments under `template/`; keep template logic minimal.
 - Update database install/update scripts under `db/` and `db/updates/`.
-- Update Composer dependencies from `www/php/`.
+- Update Composer dependencies from `php/`.
 - Use `logger()` and the configured log destination for debugging instead of dumping output in production paths.
 
 ## Verification
 
 - Syntax-check changed PHP files:
-  - `php -l www/php/fw/FwModel.php`
-  - `php -l www/php/controllers/AdminDemos.php`
+  - `php -l php/fw/FwModel.php`
+  - `php -l php/controllers/AdminDemos.php`
 - Syntax-check all project PHP when a framework-wide change has broad risk:
-  - `Get-ChildItem -Path www/php -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }`
+  - `Get-ChildItem -Path php -Recurse -Filter *.php | Where-Object { $_.FullName -notmatch '\\vendor\\' } | ForEach-Object { php -l $_.FullName }`
 - Validate Composer metadata after dependency changes:
-  - `Push-Location www/php; composer validate --no-check-publish; Pop-Location`
-- There is no dedicated first-party PHPUnit suite in this repository at the time this guide was written. If tests are
-  added later, document the canonical commands here and in the task summary.
+  - `Push-Location php; composer validate --no-check-publish; Pop-Location`
+- Run the PHPUnit harness when the change affects test-covered framework behavior:
+  - `php php/tests/run-local-phpunit.php --testsuite Unit`
+  - `Push-Location php; composer test; Pop-Location`
 - For DB changes, bootstrap a local database using `db/README.md`, apply base SQL plus the new update, and manually check
   the affected controller/model flow.
 - For web/admin/template changes, exercise the relevant route in a browser when local config and DB are available.
@@ -186,9 +189,8 @@ data.
 
 ## Command Notes
 
-- The repository may be checked out under Windows with ownership that triggers Git's dubious-ownership protection. Use
-  `git -c safe.directory=C:/DOCS_PROJ/github/osafw-php <command>` for local inspection, or ask before changing global Git
-  config.
+- The repository may be checked out under Windows with ownership that triggers Git's dubious-ownership protection. Run
+  Git from the repository root and prefer a local command override for inspection, or ask before changing global Git config.
 - Do not revert unrelated dirty files. This repo may contain local config, generated vendor metadata, or developer changes
   unrelated to the current task.
 - Prefer `rg` / `rg --files` for searches. Use focused file reads before broad sweeps.
